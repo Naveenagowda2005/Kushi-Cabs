@@ -1,0 +1,65 @@
+-- ============================================================
+-- SEED SAMPLE DATA FOR TESTING
+-- ============================================================
+
+-- Insert sample vendor users
+INSERT INTO users (id, phone, full_name, role_id, is_active, email) VALUES
+  ('11111111-1111-1111-1111-111111111111', '+1234567890', 'ABC Taxi Company', 2, true, 'abc@taxi.com'),
+  ('22222222-2222-2222-2222-222222222222', '+1234567891', 'XYZ Transport', 2, true, 'xyz@transport.com'),
+  ('33333333-3333-3333-3333-333333333333', '+1234567892', 'City Cabs', 2, false, 'city@cabs.com')
+ON CONFLICT (id) DO NOTHING;
+
+-- Insert sample driver users  
+INSERT INTO users (id, phone, full_name, role_id, is_active, email) VALUES
+  ('44444444-4444-4444-4444-444444444444', '+1234567893', 'John Driver', 3, true, 'john@driver.com'),
+  ('55555555-5555-5555-5555-555555555555', '+1234567894', 'Mike Smith', 3, true, 'mike@driver.com'),
+  ('66666666-6666-6666-6666-666666666666', '+1234567895', 'Sarah Johnson', 3, false, 'sarah@driver.com'),
+  ('77777777-7777-7777-7777-777777777777', '+1234567896', 'David Wilson', 3, true, 'david@driver.com'),
+  ('88888888-8888-8888-8888-888888888888', '+1234567897', 'Lisa Brown', 3, true, 'lisa@driver.com')
+ON CONFLICT (id) DO NOTHING;
+
+-- Insert vendor profiles
+INSERT INTO vendors (user_id, company_name, commission_pct) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'ABC Taxi Company', 12.00),
+  ('22222222-2222-2222-2222-222222222222', 'XYZ Transport', 10.00),
+  ('33333333-3333-3333-3333-333333333333', 'City Cabs', 15.00)
+ON CONFLICT (user_id) DO NOTHING;
+
+-- Insert driver profiles
+INSERT INTO drivers (user_id, vendor_id, license_number, vehicle_number, is_available) VALUES
+  ('44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'DL123456789', 'MH01AB1234', true),
+  ('55555555-5555-5555-5555-555555555555', '11111111-1111-1111-1111-111111111111', 'DL987654321', 'MH01CD5678', true),
+  ('66666666-6666-6666-6666-666666666666', '22222222-2222-2222-2222-222222222222', 'DL456789123', 'MH01EF9012', false),
+  ('77777777-7777-7777-7777-777777777777', '22222222-2222-2222-2222-222222222222', 'DL789123456', 'MH01GH3456', true),
+  ('88888888-8888-8888-8888-888888888888', '33333333-3333-3333-3333-333333333333', 'DL321654987', 'MH01IJ7890', true)
+ON CONFLICT (user_id) DO NOTHING;
+
+-- Insert sample trips
+INSERT INTO trips (id, created_by, driver_id, vendor_id, pickup_location, dropoff_location, fare_amount, status, created_at, scheduled_at) VALUES
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'ef1477e2-56c8-49a3-b32e-6a6bfe2db4f5', '44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'Airport', 'City Center', 250.00, 'completed', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'ef1477e2-56c8-49a3-b32e-6a6bfe2db4f5', '55555555-5555-5555-5555-555555555555', '11111111-1111-1111-1111-111111111111', 'Mall', 'Railway Station', 180.00, 'completed', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day'),
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'ef1477e2-56c8-49a3-b32e-6a6bfe2db4f5', '77777777-7777-7777-7777-777777777777', '22222222-2222-2222-2222-222222222222', 'Hotel', 'Airport', 300.00, 'pending', NOW(), NOW() + INTERVAL '2 hours'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'ef1477e2-56c8-49a3-b32e-6a6bfe2db4f5', '88888888-8888-8888-8888-888888888888', '33333333-3333-3333-3333-333333333333', 'Office Complex', 'Residential Area', 150.00, 'in_progress', NOW() - INTERVAL '30 minutes', NOW() - INTERVAL '30 minutes')
+ON CONFLICT (id) DO NOTHING;
+
+-- Update wallet balances for sample data
+UPDATE wallets SET balance = 1250.00 WHERE user_id = '44444444-4444-4444-4444-444444444444';
+UPDATE wallets SET balance = 890.00 WHERE user_id = '55555555-5555-5555-5555-555555555555';
+UPDATE wallets SET balance = 2100.00 WHERE user_id = '66666666-6666-6666-6666-666666666666';
+UPDATE wallets SET balance = 1750.00 WHERE user_id = '77777777-7777-7777-7777-777777777777';
+UPDATE wallets SET balance = 950.00 WHERE user_id = '88888888-8888-8888-8888-888888888888';
+
+UPDATE wallets SET balance = 5000.00 WHERE user_id = '11111111-1111-1111-1111-111111111111';
+UPDATE wallets SET balance = 3500.00 WHERE user_id = '22222222-2222-2222-2222-222222222222';
+UPDATE wallets SET balance = 2800.00 WHERE user_id = '33333333-3333-3333-3333-333333333333';
+
+-- Insert sample transactions
+INSERT INTO transactions (wallet_id, trip_id, type, amount, description, created_at) 
+SELECT w.id, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'credit', 250.00, 'Trip earnings', NOW() - INTERVAL '2 days'
+FROM wallets w WHERE w.user_id = '44444444-4444-4444-4444-444444444444'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO transactions (wallet_id, trip_id, type, amount, description, created_at)
+SELECT w.id, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'credit', 180.00, 'Trip earnings', NOW() - INTERVAL '1 day'
+FROM wallets w WHERE w.user_id = '55555555-5555-5555-5555-555555555555'
+ON CONFLICT DO NOTHING;

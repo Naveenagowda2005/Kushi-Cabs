@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Kushi Cabs Unified",
+    "slug": "kushicabs-unified",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#001a33"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyAGZ5ps5kpMnfbDPox8kuN4IoWMSO0TeAY"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#001a33"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAGZ5ps5kpMnfbDPox8kuN4IoWMSO0TeAY"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Kushi Cabs to use your location for navigation and trip tracking.",
+          "locationWhenInUsePermission": "Allow Kushi Cabs to use your location for navigation."
+        }
+      ]
+    ],
+    "permissions": [
+      "LOCATION",
+      "CAMERA",
+      "MEDIA_LIBRARY"
+    ]
+  }
+}
