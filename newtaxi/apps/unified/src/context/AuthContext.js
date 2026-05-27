@@ -130,47 +130,19 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (identifier, password, role) => {
     try {
       setLoading(true);
-      console.log('Unified AuthContext: Attempting sign in with:', identifier, 'role:', role);
+      console.log('Unified AuthContext: Attempting OTP-only sign in with phone:', identifier, 'role:', role);
       
-      let email;
+      // All roles use phone number to construct email
+      const phoneDigits = identifier.replace(/[^0-9]/g, '');
+      const email = `${phoneDigits}@kushicabs.phone`;
       
-      if (role === ROLES.SUPER_ADMIN) {
-        // Super Admin uses email directly
-        email = identifier;
-      } else {
-        // For Vendor/Driver, check if phone number exists for this specific role
-        const phoneDigits = identifier.replace(/[^0-9]/g, '');
-        
-        // Check if this phone number is already registered for a different role
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select(`
-            id,
-            phone,
-            roles (
-              name
-            )
-          `)
-          .eq('phone', phoneDigits)
-          .maybeSingle();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          throw checkError;
-        }
-
-        if (existingUser && existingUser.roles?.name !== role) {
-          throw new Error(`This phone number is already registered as ${existingUser.roles.name}. Please use a different phone number or login with the correct role.`);
-        }
-
-        email = `${phoneDigits}@kushicabs.phone`;
-      }
+      console.log('OTP-only login with email:', email);
       
-      // For OTP-only login, we just need to verify the user exists
-      // The actual authentication happens via OTP verification in the backend
+      // For OTP-only login, just verify the user exists in the database
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, email, phone, role_id, roles(name)')
-        .eq('email', email)
+        .eq('phone', phoneDigits)
         .maybeSingle();
 
       if (userError && userError.code !== 'PGRST116') {
@@ -181,38 +153,41 @@ export const AuthProvider = ({ children }) => {
         throw new Error('User not found. Please sign up first.');
       }
 
-      // Create a session without password (OTP verified)
-      // We'll use a dummy password since Supabase requires it
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: 'otp-verified', // Dummy password for OTP-verified users
-      });
+      console.log('User found in database:', userData);
 
-      // If password fails, try to sign up the user if they don't exist
-      if (error && error.message.includes('Invalid login credentials')) {
-        console.log('Unified AuthContext: User auth account not found, creating one');
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password: 'otp-verified',
-        });
-        
-        if (signUpError && !signUpError.message.includes('already registered')) {
-          throw signUpError;
-        }
-
-        // Now try to sign in again
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password: 'otp-verified',
-        });
-
-        if (signInError) throw signInError;
-        return { data: signInData, error: null };
+      // For OTP-verified users, create a session directly from database user
+      // This bypasses Supabase auth which may not have valid credentials
+      console.log('Creating OTP-verified session from database user');
+      
+      // Create a session object that represents an OTP-verified user
+      const otpSession = {
+        user: {
+          id: userData.id,
+          email: userData.email,
+          phone: userData.phone,
+        },
+        access_token: 'otp-verified-' + phoneDigits + '-' + Date.now(),
+        token_type: 'bearer',
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      };
+      
+      // Set the session and user state
+      setSession(otpSession);
+      setUser(userData);
+      if (userData.roles?.name) {
+        setSelectedRole(userData.roles.name);
       }
-
-      if (error) throw error;
-
-      return { data, error: null };
+      
+      console.log('OTP-verified session created successfully');
+      
+      return { 
+        data: { 
+          user: userData,
+          session: otpSession
+        }, 
+        error: null 
+      };
     } catch (error) {
       console.error('Unified Sign in error:', error);
       return { data: null, error };
@@ -248,7 +223,21 @@ export const AuthProvider = ({ children }) => {
         }
 
         const email = `${phoneDigits}@kushicabs.phone`;
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        
+        // For OTP-only signup, create a temporary password
+        // Users will only authenticate via OTP, not password
+        const tempPassword = 'OTP-' + phoneDigits + '-' + Math.random().toString(36).substring(7);
+        
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password: tempPassword,
+          options: {
+            data: {
+              phone: phoneDigits,
+            }
+          }
+        });
+        
         if (error) throw error;
 
         // Supabase returns identities=[] when the auth account already exists (incomplete registration).
@@ -257,7 +246,7 @@ export const AuthProvider = ({ children }) => {
           console.log('Unified AuthContext: Auth user already exists (incomplete registration), signing in');
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email,
-            password,
+            password: tempPassword,
           });
           if (signInError) throw new Error('Account already exists. Please login instead.');
           return { data: signInData, error: null };

@@ -100,6 +100,7 @@ function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError,
 
         if (error) {
           console.error('Error creating signed URL:', error);
+          setSignedUrl(null);
           onError?.();
           setLoading(false);
           return;

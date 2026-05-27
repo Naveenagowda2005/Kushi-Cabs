@@ -16,15 +16,9 @@ export default function LoginScreen({ navigation }) {
   
   // Initialize form based on role
   const getInitialForm = () => {
-    if (selectedRole === ROLES.SUPER_ADMIN) {
-      return {
-        identifier: 'admin@newtaxi.com', // email for super admin
-      };
-    } else {
-      return {
-        identifier: '', // phone for vendor/driver
-      };
-    }
+    return {
+      identifier: '', // phone for all roles
+    };
   };
 
   // Start animations on mount
@@ -97,156 +91,84 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    // For Super Admin - show OTP field after email verification
-    if (selectedRole === ROLES.SUPER_ADMIN) {
-      if (!showOtpField) {
-        // Request OTP for admin
-        try {
-          console.log('Requesting OTP for admin:', form.identifier);
-          
-          // Admin phone number
-          const adminPhone = '9686314982';
-          
-          const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              to: adminPhone,
-              purpose: 'admin_login'
-            }),
-            timeout: 10000
-          });
-          
-          console.log('Admin OTP Response status:', response.status);
-          const data = await response.json();
-          console.log('Admin OTP Response data:', data);
-          
-          if (data.success || data.otpSent) {
-            setShowOtpField(true);
-            setOtpSent(true);
-            Alert.alert('OTP Sent', `OTP has been sent to your registered phone number`);
-          } else {
-            Alert.alert('Error', 'Failed to send OTP. Please try again.');
-          }
-        } catch (error) {
-          console.error('Admin OTP Request Error:', error);
-          Alert.alert('Network Error', 'Unable to connect to SMS service: ' + error.message);
-        }
-        return;
-      }
-      
-      // Verify OTP for admin
-      if (!otp.trim()) {
-        Alert.alert('Error', 'Please enter the OTP');
-        return;
-      }
-      
-      try {
-        console.log('Verifying admin OTP');
-        const adminPhone = '9686314982';
-        const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: adminPhone,
-            otp: otp
-          }),
-          timeout: 10000
-        });
-        
-        const data = await response.json();
-        console.log('Admin OTP Verify Response:', data);
-        
-        if (!data.verified) {
-          Alert.alert('Error', 'Invalid OTP. Please try again.');
-          return;
-        }
-      } catch (error) {
-        console.error('Admin OTP Verify Error:', error);
-        Alert.alert('Network Error', 'Unable to verify OTP: ' + error.message);
-        return;
-      }
+    // Validate phone for all roles (must be 10 digits)
+    if (form.identifier.length !== 10 || !/^\d{10}$/.test(form.identifier)) {
+      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      return;
     }
-
-    // Validate phone for vendor/driver (must be 10 digits)
-    if (selectedRole !== ROLES.SUPER_ADMIN) {
-      if (form.identifier.length !== 10 || !/^\d{10}$/.test(form.identifier)) {
-        Alert.alert('Error', 'Please enter a valid 10-digit phone number');
-        return;
-      }
-      
-      // For vendor/driver, show OTP field instead of direct login
-      if (!showOtpField) {
-        // Request OTP
-        try {
-          console.log('Requesting OTP for:', form.identifier);
-          console.log('Using API URL:', API_CONFIG.SMS_API_URL);
-          
-          const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              to: form.identifier,
-              purpose: 'login'
-            }),
-            timeout: 10000
-          });
-          
-          console.log('OTP Response status:', response.status);
-          const data = await response.json();
-          console.log('OTP Response data:', data);
-          
-          if (data.success || data.otpSent) {
-            setShowOtpField(true);
-            setOtpSent(true);
-            Alert.alert('OTP Sent', `OTP has been sent to ${form.identifier}`);
-          } else {
-            Alert.alert('Error', 'Failed to send OTP. Please try again.');
-          }
-        } catch (error) {
-          console.error('OTP Request Error:', error);
-          console.error('Error message:', error.message);
-          console.error('Error stack:', error.stack);
-          Alert.alert('Network Error', 'Unable to connect to SMS service. Make sure the backend is running.\n\nError: ' + error.message);
-        }
-        return;
-      }
-      
-      // Verify OTP
-      if (!otp.trim()) {
-        Alert.alert('Error', 'Please enter the OTP');
-        return;
-      }
-      
+    
+    // Show OTP field
+    if (!showOtpField) {
+      // Request OTP
       try {
-        console.log('Verifying OTP for:', form.identifier);
-        const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
+        console.log('Requesting OTP for:', form.identifier);
+        console.log('Using API URL:', API_CONFIG.SMS_API_URL);
+        
+        const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             to: form.identifier,
-            otp: otp
+            purpose: 'login'
           }),
           timeout: 10000
         });
         
+        console.log('OTP Response status:', response.status);
         const data = await response.json();
-        console.log('OTP Verify Response:', data);
+        console.log('OTP Response data:', data);
         
-        if (!data.verified) {
-          Alert.alert('Error', 'Invalid OTP. Please try again.');
-          return;
+        if (data.success || data.otpSent) {
+          setShowOtpField(true);
+          setOtpSent(true);
+          Alert.alert('OTP Sent', `OTP has been sent to ${form.identifier}`);
+        } else {
+          Alert.alert('Error', 'Failed to send OTP. Please try again.');
         }
       } catch (error) {
-        console.error('OTP Verify Error:', error);
-        Alert.alert('Network Error', 'Unable to verify OTP: ' + error.message);
+        console.error('OTP Request Error:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        Alert.alert('Network Error', 'Unable to connect to SMS service. Make sure the backend is running.\n\nError: ' + error.message);
+      }
+      return;
+    }
+    
+    // Verify OTP
+    if (!otp.trim()) {
+      Alert.alert('Error', 'Please enter the OTP');
+      return;
+    }
+    
+    try {
+      console.log('Verifying OTP for:', form.identifier);
+      const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: form.identifier,
+          otp: otp
+        }),
+        timeout: 10000
+      });
+      
+      const data = await response.json();
+      console.log('OTP Verify Response:', data);
+      
+      if (!data.verified) {
+        Alert.alert('Error', 'Invalid OTP. Please try again.');
         return;
       }
+    } catch (error) {
+      console.error('OTP Verify Error:', error);
+      Alert.alert('Network Error', 'Unable to verify OTP: ' + error.message);
+      return;
     }
 
-    console.log('Unified LoginScreen: Attempting login with role:', selectedRole, 'identifier:', form.identifier);
+    console.log('Unified LoginScreen: Attempting login with role:', selectedRole, 'phone:', form.identifier);
 
-    const { data, error } = await signIn(form.identifier, '', selectedRole);
+    const phoneDigits = form.identifier.replace(/[^0-9]/g, '');
+    const { data, error } = await signIn(phoneDigits, '', selectedRole);
     
     if (error) {
       console.error('Unified LoginScreen: Login failed:', error.message);
@@ -278,13 +200,13 @@ export default function LoginScreen({ navigation }) {
     switch (selectedRole) {
       case ROLES.SUPER_ADMIN:
         return {
-          title: 'Super Admin Login',
+          title: 'Admin Login',
           subtitle: 'System Administrator Access',
           icon: 'shield-checkmark',
           color: COLORS.superAdmin.primary,
-          showCredentials: true,
+          showCredentials: false,
           showSignUp: false,
-          inputLabel: 'Email Address',
+          inputLabel: 'Phone Number',
         };
       case ROLES.VENDOR:
         return {
@@ -395,7 +317,7 @@ export default function LoginScreen({ navigation }) {
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <Ionicons 
-              name={selectedRole === ROLES.SUPER_ADMIN ? "mail-outline" : "call-outline"} 
+              name="call-outline" 
               size={20} 
               color={COLORS.textSecondary} 
               style={styles.inputIcon} 
@@ -406,19 +328,14 @@ export default function LoginScreen({ navigation }) {
               placeholderTextColor={COLORS.textSecondary}
               value={form.identifier}
               onChangeText={(text) => {
-                if (selectedRole === ROLES.SUPER_ADMIN) {
-                  // Email for super admin - no restriction
-                  setForm(prev => ({ ...prev, identifier: text }));
-                } else {
-                  // Phone for vendor/driver - only 10 digits
-                  const digitsOnly = text.replace(/[^0-9]/g, '').slice(0, 10);
-                  setForm(prev => ({ ...prev, identifier: digitsOnly }));
-                }
+                // Phone for all roles - only 10 digits
+                const digitsOnly = text.replace(/[^0-9]/g, '').slice(0, 10);
+                setForm(prev => ({ ...prev, identifier: digitsOnly }));
               }}
-              keyboardType={selectedRole === ROLES.SUPER_ADMIN ? "email-address" : "phone-pad"}
+              keyboardType="phone-pad"
               autoCapitalize="none"
               autoCorrect={false}
-              maxLength={selectedRole === ROLES.SUPER_ADMIN ? 100 : 10}
+              maxLength={10}
               editable={!showOtpField}
             />
           </View>
