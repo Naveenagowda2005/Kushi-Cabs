@@ -21,6 +21,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
-app.listen(port, () => {
-  console.log(`Taxi SMS backend listening on http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Taxi SMS backend listening on http://0.0.0.0:${port}`);
+  console.log(`Access from phone at: http://192.168.1.114:${port}`);
 });

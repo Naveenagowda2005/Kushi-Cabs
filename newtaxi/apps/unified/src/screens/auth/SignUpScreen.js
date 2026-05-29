@@ -6,23 +6,23 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, ROLES } from '../../constants';
+import { COLORS, ROLES, API_CONFIG } from '../../constants';
 import { wp, hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
+import { glassStyles } from '../../styles/glassomorphism';
 
 export default function SignUpScreen({ navigation }) {
   const { signUp, loading, selectedRole } = useAuth();
   const [form, setForm] = useState({
     phone: '',
-    password: '',
-    confirmPassword: '',
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [showOtpField, setShowOtpField] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
 
   const handleSignUp = async () => {
-    if (!form.phone.trim() || !form.password.trim() || !form.confirmPassword.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!form.phone.trim()) {
+      Alert.alert('Error', 'Please enter your phone number');
       return;
     }
 
@@ -32,23 +32,104 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
-    if (form.password !== form.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    if (form.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-
     if (!agreed) {
       Alert.alert('Terms Required', 'Please accept the Terms & Conditions and Cancellation Policy to continue.');
       return;
     }
 
-    // For vendor and driver, use phone-based signup
-    const { data, error } = await signUp(form.phone, form.password);
+    // Show OTP field
+    if (!showOtpField) {
+      // Request OTP
+      try {
+        console.log('Requesting OTP for new signup:', form.phone);
+        
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
+        const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: form.phone,
+            purpose: 'signup'
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        console.log('OTP Response:', data);
+        
+        if (data.success || data.otpSent) {
+          setShowOtpField(true);
+          setOtpSent(true);
+          Alert.alert('OTP Sent', `OTP has been sent to ${form.phone}`);
+        } else {
+          Alert.alert('Error', 'Failed to send OTP. Please try again.');
+        }
+      } catch (error) {
+        console.error('OTP Request Error:', error);
+        
+        if (error.name === 'AbortError') {
+          Alert.alert('Timeout', 'Request timed out. Please check your connection and try again.');
+        } else {
+          Alert.alert('Network Error', 'Unable to connect to SMS service.\n\nError: ' + error.message);
+        }
+      }
+      return;
+    }
+    
+    // Verify OTP
+    if (!otp.trim()) {
+      Alert.alert('Error', 'Please enter the OTP');
+      return;
+    }
+    
+    try {
+      console.log('Verifying OTP for signup:', form.phone);
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: form.phone,
+          otp: otp
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const data = await response.json();
+      console.log('OTP Verify Response:', data);
+      
+      if (!data.verified) {
+        Alert.alert('Error', 'Invalid OTP. Please try again.');
+        return;
+      }
+    } catch (error) {
+      console.error('OTP Verify Error:', error);
+      
+      if (error.name === 'AbortError') {
+        Alert.alert('Timeout', 'Verification request timed out. Please try again.');
+      } else {
+        Alert.alert('Network Error', 'Unable to verify OTP: ' + error.message);
+      }
+      return;
+    }
+
+    // OTP verified - create account
+    console.log('OTP verified, creating account for:', form.phone);
+    
+    // For vendor and driver, use phone-based signup with temporary password
+    const tempPassword = 'OTP-' + form.phone + '-' + Math.random().toString(36).substring(7);
+    const { data, error } = await signUp(form.phone, tempPassword, selectedRole);
     
     if (error) {
       Alert.alert('Sign Up Failed', error.message);
@@ -61,6 +142,51 @@ export default function SignUpScreen({ navigation }) {
 
   const handleLogin = () => {
     navigation.navigate('Login');
+  };
+
+  const handleResendOtp = async () => {
+    if (!form.phone.trim()) {
+      Alert.alert('Error', 'Please enter phone number');
+      return;
+    }
+
+    try {
+      console.log('Resending OTP for signup:', form.phone);
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: form.phone,
+          purpose: 'signup'
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const data = await response.json();
+      console.log('Resend OTP Response:', data);
+      
+      if (data.success || data.otpSent) {
+        setOtp(''); // Clear previous OTP
+        Alert.alert('OTP Resent', `New OTP has been sent to ${form.phone}`);
+      } else {
+        Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('Resend OTP Error:', error);
+      
+      if (error.name === 'AbortError') {
+        Alert.alert('Timeout', 'Request timed out. Please check your connection and try again.');
+      } else {
+        Alert.alert('Network Error', 'Unable to resend OTP: ' + error.message);
+      }
+    }
   };
 
   const getRoleConfig = () => {
@@ -104,7 +230,7 @@ export default function SignUpScreen({ navigation }) {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <View style={[styles.iconContainer, { backgroundColor: roleConfig.color + '15' }]}>
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(147, 51, 234, 0.1)' }]}>
             <Ionicons name={roleConfig.icon} size={40} color={roleConfig.color} />
           </View>
           <Text style={[styles.title, { color: roleConfig.color }]}>{roleConfig.title}</Text>
@@ -131,52 +257,47 @@ export default function SignUpScreen({ navigation }) {
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={10}
+              editable={!showOtpField}
             />
           </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Password"
-              placeholderTextColor={COLORS.textSecondary}
-              value={form.password}
-              onChangeText={(text) => setForm(prev => ({ ...prev, password: text }))}
-              secureTextEntry={!showPassword}
-            />
-            <TouchableOpacity
-              style={styles.eyeButton}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+          {showOtpField && (
+            <View style={[styles.otpContainer, { borderColor: roleConfig.color }]}>
+              <View style={styles.otpHeader}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={roleConfig.color} />
+                <Text style={[styles.otpTitle, { color: roleConfig.color }]}>Verify with OTP</Text>
+              </View>
+              <Text style={styles.otpSubtitle}>
+                Enter the 6-digit code sent to {form.phone}
+              </Text>
+              
+              <View style={styles.inputContainer}>
+                <Ionicons name="key-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor={COLORS.textSecondary}
+                  value={otp}
+                  onChangeText={(text) => {
+                    const digitsOnly = text.replace(/[^0-9]/g, '').slice(0, 6);
+                    setOtp(digitsOnly);
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  textAlign="center"
+                  autoFocus
+                />
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Confirm Password"
-              placeholderTextColor={COLORS.textSecondary}
-              value={form.confirmPassword}
-              onChangeText={(text) => setForm(prev => ({ ...prev, confirmPassword: text }))}
-              secureTextEntry={!showConfirmPassword}
-            />
-            <TouchableOpacity
-              style={styles.eyeButton}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+              {otpSent && (
+                <TouchableOpacity style={styles.resendOtpButton} onPress={handleResendOtp}>
+                  <Text style={[styles.resendOtpText, { color: roleConfig.color }]}>
+                    Resend OTP
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           <TouchableOpacity
             style={[
@@ -190,9 +311,26 @@ export default function SignUpScreen({ navigation }) {
             {loading ? (
               <ActivityIndicator color={COLORS.textLight} />
             ) : (
-              <Text style={styles.signUpButtonText}>Create Account</Text>
+              <Text style={styles.signUpButtonText}>
+                {showOtpField ? 'Verify & Create Account' : 'Send OTP'}
+              </Text>
             )}
           </TouchableOpacity>
+
+          {showOtpField && (
+            <TouchableOpacity
+              style={styles.backToPhoneButton}
+              onPress={() => {
+                setShowOtpField(false);
+                setOtp('');
+                setOtpSent(false);
+              }}
+            >
+              <Text style={[styles.backToPhoneText, { color: roleConfig.color }]}>
+                Back to Phone Number
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.termsRow}>
             <TouchableOpacity style={styles.checkbox} onPress={() => setAgreed(prev => !prev)}>
@@ -203,6 +341,8 @@ export default function SignUpScreen({ navigation }) {
               <Text style={[styles.link, { color: roleConfig.color }]} onPress={() => navigation.navigate('Terms')}>Terms & Conditions</Text>
               {' '}and{' '}
               <Text style={[styles.link, { color: roleConfig.color }]} onPress={() => navigation.navigate('CancellationPolicy')}>Cancellation Policy</Text>
+              {' '}and{' '}
+              <Text style={[styles.link, { color: roleConfig.color }]} onPress={() => navigation.navigate('PrivacyPolicy')}>Privacy Policy</Text>
             </Text>
           </View>
         </View>
@@ -265,12 +405,9 @@ const styles = StyleSheet.create({
     marginBottom: hp(3),
   },
   inputContainer: {
+    ...glassStyles.input,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     marginBottom: 16,
     paddingHorizontal: 16,
     minHeight: 56,
@@ -284,11 +421,46 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     paddingVertical: 16,
   },
-  eyeButton: {
-    padding: 8,
+  otpContainer: {
+    ...glassStyles.cardActive,
+    borderLeftWidth: 4,
+    marginBottom: 16,
+  },
+  otpHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  otpTitle: {
+    fontSize: getResponsiveFontSize(16),
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  otpSubtitle: {
+    fontSize: getResponsiveFontSize(12),
+    color: COLORS.textSecondary,
+    marginBottom: 16,
+  },
+  resendOtpButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginTop: 12,
+  },
+  resendOtpText: {
+    fontSize: getResponsiveFontSize(12),
+    fontWeight: '600',
+  },
+  backToPhoneButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  backToPhoneText: {
+    fontSize: getResponsiveFontSize(14),
+    fontWeight: '600',
   },
   signUpButton: {
-    borderRadius: 12,
+    ...glassStyles.button,
     paddingVertical: 18,
     alignItems: 'center',
     marginTop: 8,
@@ -299,7 +471,7 @@ const styles = StyleSheet.create({
   signUpButtonText: {
     fontSize: getResponsiveFontSize(18),
     fontWeight: '600',
-    color: COLORS.textLight,
+    color: COLORS.text,
   },
   footer: {
     flexDirection: 'row',

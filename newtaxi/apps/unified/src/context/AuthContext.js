@@ -23,38 +23,57 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log('Unified AuthContext: Getting initial session...');
     
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Unified AuthContext: Initial session:', !!session);
-      setSession(session);
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      } else {
-        setSelectedRole(null);
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Unified AuthContext: Auth state change:', event, !!session);
-        setSession(session);
+    const initAuth = async () => {
+      try {
+        // Get initial session
+        const { data: { session }, error } = await supabase.auth.getSession();
         
+        if (error) {
+          console.error('Unified AuthContext: Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('Unified AuthContext: Initial session:', !!session);
+        setSession(session);
         if (session?.user) {
-          // Skip TOKEN_REFRESHED if we already have user data — avoids duplicate fetches
-          if (event === 'TOKEN_REFRESHED' && fetchingRef.current) return;
           await fetchUserProfile(session.user.id);
         } else {
-          console.log('Unified AuthContext: No session, clearing user and role');
-          setUser(null);
           setSelectedRole(null);
           setLoading(false);
         }
+      } catch (err) {
+        console.error('Unified AuthContext: Exception getting session:', err);
+        setLoading(false);
       }
-    );
+    };
+    
+    initAuth();
 
-    return () => subscription.unsubscribe();
+    // Listen for auth changes
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          console.log('Unified AuthContext: Auth state change:', event, !!session);
+          setSession(session);
+          
+          if (session?.user) {
+            // Skip TOKEN_REFRESHED if we already have user data — avoids duplicate fetches
+            if (event === 'TOKEN_REFRESHED' && fetchingRef.current) return;
+            await fetchUserProfile(session.user.id);
+          } else {
+            console.log('Unified AuthContext: No session, clearing user and role');
+            setUser(null);
+            setSelectedRole(null);
+            setLoading(false);
+          }
+        }
+      );
+
+      return () => subscription?.unsubscribe();
+    } catch (err) {
+      console.error('Unified AuthContext: Error setting up auth listener:', err);
+    }
   }, []);
 
   const fetchUserProfile = async (userId) => {
@@ -92,6 +111,7 @@ export const AuthProvider = ({ children }) => {
       if (error) {
         console.error('Unified Error fetching user profile:', error);
         setUser(null);
+        setLoading(false);
       } else if (data) {
         console.log('Unified setting user profile:', data);
         setUser(data);
@@ -100,10 +120,12 @@ export const AuthProvider = ({ children }) => {
           console.log('Unified auto-selecting role:', data.roles.name);
           setSelectedRole(data.roles.name);
         }
+        setLoading(false);
       } else {
         console.log('Unified: No user profile found for authenticated user ID:', userId);
         console.log('Unified: User needs to complete registration');
         setUser(null);
+        setLoading(false);
         // Don't sign out - let them complete registration
         // The RootNavigator will handle showing the appropriate screen
       }
@@ -114,7 +136,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setLoading(false);
     } finally {
-      setLoading(false);
+      fetchingRef.current = false;
     }
   };
 

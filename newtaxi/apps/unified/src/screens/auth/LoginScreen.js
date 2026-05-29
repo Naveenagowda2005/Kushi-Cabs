@@ -8,11 +8,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, ROLES, API_CONFIG } from '../../constants';
 import { wp, hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
+import { glassStyles } from '../../styles/glassomorphism';
 
 export default function LoginScreen({ navigation }) {
   const { signIn, signOut, loading, selectedRole, resetRoleSelection, hasSession } = useAuth();
   const colorAnim = React.useRef(new Animated.Value(0)).current;
   const heartbeat = React.useRef(new Animated.Value(0)).current;
+  const glowAnim = React.useRef(new Animated.Value(0)).current;
+  const pulse1 = React.useRef(new Animated.Value(0)).current;
+  const pulse2 = React.useRef(new Animated.Value(0)).current;
+  const pulse3 = React.useRef(new Animated.Value(0)).current;
+  const rotateAnim = React.useRef(new Animated.Value(0)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0)).current;
+  const borderGlowAnim = React.useRef(new Animated.Value(0)).current;
+  const gpsRing1 = React.useRef(new Animated.Value(0)).current;
+  const gpsRing2 = React.useRef(new Animated.Value(0)).current;
+  const gpsRing3 = React.useRef(new Animated.Value(0)).current;
   
   // Initialize form based on role
   const getInitialForm = () => {
@@ -57,11 +68,301 @@ export default function LoginScreen({ navigation }) {
         }),
       ])
     ).start();
-  }, []);
+
+    // Glow animation for Super Admin
+    if (selectedRole === ROLES.SUPER_ADMIN) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // Pulse rings
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse1, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulse1, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(600),
+          Animated.timing(pulse2, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulse2, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(1200),
+          Animated.timing(pulse3, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulse3, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // Scale animation for logo
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // Border glow animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(borderGlowAnim, {
+            toValue: 1,
+            duration: 1200,
+            useNativeDriver: false,
+          }),
+          Animated.timing(borderGlowAnim, {
+            toValue: 0,
+            duration: 1200,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // GPS Ring animations
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(gpsRing1, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(gpsRing1, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(600),
+          Animated.timing(gpsRing2, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(gpsRing2, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(1200),
+          Animated.timing(gpsRing3, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(gpsRing3, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    } else {
+      // For Vendor and Driver - same animations but different colors
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // Pulse rings
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse1, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulse1, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(600),
+          Animated.timing(pulse2, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulse2, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(1200),
+          Animated.timing(pulse3, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulse3, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // Scale animation for logo
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // Border glow animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(borderGlowAnim, {
+            toValue: 1,
+            duration: 1200,
+            useNativeDriver: false,
+          }),
+          Animated.timing(borderGlowAnim, {
+            toValue: 0,
+            duration: 1200,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // GPS Ring animations
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(gpsRing1, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(gpsRing1, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(600),
+          Animated.timing(gpsRing2, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(gpsRing2, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(1200),
+          Animated.timing(gpsRing3, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(gpsRing3, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    }
+  }, [selectedRole]);
 
   const backgroundColor = colorAnim.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: ['#FF6B6B', '#FFA500', '#FFD700', '#FFA500', '#FF6B6B'],
+    outputRange: ['#ffffff', '#f0f0f0', '#e8e8e8', '#f0f0f0', '#ffffff'],
   });
 
   const shadowOpacity = heartbeat.interpolate({
@@ -72,6 +373,105 @@ export default function LoginScreen({ navigation }) {
   const shadowRadius = heartbeat.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 200],
+  });
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.8],
+  });
+
+  const glowRadius = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, 60],
+  });
+
+  // Pulse ring animations
+  const pulse1Scale = pulse1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+
+  const pulse1Opacity = pulse1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 0],
+  });
+
+  const pulse2Scale = pulse2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+
+  const pulse2Opacity = pulse2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 0],
+  });
+
+  const pulse3Scale = pulse3.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+
+  const pulse3Opacity = pulse3.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 0],
+  });
+
+  // Logo rotation and scale
+  const logoRotation = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const logoScale = scaleAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 1.1, 1],
+  });
+
+  // Border glow animation
+  const borderWidth = borderGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [3, 5],
+  });
+
+  const borderGlowOpacity = borderGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.6, 1],
+  });
+
+  const borderShadowRadius = borderGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [10, 30],
+  });
+
+  // GPS Ring animations
+  const gpsRing1Scale = gpsRing1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 2.5],
+  });
+
+  const gpsRing1Opacity = gpsRing1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const gpsRing2Scale = gpsRing2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 2.5],
+  });
+
+  const gpsRing2Opacity = gpsRing2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const gpsRing3Scale = gpsRing3.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 2.5],
+  });
+
+  const gpsRing3Opacity = gpsRing3.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
   });
 
   // Reset form when role changes
@@ -104,6 +504,10 @@ export default function LoginScreen({ navigation }) {
         console.log('Requesting OTP for:', form.identifier);
         console.log('Using API URL:', API_CONFIG.SMS_API_URL);
         
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
         const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -111,8 +515,10 @@ export default function LoginScreen({ navigation }) {
             to: form.identifier,
             purpose: 'login'
           }),
-          timeout: 10000
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log('OTP Response status:', response.status);
         const data = await response.json();
@@ -129,7 +535,12 @@ export default function LoginScreen({ navigation }) {
         console.error('OTP Request Error:', error);
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
-        Alert.alert('Network Error', 'Unable to connect to SMS service. Make sure the backend is running.\n\nError: ' + error.message);
+        
+        if (error.name === 'AbortError') {
+          Alert.alert('Timeout', 'Request timed out. Please check your connection and try again.');
+        } else {
+          Alert.alert('Network Error', 'Unable to connect to SMS service. Make sure the backend is running at ' + API_CONFIG.SMS_API_URL + '\n\nError: ' + error.message);
+        }
       }
       return;
     }
@@ -142,6 +553,11 @@ export default function LoginScreen({ navigation }) {
     
     try {
       console.log('Verifying OTP for:', form.identifier);
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
       const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,8 +565,10 @@ export default function LoginScreen({ navigation }) {
           to: form.identifier,
           otp: otp
         }),
-        timeout: 10000
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const data = await response.json();
       console.log('OTP Verify Response:', data);
@@ -161,7 +579,12 @@ export default function LoginScreen({ navigation }) {
       }
     } catch (error) {
       console.error('OTP Verify Error:', error);
-      Alert.alert('Network Error', 'Unable to verify OTP: ' + error.message);
+      
+      if (error.name === 'AbortError') {
+        Alert.alert('Timeout', 'Verification request timed out. Please try again.');
+      } else {
+        Alert.alert('Network Error', 'Unable to verify OTP: ' + error.message);
+      }
       return;
     }
 
@@ -194,6 +617,51 @@ export default function LoginScreen({ navigation }) {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleResendOtp = async () => {
+    if (!form.identifier.trim()) {
+      Alert.alert('Error', 'Please enter phone number');
+      return;
+    }
+
+    try {
+      console.log('Resending OTP for:', form.identifier);
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: form.identifier,
+          purpose: 'login'
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const data = await response.json();
+      console.log('Resend OTP Response:', data);
+      
+      if (data.success || data.otpSent) {
+        setOtp(''); // Clear previous OTP
+        Alert.alert('OTP Resent', `New OTP has been sent to ${form.identifier}`);
+      } else {
+        Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('Resend OTP Error:', error);
+      
+      if (error.name === 'AbortError') {
+        Alert.alert('Timeout', 'Request timed out. Please check your connection and try again.');
+      } else {
+        Alert.alert('Network Error', 'Unable to resend OTP: ' + error.message);
+      }
+    }
   };
 
   const getRoleConfig = () => {
@@ -276,7 +744,102 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
           )}
           
-          <View style={[styles.iconContainer, { backgroundColor: roleConfig.color + '15' }]}>
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(147, 51, 234, 0.1)' }]}>
+            {/* Pulse rings */}
+            {selectedRole === ROLES.SUPER_ADMIN && (
+              <>
+                <Animated.View
+                  style={[
+                    {
+                      position: 'absolute',
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      borderWidth: 2,
+                      borderColor: '#ffffff',
+                      transform: [{ scale: pulse1Scale }],
+                      opacity: pulse1Opacity,
+                    }
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    {
+                      position: 'absolute',
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      borderWidth: 2,
+                      borderColor: '#ffffff',
+                      transform: [{ scale: pulse2Scale }],
+                      opacity: pulse2Opacity,
+                    }
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    {
+                      position: 'absolute',
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      borderWidth: 2,
+                      borderColor: '#ffffff',
+                      transform: [{ scale: pulse3Scale }],
+                      opacity: pulse3Opacity,
+                    }
+                  ]}
+                />
+              </>
+            )}
+            {selectedRole !== ROLES.SUPER_ADMIN && (
+              <>
+                <Animated.View
+                  style={[
+                    {
+                      position: 'absolute',
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      borderWidth: 2,
+                      borderColor: roleConfig.color,
+                      transform: [{ scale: pulse1Scale }],
+                      opacity: pulse1Opacity,
+                    }
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    {
+                      position: 'absolute',
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      borderWidth: 2,
+                      borderColor: roleConfig.color,
+                      transform: [{ scale: pulse2Scale }],
+                      opacity: pulse2Opacity,
+                    }
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    {
+                      position: 'absolute',
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      borderWidth: 2,
+                      borderColor: roleConfig.color,
+                      transform: [{ scale: pulse3Scale }],
+                      opacity: pulse3Opacity,
+                    }
+                  ]}
+                />
+              </>
+            )}
+            
+            {/* Logo */}
             <Animated.View 
               style={[
                 {
@@ -286,11 +849,16 @@ export default function LoginScreen({ navigation }) {
                   height: 80,
                   justifyContent: 'center',
                   alignItems: 'center',
-                  shadowOpacity: shadowOpacity,
-                  shadowColor: '#FF6B6B',
+                  borderWidth: borderWidth,
+                  borderColor: selectedRole === ROLES.SUPER_ADMIN ? '#ffffff' : roleConfig.color,
+                  shadowOpacity: borderGlowOpacity,
+                  shadowColor: selectedRole === ROLES.SUPER_ADMIN ? '#ffffff' : roleConfig.color,
                   shadowOffset: { width: 0, height: 0 },
-                  shadowRadius: shadowRadius,
+                  shadowRadius: borderShadowRadius,
                   elevation: 12,
+                  transform: [
+                    { scale: logoScale }
+                  ],
                 }
               ]}
             >
@@ -372,7 +940,7 @@ export default function LoginScreen({ navigation }) {
               </View>
 
               {otpSent && (
-                <TouchableOpacity style={styles.resendOtpButton}>
+                <TouchableOpacity style={styles.resendOtpButton} onPress={handleResendOtp}>
                   <Text style={[styles.resendOtpText, { color: roleConfig.color }]}>
                     Resend OTP
                   </Text>
@@ -511,14 +1079,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   sessionInfo: {
-    backgroundColor: COLORS.warning + '15',
-    borderRadius: 8,
-    padding: 12,
+    ...glassStyles.banner,
+    borderLeftColor: COLORS.warning,
     marginBottom: hp(2),
     flexDirection: 'row',
     alignItems: 'center',
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.warning,
   },
   sessionInfoText: {
     fontSize: getResponsiveFontSize(12),
@@ -555,12 +1120,9 @@ const styles = StyleSheet.create({
     marginBottom: hp(4),
   },
   inputContainer: {
+    ...glassStyles.input,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     marginBottom: 16,
     paddingHorizontal: 16,
     minHeight: 56,
@@ -578,11 +1140,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   otpContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    borderWidth: 2,
+    ...glassStyles.cardActive,
     borderLeftWidth: 4,
-    padding: 16,
     marginBottom: 16,
   },
   otpHeader: {
@@ -619,7 +1178,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loginButton: {
-    borderRadius: 12,
+    ...glassStyles.button,
     paddingVertical: 18,
     alignItems: 'center',
     marginTop: 8,
@@ -648,8 +1207,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   signUpButton: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    ...glassStyles.buttonSecondary,
     paddingVertical: 18,
     alignItems: 'center',
     borderWidth: 2,
@@ -657,6 +1215,7 @@ const styles = StyleSheet.create({
   signUpButtonText: {
     fontSize: getResponsiveFontSize(16),
     fontWeight: '600',
+    color: COLORS.text,
   },
   footer: {
     alignItems: 'center',
