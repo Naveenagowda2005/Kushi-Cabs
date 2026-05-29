@@ -25,8 +25,13 @@ export const AuthProvider = ({ children }) => {
     
     const initAuth = async () => {
       try {
-        // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Get initial session with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
+        );
+
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
         
         if (error) {
           console.error('Unified AuthContext: Error getting session:', error);
@@ -43,7 +48,8 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
         }
       } catch (err) {
-        console.error('Unified AuthContext: Exception getting session:', err);
+        console.error('Unified AuthContext: Exception getting session:', err.message);
+        // Don't crash - just set loading to false and let user see role selection
         setLoading(false);
       }
     };
