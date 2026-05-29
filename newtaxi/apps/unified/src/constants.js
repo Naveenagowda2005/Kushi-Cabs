@@ -202,7 +202,7 @@ const getApiUrl = () => {
   
   if (Platform.OS === 'android') {
     // Use Railway production URL for all builds
-    return 'https://your-railway-app-url.railway.app';
+    return 'https://kushi-cabs-production.up.railway.app';
   } else if (Platform.OS === 'ios') {
     // iOS simulator uses localhost
     return 'http://localhost:4000';
