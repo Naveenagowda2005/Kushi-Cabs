@@ -6,6 +6,30 @@ import RootNavigator from './navigation/RootNavigator';
 import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
+  React.useEffect(() => {
+    console.log('App mounted successfully');
+    
+    // Log any unhandled errors
+    const errorHandler = (error) => {
+      console.error('Unhandled error:', error);
+    };
+    
+    const unhandledRejectionHandler = (reason) => {
+      console.error('Unhandled promise rejection:', reason);
+    };
+    
+    // These won't work in React Native, but let's try
+    if (global.ErrorUtils) {
+      global.ErrorUtils.setGlobalHandler(errorHandler);
+    }
+    
+    return () => {
+      if (global.ErrorUtils) {
+        global.ErrorUtils.setGlobalHandler(null);
+      }
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>

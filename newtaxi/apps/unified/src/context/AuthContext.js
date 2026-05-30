@@ -20,11 +20,15 @@ export const AuthProvider = ({ children }) => {
   const [selectedRole, setSelectedRole] = useState(null);
   const fetchingRef = React.useRef(false);
 
+  console.log('AuthProvider: Initializing...');
+
   useEffect(() => {
-    console.log('Unified AuthContext: Getting initial session...');
+    console.log('AuthProvider: useEffect starting...');
     
     const initAuth = async () => {
       try {
+        console.log('AuthProvider: initAuth starting...');
+        
         // Get initial session with timeout
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) =>
@@ -33,13 +37,15 @@ export const AuthProvider = ({ children }) => {
 
         const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
         
+        console.log('AuthProvider: Got session result:', { hasSession: !!session, error: error?.message });
+        
         if (error) {
-          console.error('Unified AuthContext: Error getting session:', error);
+          console.error('AuthProvider: Error getting session:', error);
           setLoading(false);
           return;
         }
         
-        console.log('Unified AuthContext: Initial session:', !!session);
+        console.log('AuthProvider: Initial session:', !!session);
         setSession(session);
         if (session?.user) {
           await fetchUserProfile(session.user.id);
@@ -48,7 +54,7 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
         }
       } catch (err) {
-        console.error('Unified AuthContext: Exception getting session:', err.message);
+        console.error('AuthProvider: Exception getting session:', err.message);
         // Don't crash - just set loading to false and let user see role selection
         setLoading(false);
       }
@@ -58,9 +64,10 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for auth changes
     try {
+      console.log('AuthProvider: Setting up auth listener...');
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event, session) => {
-          console.log('Unified AuthContext: Auth state change:', event, !!session);
+          console.log('AuthProvider: Auth state change:', event, !!session);
           setSession(session);
           
           if (session?.user) {
@@ -68,7 +75,7 @@ export const AuthProvider = ({ children }) => {
             if (event === 'TOKEN_REFRESHED' && fetchingRef.current) return;
             await fetchUserProfile(session.user.id);
           } else {
-            console.log('Unified AuthContext: No session, clearing user and role');
+            console.log('AuthProvider: No session, clearing user and role');
             setUser(null);
             setSelectedRole(null);
             setLoading(false);
@@ -76,9 +83,10 @@ export const AuthProvider = ({ children }) => {
         }
       );
 
+      console.log('AuthProvider: Auth listener set up successfully');
       return () => subscription?.unsubscribe();
     } catch (err) {
-      console.error('Unified AuthContext: Error setting up auth listener:', err);
+      console.error('AuthProvider: Error setting up auth listener:', err);
     }
   }, []);
 
