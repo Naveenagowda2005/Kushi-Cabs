@@ -197,17 +197,22 @@ export const COLORS = {
 
 // API Configuration - automatically detect the correct URL based on platform
 const getApiUrl = () => {
-  // For physical devices using Expo Go, use your machine's IP address
-  const MACHINE_IP = '192.168.1.111'; // Your machine's IP address
+  // Use environment variable for production, fallback for development
+  const productionUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
+  
+  if (productionUrl) {
+    console.log('Using production SMS API URL:', productionUrl);
+    return productionUrl;
+  }
+  
+  // Fallback for local development
+  const MACHINE_IP = '192.168.1.111';
   
   if (Platform.OS === 'android') {
-    // Use Railway production URL for all builds
-    return 'https://kushi-cabs-production.up.railway.app';
+    return `http://${MACHINE_IP}:4000`;
   } else if (Platform.OS === 'ios') {
-    // iOS simulator uses localhost
     return 'http://localhost:4000';
   } else {
-    // Web uses localhost
     return 'http://localhost:4000';
   }
 };
