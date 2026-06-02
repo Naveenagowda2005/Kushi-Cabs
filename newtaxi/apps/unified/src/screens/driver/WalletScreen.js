@@ -45,7 +45,7 @@ export default function DriverWalletScreen() {
           <RefreshControl
             refreshing={walletLoading || txLoading}
             onRefresh={() => { refetchWallet(); refetchTx(); }}
-            tintColor="#e94560" colors={['#e94560']}
+            tintColor="#1a1a2e" colors={['#1a1a2e']}
           />
         }
         ListEmptyComponent={
@@ -79,9 +79,9 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
   actionBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#e94560', borderRadius: 12, padding: 14,
+    gap: 8, backgroundColor: '#1a1a2e', borderRadius: 12, padding: 14,
   },
-  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#e94560' },
+  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#1a1a2e' },
   actionBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   historyHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
@@ -110,11 +110,11 @@ const modal = StyleSheet.create({
   quickBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   methodRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   methodBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center', backgroundColor: '#0f3460', borderWidth: 1, borderColor: '#1a1a2e' },
-  methodBtnActive: { backgroundColor: '#e94560', borderColor: '#e94560' },
+  methodBtnActive: { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
   methodText: { color: '#888', fontWeight: '600' },
   methodTextActive: { color: '#fff' },
   confirmBtn: {
-    backgroundColor: '#e94560', borderRadius: 14, padding: 16,
+    backgroundColor: '#1a1a2e', borderRadius: 14, padding: 16,
     alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 12,
   },
   confirmBtnDisabled: { opacity: 0.6 },

@@ -13,6 +13,7 @@ import SuperAdminTripsScreen      from '../screens/superadmin/TripsScreen';
 import SuperAdminCommissionScreen from '../screens/superadmin/CommissionScreen';
 import SuperAdminWalletsScreen    from '../screens/superadmin/WalletsScreen';
 import SuperAdminSettingsScreen   from '../screens/superadmin/SettingsScreen';
+import AdminVerificationDashboard from '../screens/superadmin/AdminVerificationDashboard';
 
 const Stack = createNativeStackNavigator();
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -22,6 +23,7 @@ const TABS = [
   { key: 'Trips',      label: 'Trips',      icon: 'list-outline',          component: SuperAdminTripsScreen },
   { key: 'Drivers',    label: 'Drivers',    icon: 'people-outline',        component: SuperAdminDriversScreen },
   { key: 'Vendors',    label: 'Vendors',    icon: 'business-outline',      component: SuperAdminVendorsScreen },
+  { key: 'Verification', label: 'Verification', icon: 'document-outline',  component: AdminVerificationDashboard },
   { key: 'Commission', label: 'Commission', icon: 'trending-up-outline',   component: SuperAdminCommissionScreen },
   { key: 'Wallets',    label: 'Wallets',    icon: 'wallet-outline',        component: SuperAdminWalletsScreen },
   { key: 'Settings',   label: 'Settings',   icon: 'settings-outline',      component: SuperAdminSettingsScreen },

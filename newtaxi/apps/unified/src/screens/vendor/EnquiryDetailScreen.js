@@ -87,7 +87,7 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
   function InfoRow({ icon, label, value }) {
     return (
       <View style={styles.infoRow}>
-        <Ionicons name={icon} size={20} color="#e94560" style={styles.infoIcon} />
+        <Ionicons name={icon} size={20} color="#1a1a2e" style={styles.infoIcon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.infoLabel}>{label}</Text>
           <Text style={styles.infoValue}>{value || '—'}</Text>
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  fare: { color: '#e94560', fontSize: 32, fontWeight: 'bold' },
+  fare: { color: '#1a1a2e', fontSize: 32, fontWeight: 'bold' },
   section: {
     backgroundColor: '#16213e',
     borderRadius: 14,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#16213e',
   },
   acceptBtn: {
-    backgroundColor: '#e94560',
+    backgroundColor: '#1a1a2e',
     borderRadius: 14,
     padding: 18,
     alignItems: 'center',

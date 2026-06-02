@@ -258,7 +258,7 @@ export default function VendorMyTripsScreen({ navigation }) {
                       </View>
                     </View>
                     <View style={styles.locationRow}>
-                      <Ionicons name="flag" size={16} color="#e94560" />
+                      <Ionicons name="flag" size={16} color="#1a1a2e" />
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.locationLabelText}>Dropoff</Text>
                         <Text style={styles.locationValueText}>{selectedTrip.dropoff_location}</Text>
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   tripFare: {
-    color: '#e94560',
+    color: '#1a1a2e',
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 6,

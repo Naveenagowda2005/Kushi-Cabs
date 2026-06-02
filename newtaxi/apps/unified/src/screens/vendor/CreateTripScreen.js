@@ -33,6 +33,7 @@ export default function VendorCreateTripScreen({ navigation }) {
     fuelType:         '',
     segment:          '',
     package:          '',
+    tollIncluded:     false,
   });
   const [loading, setLoading] = useState(false);
   const [carTypes, setCarTypes] = useState([]);
@@ -167,6 +168,7 @@ export default function VendorCreateTripScreen({ navigation }) {
         vendor_id:            vendor?.id || null,
         created_by:           user.id,
         is_published:         false,
+        toll_included:        form.tollIncluded,
       });
 
       if (error) throw error;
@@ -207,7 +209,7 @@ export default function VendorCreateTripScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
         <View style={styles.sectionHeader}>
-          <Ionicons name="layers-outline" size={18} color="#e94560" />
+          <Ionicons name="layers-outline" size={18} color="#1a1a2e" />
           <Text style={styles.sectionTitle}>Trip Type</Text>
         </View>
 
@@ -254,7 +256,7 @@ export default function VendorCreateTripScreen({ navigation }) {
         )}
 
         <View style={styles.sectionHeader}>
-          <Ionicons name="location-outline" size={18} color="#e94560" />
+          <Ionicons name="location-outline" size={18} color="#1a1a2e" />
           <Text style={styles.sectionTitle}>Trip Details</Text>
         </View>
 
@@ -350,6 +352,37 @@ export default function VendorCreateTripScreen({ navigation }) {
           mode="datetime"
           placeholder="Select date and time"
         />
+
+        <View style={styles.sectionHeader}>
+          <Ionicons name="cash-outline" size={18} color="#ff9800" />
+          <Text style={styles.sectionTitle}>Extra Charges</Text>
+        </View>
+
+        {/* Toll Charge Toggle */}
+        <View style={styles.toggleWrapper}>
+          <View style={styles.toggleLabel}>
+            <Ionicons name="cash-outline" size={16} color="#ff9800" />
+            <Text style={styles.toggleLabelText}>Toll Charge Included in Fare</Text>
+          </View>
+          <View style={styles.toggleButtonGroup}>
+            <TouchableOpacity
+              style={[styles.toggleButton, !form.tollIncluded && styles.toggleButtonActive]}
+              onPress={() => update('tollIncluded', false)}
+            >
+              <Text style={[styles.toggleButtonText, !form.tollIncluded && styles.toggleButtonTextActive]}>
+                No
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, form.tollIncluded && styles.toggleButtonActive]}
+              onPress={() => update('tollIncluded', true)}
+            >
+              <Text style={[styles.toggleButtonText, form.tollIncluded && styles.toggleButtonTextActive]}>
+                Yes
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.sectionHeader}>
           <Ionicons name="car-outline" size={18} color="#2196f3" />
@@ -496,16 +529,64 @@ const styles = StyleSheet.create({
   fieldLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   fieldLabelText: { color: '#aaa', fontSize: 13 },
   input: { backgroundColor: '#16213e', color: '#fff', borderRadius: 12, padding: 14, fontSize: 15, borderWidth: 1, borderColor: '#1a1a2e' },
+  toggleWrapper: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    backgroundColor: '#16213e', 
+    borderRadius: 12, 
+    padding: 14, 
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#1a1a2e'
+  },
+  toggleLabel: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8,
+    flex: 1
+  },
+  toggleLabelText: { 
+    color: '#aaa', 
+    fontSize: 13,
+    fontWeight: '500'
+  },
+  toggleButtonGroup: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  toggleButton: {
+    backgroundColor: '#0f3460',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: '#555',
+    minWidth: 50,
+    alignItems: 'center'
+  },
+  toggleButtonActive: {
+    backgroundColor: '#ff9800',
+    borderColor: '#ff9800'
+  },
+  toggleButtonText: {
+    color: '#aaa',
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  toggleButtonTextActive: {
+    color: '#fff'
+  },
   breakdownCard: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#1a1a2e' },
   breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   breakdownLabel: { color: '#888', fontSize: 13 },
   breakdownValue: { color: '#fff', fontSize: 13, fontWeight: '600' },
   breakdownTotal: { borderTopWidth: 1, borderTopColor: '#0f3460', paddingTop: 8, marginTop: 4, marginBottom: 0 },
   breakdownTotalLabel: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  breakdownTotalValue: { color: '#e94560', fontSize: 16, fontWeight: '700' },
+  breakdownTotalValue: { color: '#1a1a2e', fontSize: 16, fontWeight: '700' },
   infoBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#2a1a00', borderRadius: 10, padding: 12, marginBottom: 20 },
   infoText: { color: '#ff9800', fontSize: 12, flex: 1, lineHeight: 18 },
-  createBtn: { backgroundColor: '#e94560', borderRadius: 14, padding: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 8 },
+  createBtn: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 8 },
   createBtnDisabled: { opacity: 0.6 },
   createBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
   pickerWrapper: {

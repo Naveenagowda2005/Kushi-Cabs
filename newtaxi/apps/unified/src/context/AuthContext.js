@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { ROLES } from '../constants';
+import { ROLES, API_CONFIG } from '../constants';
 
 const AuthContext = createContext({});
 
@@ -18,6 +18,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [incompleteSignupPhone, setIncompleteSignupPhone] = useState(null);
+  const [incompleteSignupUserId, setIncompleteSignupUserId] = useState(null); // Store auth user ID
   const fetchingRef = React.useRef(false);
 
   console.log('AuthProvider: Initializing...');
@@ -55,7 +57,6 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.error('AuthProvider: Exception getting session:', err.message);
-        // Don't crash - just set loading to false and let user see role selection
         setLoading(false);
       }
     };
@@ -71,7 +72,6 @@ export const AuthProvider = ({ children }) => {
           setSession(session);
           
           if (session?.user) {
-            // Skip TOKEN_REFRESHED if we already have user data — avoids duplicate fetches
             if (event === 'TOKEN_REFRESHED' && fetchingRef.current) return;
             await fetchUserProfile(session.user.id);
           } else {
@@ -95,7 +95,6 @@ export const AuthProvider = ({ children }) => {
       console.log('Unified fetchUserProfile called for user:', userId);
       fetchingRef.current = true;
 
-      // Race the query against a 10-second timeout so the app never hangs
       const queryPromise = supabase
         .from('users')
         .select(`
@@ -129,7 +128,6 @@ export const AuthProvider = ({ children }) => {
       } else if (data) {
         console.log('Unified setting user profile:', data);
         setUser(data);
-        // Auto-select role if user has one and it's different from currently selected
         if (data.roles?.name) {
           console.log('Unified auto-selecting role:', data.roles.name);
           setSelectedRole(data.roles.name);
@@ -137,16 +135,11 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       } else {
         console.log('Unified: No user profile found for authenticated user ID:', userId);
-        console.log('Unified: User needs to complete registration');
         setUser(null);
         setLoading(false);
-        // Don't sign out - let them complete registration
-        // The RootNavigator will handle showing the appropriate screen
       }
     } catch (err) {
       console.error('Unified fetchUserProfile error:', err.message);
-      // On timeout or network error — clear loading so app doesn't stay stuck
-      // User will see role selection and can try logging in again
       setUser(null);
       setLoading(false);
     } finally {
@@ -166,15 +159,80 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (identifier, password, role) => {
     try {
       setLoading(true);
-      console.log('Unified AuthContext: Attempting OTP-only sign in with phone:', identifier, 'role:', role);
+      console.log('Unified AuthContext: Attempting sign in - identifier:', identifier, 'role:', role);
       
-      // All roles use phone number to construct email
+      // SUPER_ADMIN uses phone-based OTP authentication (like drivers)
+      if (role === ROLES.SUPER_ADMIN) {
+        console.log('Super Admin login attempt with phone:', identifier);
+        
+        // Convert phone to digits only
+        const phoneDigits = identifier.replace(/[^0-9]/g, '');
+        
+        if (phoneDigits.length !== 10) {
+          throw new Error('Please enter a valid 10-digit phone number');
+        }
+        
+        console.log('Super Admin: Phone digits:', phoneDigits);
+        
+        // For super_admin, verify phone exists in database and has super_admin role
+        // OTP verification already happened (SMS was verified)
+        const { data: adminData, error: adminError } = await supabase
+          .from('users')
+          .select('id, email, phone, full_name, role_id, roles(name)')
+          .eq('phone', phoneDigits)
+          .maybeSingle();
+
+        if (adminError && adminError.code !== 'PGRST116') {
+          throw adminError;
+        }
+
+        if (!adminData) {
+          throw new Error('Admin not found. Please check phone number.');
+        }
+
+        console.log('Super Admin found in database:', adminData);
+
+        // Verify it's actually a super_admin
+        if (adminData.roles?.name !== ROLES.SUPER_ADMIN) {
+          throw new Error('This account is not a super admin account.');
+        }
+
+        console.log('Super Admin verified - OTP was already verified via SMS');
+
+        // For super admin, we bypass Supabase Auth entirely
+        // We set both session and user from database without JWT
+        // The session is minimal - just enough for the app to recognize authenticated state
+        const mockSession = {
+          user: {
+            id: adminData.id,
+            email: adminData.email,
+            phone: adminData.phone,
+          },
+          access_token: 'super-admin-verified',
+          token_type: 'bearer',
+        };
+
+        // Set both session and user - this allows app to navigate
+        setSession(mockSession);
+        setUser(adminData);
+        if (adminData.roles?.name) {
+          setSelectedRole(adminData.roles.name);
+        }
+        
+        console.log('Super Admin session and user set - redirecting to dashboard');
+        
+        return { data: { user: adminData, session: mockSession }, error: null };
+      }
+      
+      // For DRIVER or VENDOR - use phone-based OTP email
+      console.log('OTP-verified login with phone:', identifier, 'role:', role);
+      
       const phoneDigits = identifier.replace(/[^0-9]/g, '');
       const email = `${phoneDigits}@kushicabs.phone`;
       
-      console.log('OTP-only login with email:', email);
+      console.log('OTP login email:', email);
       
-      // For OTP-only login, just verify the user exists in the database
+      // Verify user exists in database
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, email, phone, role_id, roles(name)')
@@ -191,39 +249,73 @@ export const AuthProvider = ({ children }) => {
 
       console.log('User found in database:', userData);
 
-      // For OTP-verified users, create a session directly from database user
-      // This bypasses Supabase auth which may not have valid credentials
-      console.log('Creating OTP-verified session from database user');
+      // For drivers, check if documents are approved before allowing login
+      if (userData.roles?.name === 'driver') {
+        try {
+          const { data: verificationStatus, error: verifyError } = await supabase
+            .from('driver_verification_status')
+            .select('overall_status, all_documents_submitted')
+            .eq('driver_id', userData.id)
+            .single();
+          
+          if (verifyError && verifyError.code !== 'PGRST116') {
+            throw verifyError;
+          }
+          
+          // Check document verification status
+          if (verificationStatus) {
+            console.log('Driver verification status:', verificationStatus?.overall_status);
+            
+            // If documents not yet submitted, block login - they must upload first
+            if (!verificationStatus.all_documents_submitted) {
+              throw new Error('Please upload your documents first.');
+            }
+            
+            // ALL other statuses (pending_review, approved, rejected) → allow login
+            // DriverNavigator will show the correct screen based on status:
+            // - pending_review → WaitingForApproval screen
+            // - approved       → Driver dashboard
+            // - rejected       → WaitingForApproval screen (shows rejected docs to re-upload)
+            console.log('Driver login allowed - status:', verificationStatus.overall_status);
+          } else {
+            // No verification status record - new driver, must upload documents
+            throw new Error('Please upload your documents first.');
+          }
+        } catch (err) {
+          if (err.message.includes('Please upload') || err.message.includes('rejected')) {
+            throw err;
+          }
+          console.log('Could not verify document status:', err.message);
+        }
+      }
+
+      // Authenticate OTP user with Supabase
+      console.log('Authenticating OTP user with Supabase');
       
-      // Create a session object that represents an OTP-verified user
-      const otpSession = {
-        user: {
-          id: userData.id,
-          email: userData.email,
-          phone: userData.phone,
-        },
-        access_token: 'otp-verified-' + phoneDigits + '-' + Date.now(),
-        token_type: 'bearer',
-        expires_in: 3600,
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
-      };
+      // Try to sign in with the phone-based email and temporary password
+      const tempPassword = 'OTP-' + phoneDigits + '-kushicabs';
       
-      // Set the session and user state
-      setSession(otpSession);
-      setUser(userData);
-      if (userData.roles?.name) {
-        setSelectedRole(userData.roles.name);
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: tempPassword,
+      });
+      
+      if (signInError) {
+        console.error('Auth sign in failed:', signInError.message);
+        throw new Error('Authentication failed. Please try again.');
       }
       
-      console.log('OTP-verified session created successfully');
+      if (signInData?.session) {
+        console.log('OTP user authenticated successfully');
+        setSession(signInData.session);
+        setUser(userData);
+        if (userData.roles?.name) {
+          setSelectedRole(userData.roles.name);
+        }
+        return { data: signInData, error: null };
+      }
       
-      return { 
-        data: { 
-          user: userData,
-          session: otpSession
-        }, 
-        error: null 
-      };
+      throw new Error('Authentication failed. Please try again.');
     } catch (error) {
       console.error('Unified Sign in error:', error);
       return { data: null, error };
@@ -240,55 +332,51 @@ export const AuthProvider = ({ children }) => {
       if (role !== ROLES.SUPER_ADMIN) {
         const phoneDigits = identifier.replace(/[^0-9]/g, '');
 
-        // Check if this phone number is already fully registered (has a users row)
+        // Check if this phone number is already fully registered in DB
         const { data: existingUser, error: checkError } = await supabase
           .from('users')
-          .select('id, phone, roles ( name )')
+          .select('id, phone, roles(name)')
           .eq('phone', phoneDigits)
           .maybeSingle();
 
-        if (checkError && checkError.code !== 'PGRST116') {
-          throw checkError;
-        }
+        if (checkError && checkError.code !== 'PGRST116') throw checkError;
 
-        // Only block if the existing row belongs to a DIFFERENT auth user
-        if (existingUser && existingUser.id !== (await supabase.auth.getUser()).data?.user?.id) {
+        if (existingUser) {
           throw new Error(
             `This phone number is already registered as ${existingUser.roles?.name || 'a user'}. Please login instead.`
           );
         }
 
-        const email = `${phoneDigits}@kushicabs.phone`;
-        
-        // For OTP-only signup, create a temporary password
-        // Users will only authenticate via OTP, not password
-        const tempPassword = 'OTP-' + phoneDigits + '-' + Math.random().toString(36).substring(7);
-        
-        const { data, error } = await supabase.auth.signUp({ 
-          email, 
-          password: tempPassword,
-          options: {
-            data: {
-              phone: phoneDigits,
-            }
-          }
+        // Use backend to create/reset the auth account with a KNOWN password
+        console.log('Calling backend to create/reset auth account...');
+        const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/create-driver-account`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phoneDigits }),
         });
-        
-        if (error) throw error;
 
-        // Supabase returns identities=[] when the auth account already exists (incomplete registration).
-        // Sign them in so we have a valid session for createUserProfile.
-        if (data?.user && data.user.identities?.length === 0) {
-          console.log('Unified AuthContext: Auth user already exists (incomplete registration), signing in');
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password: tempPassword,
-          });
-          if (signInError) throw new Error('Account already exists. Please login instead.');
-          return { data: signInData, error: null };
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Failed to create account');
         }
 
-        return { data, error: null };
+        console.log('✅ Auth account ready. userId:', result.userId);
+
+        // Now sign in with the known password the backend set
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: result.email,
+          password: `OTP-${phoneDigits}-kushicabs`,
+        });
+
+        if (signInError) throw signInError;
+
+        console.log('✅ Signed in successfully after account creation');
+
+        // Store everything needed for profile creation
+        setSession(signInData.session);
+        setIncompleteSignupUserId(signInData.user.id);
+
+        return { data: signInData, error: null };
       }
 
       // Super Admin path (email-based)
@@ -329,22 +417,15 @@ export const AuthProvider = ({ children }) => {
   const createUserProfile = async (userData, role) => {
     try {
       console.log('Unified createUserProfile: Starting profile creation for role:', role);
-      
-      if (!session?.user?.id) {
-        throw new Error('No authenticated user');
-      }
 
-      const userId = session.user.id;
-      console.log('Unified createUserProfile: User ID:', userId);
+      const userId = session?.user?.id || incompleteSignupUserId;
+      if (!userId) throw new Error('No authenticated user - please try signing up again');
 
-      // Extract phone from the auth email (format: {phoneDigits}@kushicabs.phone)
-      // This is the source of truth — RegisterScreen no longer collects phone separately
-      let phone = userData.phone || '';
-      if (!phone && session.user.email?.endsWith('@kushicabs.phone')) {
-        phone = session.user.email.replace('@kushicabs.phone', '');
-      }
+      const phone = userData.phone || incompleteSignupPhone || '';
+      const email = session?.user?.email || `${phone}@kushicabs.phone`;
 
-      // Get role ID
+      console.log('Unified createUserProfile: userId:', userId, 'phone:', phone);
+
       const { data: roleData, error: roleError } = await supabase
         .from('roles')
         .select('id')
@@ -352,20 +433,11 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (roleError) throw roleError;
-      console.log('Unified createUserProfile: Role ID found:', roleData.id);
 
-      // Upsert user profile — safe to retry if a previous attempt partially succeeded
       const { data, error } = await supabase
         .from('users')
         .upsert(
-          {
-            id: userId,
-            email: session.user.email,
-            role_id: roleData.id,
-            full_name: userData.full_name,
-            phone: phone,
-            is_active: true,
-          },
+          { id: userId, email, role_id: roleData.id, full_name: userData.full_name, phone, is_active: true },
           { onConflict: 'id' }
         )
         .select()
@@ -374,7 +446,6 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
       console.log('Unified createUserProfile: User profile upserted:', data);
 
-      // Upsert role-specific profile — also safe to retry
       if (role === ROLES.VENDOR) {
         console.log('Unified createUserProfile: Upserting vendor profile');
         const { error: vendorError } = await supabase
@@ -390,6 +461,7 @@ export const AuthProvider = ({ children }) => {
 
         if (vendorError) throw vendorError;
         console.log('Unified createUserProfile: Vendor profile upserted');
+        await refreshUserProfile();
       } else if (role === ROLES.DRIVER) {
         console.log('Unified createUserProfile: Upserting driver profile');
         const { error: driverError } = await supabase
@@ -408,9 +480,7 @@ export const AuthProvider = ({ children }) => {
         if (driverError) throw driverError;
         console.log('Unified createUserProfile: Driver profile upserted');
       }
-
-      console.log('Unified createUserProfile: Refreshing user profile...');
-      await refreshUserProfile();
+      
       console.log('Unified createUserProfile: Profile creation completed successfully');
       
       return { data, error: null };
@@ -456,6 +526,10 @@ export const AuthProvider = ({ children }) => {
     selectedRole,
     setSelectedRole,
     resetRoleSelection,
+    incompleteSignupPhone,
+    setIncompleteSignupPhone,
+    incompleteSignupUserId,
+    setIncompleteSignupUserId,
     signIn,
     signUp,
     signOut,

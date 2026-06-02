@@ -407,7 +407,7 @@ export default function NavigationMap({
           {routePoints.length > 0 && (
             <Polyline
               coordinates={routePoints}
-              strokeColor="#e94560"
+              strokeColor="#1a1a2e"
               strokeWidth={4}
               lineDashPattern={[0]}
             />
@@ -425,7 +425,7 @@ export default function NavigationMap({
           {/* Dropoff marker */}
           {finalDropoffLat && finalDropoffLng && (
             <Marker coordinate={{ latitude: finalDropoffLat, longitude: finalDropoffLng }} title="Drop-off" description={dropoffLocation}>
-              <View style={[styles.markerBubble, { backgroundColor: '#e94560' }]}>
+              <View style={[styles.markerBubble, { backgroundColor: '#1a1a2e' }]}>
                 <Ionicons name="flag" size={18} color="#fff" />
               </View>
             </Marker>
@@ -435,14 +435,14 @@ export default function NavigationMap({
         {/* Loading overlay */}
         {loadingRoute && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#e94560" />
+            <ActivityIndicator size="large" color="#1a1a2e" />
             <Text style={styles.loadingText}>Loading route...</Text>
           </View>
         )}
 
         {/* My location FAB */}
         <TouchableOpacity style={styles.myLocBtn} onPress={fitToMarkers}>
-          <Ionicons name="navigate-outline" size={22} color="#e94560" />
+          <Ionicons name="navigate-outline" size={22} color="#1a1a2e" />
         </TouchableOpacity>
       </View>
 
@@ -453,7 +453,7 @@ export default function NavigationMap({
           <Text style={styles.locationText} numberOfLines={1}>{pickupLocation || 'Pickup'}</Text>
         </View>
         <View style={styles.locationRow}>
-          <Ionicons name="flag" size={14} color="#e94560" />
+          <Ionicons name="flag" size={14} color="#1a1a2e" />
           <Text style={styles.locationText} numberOfLines={1}>{dropoffLocation || 'Drop-off'}</Text>
         </View>
 
@@ -499,7 +499,7 @@ export default function NavigationMap({
             <Text style={styles.navBtnText}>Go to Pickup</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.navBtn, { backgroundColor: '#e94560' }, (!finalDropoffLat || !finalDropoffLng) && styles.disabledBtn]}
+            style={[styles.navBtn, { backgroundColor: '#1a1a2e' }, (!finalDropoffLat || !finalDropoffLng) && styles.disabledBtn]}
             onPress={() => {
               if (finalDropoffLat && finalDropoffLng) {
                 openInGoogleMaps(finalDropoffLat, finalDropoffLng, dropoffLocation);
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e94560',
+    backgroundColor: '#1a1a2e',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,

@@ -239,7 +239,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
   if (!activeTrip) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#e94560" size="large" />
+        <ActivityIndicator color="#1a1a2e" size="large" />
         <Text style={styles.loadingText}>Loading trip...</Text>
       </View>
     );
@@ -305,7 +305,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
             <Text style={styles.doneTripText} numberOfLines={1}>{trip.pickup_location}</Text>
           </View>
           <View style={styles.doneRow}>
-            <Ionicons name="flag" size={14} color="#e94560" />
+            <Ionicons name="flag" size={14} color="#1a1a2e" />
             <Text style={styles.doneTripText} numberOfLines={1}>{trip.dropoff_location}</Text>
           </View>
         </View>
@@ -326,7 +326,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
         <View style={styles.tripCard}>
           <Row icon="location" color="#4caf50" text={activeTrip.pickup_location} />
           <View style={styles.divider} />
-          <Row icon="flag" color="#e94560" text={activeTrip.dropoff_location} />
+          <Row icon="flag" color="#1a1a2e" text={activeTrip.dropoff_location} />
           {activeTrip.passenger_name && (
             <>
               <View style={styles.divider} />
@@ -657,18 +657,18 @@ const styles = StyleSheet.create({
   stepBar: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#16213e', paddingHorizontal: 16, paddingVertical: 12 },
   stepItem: { alignItems: 'center', flex: 1 },
   stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#333', marginBottom: 4 },
-  stepDotActive: { backgroundColor: '#e94560' },
+  stepDotActive: { backgroundColor: '#1a1a2e' },
   stepLabel: { color: '#555', fontSize: 10 },
-  stepLabelActive: { color: '#e94560' },
+  stepLabelActive: { color: '#1a1a2e' },
   tripCard: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
   rowText: { color: '#fff', fontSize: 15, flex: 1 },
   divider: { height: 1, backgroundColor: '#0f3460', marginVertical: 8 },
-  farePill: { alignSelf: 'flex-end', backgroundColor: '#e94560', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, marginTop: 8 },
+  farePill: { alignSelf: 'flex-end', backgroundColor: '#1a1a2e', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, marginTop: 8 },
   fareText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   inProgressBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0a2a0a', borderRadius: 10, padding: 12, marginBottom: 16 },
   inProgressText: { color: '#4caf50', fontSize: 14, fontWeight: '600' },
-  actionBtn: { backgroundColor: '#e94560', borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
+  actionBtn: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
   actionBtnComplete: { backgroundColor: '#4caf50' },
   actionBtnDisabled: { backgroundColor: '#444' },
   actionBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../constants';
+import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 
 export default function SuperAdminVendorsScreen({ navigation }) {
@@ -78,28 +78,30 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            // Get vendors table row id (FK target for trips.vendor_id)
-            const { data: vendorRow } = await supabase
-              .from('vendors').select('id').eq('user_id', vendorId).maybeSingle();
+            // Use backend API to delete user (checks for pending trips)
+            const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/delete-user`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: vendorId,
+                email: `${vendorId}@kushicabs.phone`
+              })
+            });
 
-            // Null out all trip FK references
-            if (vendorRow?.id) {
-              await supabase.from('trips').update({ vendor_id: null }).eq('vendor_id', vendorRow.id);
+            const result = await response.json();
+
+            if (!response.ok) {
+              // Check if error is due to pending trips
+              if (result.pendingTripsCount > 0) {
+                Alert.alert(
+                  'Cannot Delete Vendor',
+                  `${result.message}\n\nPending Trips: ${result.pendingTripsCount}\nStatuses: ${result.tripStatuses?.join(', ') || 'N/A'}`
+                );
+              } else {
+                throw new Error(result.message || 'Failed to delete vendor');
+              }
+              return;
             }
-            await supabase.from('trips').update({ accepted_by: null }).eq('accepted_by', vendorId);
-            await supabase.from('trips').update({ created_by: null }).eq('created_by', vendorId);
-
-            // Delete wallet transactions then wallet
-            const { data: wallet } = await supabase.from('wallets').select('id').eq('user_id', vendorId).maybeSingle();
-            if (wallet?.id) await supabase.from('transactions').delete().eq('wallet_id', wallet.id);
-            await supabase.from('wallets').delete().eq('user_id', vendorId);
-
-            // Delete documents, vendor profile, then user
-            await supabase.from('documents').delete().eq('user_id', vendorId);
-            await supabase.from('vendors').delete().eq('user_id', vendorId);
-
-            const { error } = await supabase.from('users').delete().eq('id', vendorId);
-            if (error) throw error;
 
             Alert.alert('Success', 'Vendor deleted successfully');
             fetchVendors();

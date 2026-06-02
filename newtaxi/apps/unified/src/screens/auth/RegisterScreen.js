@@ -10,13 +10,18 @@ import { COLORS, ROLES } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 
 export default function RegisterScreen({ route, navigation }) {
-  const { createUserProfile, loading, selectedRole } = useAuth();
+  const { createUserProfile, loading, selectedRole, session, incompleteSignupPhone } = useAuth();
 
   const role = route.params?.role || selectedRole;
-  // Phone was already entered on the SignUp screen — use it directly
-  const phone = route.params?.phone || '';
+  // Phone can come from: route params -> context state -> extracted from auth email
+  let phone = route.params?.phone || incompleteSignupPhone || '';
+  
+  // If phone not in params or context, extract from auth email (format: {phone}@kushicabs.phone)
+  if (!phone && session?.user?.email?.endsWith('@kushicabs.phone')) {
+    phone = session.user.email.replace('@kushicabs.phone', '');
+  }
 
-  console.log('RegisterScreen: Role for registration:', role);
+  console.log('RegisterScreen: Role for registration:', role, 'Phone:', phone);
 
   const [form, setForm] = useState({
     full_name: '',
@@ -64,9 +69,18 @@ export default function RegisterScreen({ route, navigation }) {
       Alert.alert('Registration Failed', error.message);
     } else {
       console.log('RegisterScreen: Registration successful');
-      Alert.alert('Success', 'Registration completed successfully!', [
-        { text: 'OK' }
-      ]);
+      
+      // For drivers, redirect to document upload screen
+      if (role === ROLES.DRIVER) {
+        console.log('RegisterScreen: Redirecting driver to document upload');
+        // Navigate directly to document upload screen
+        navigation.navigate('DriverDocumentUpload');
+      } else {
+        // For vendors, show success and they can proceed to dashboard
+        Alert.alert('Success', 'Registration completed successfully!', [
+          { text: 'OK' }
+        ]);
+      }
     }
   };
 
@@ -74,6 +88,13 @@ export default function RegisterScreen({ route, navigation }) {
     switch (role) {
       case ROLES.VENDOR: return 'Vendor Registration';
       case ROLES.DRIVER: return 'Driver Registration';
+      default: return 'Complete Registration';
+    }
+  };
+
+  const getButtonText = () => {
+    switch (role) {
+      case ROLES.DRIVER: return 'Next Step';
       default: return 'Complete Registration';
     }
   };
@@ -183,7 +204,7 @@ export default function RegisterScreen({ route, navigation }) {
             {loading ? (
               <ActivityIndicator color={COLORS.textLight} />
             ) : (
-              <Text style={styles.registerButtonText}>Complete Registration</Text>
+              <Text style={styles.registerButtonText}>{getButtonText()}</Text>
             )}
           </TouchableOpacity>
         </View>

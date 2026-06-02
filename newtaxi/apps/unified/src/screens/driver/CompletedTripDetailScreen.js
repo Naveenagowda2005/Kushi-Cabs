@@ -56,7 +56,7 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
-            <Ionicons name="flag" size={16} color="#e94560" />
+            <Ionicons name="flag" size={16} color="#1a1a2e" />
             <Text style={styles.summaryLocation} numberOfLines={2}>{trip.dropoff_location}</Text>
           </View>
         </View>
@@ -180,6 +180,6 @@ const styles = StyleSheet.create({
   phoneButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   footer: { padding: 16, paddingBottom: 32, backgroundColor: '#1a1a2e', borderTopWidth: 1, borderTopColor: '#16213e' },
-  backBtn: { backgroundColor: '#e94560', borderRadius: 12, padding: 16, alignItems: 'center' },
+  backBtn: { backgroundColor: '#1a1a2e', borderRadius: 12, padding: 16, alignItems: 'center' },
   backBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

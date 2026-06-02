@@ -166,7 +166,7 @@ export default function VendorProfileScreen({ navigation }) {
       </View>
 
       <TouchableOpacity style={styles.signOut} onPress={signOut}>
-        <Ionicons name="log-out-outline" size={20} color="#e94560" />
+        <Ionicons name="log-out-outline" size={20} color="#1a1a2e" />
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -178,12 +178,12 @@ const styles = StyleSheet.create({
   scroll: { padding: 24, paddingTop: 60 },
   avatarWrap: { alignItems: 'center', marginBottom: 24 },
   avatarContainer: { position: 'relative', marginBottom: 8 },
-  avatarImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: '#e94560' },
-  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#e94560', justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: '#1a1a2e' },
+  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
   cameraOverlay: {
     position: 'absolute', bottom: 0, right: 0,
-    backgroundColor: '#e94560', borderRadius: 14,
+    backgroundColor: '#1a1a2e', borderRadius: 14,
     width: 28, height: 28, justifyContent: 'center', alignItems: 'center',
     borderWidth: 2, borderColor: '#0f3460',
   },
@@ -191,15 +191,15 @@ const styles = StyleSheet.create({
   name: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   phone: { color: '#888', fontSize: 14, marginBottom: 4 },
   company: { color: '#aaa', fontSize: 13, marginBottom: 8 },
-  roleBadge: { backgroundColor: '#e9456022', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#e94560', alignItems: 'center' },
-  roleText: { color: '#e94560', fontSize: 12, fontWeight: '600' },
-  commissionText: { color: '#e94560', fontSize: 10, marginTop: 3 },
+  roleBadge: { backgroundColor: '#1a1a2e22', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#1a1a2e', alignItems: 'center' },
+  roleText: { color: '#1a1a2e', fontSize: 12, fontWeight: '600' },
+  commissionText: { color: '#1a1a2e', fontSize: 10, marginTop: 3 },
   balanceCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 20 },
   balanceLabel: { color: '#888', fontSize: 12 },
   balanceAmount: { color: '#4caf50', fontSize: 20, fontWeight: 'bold' },
   menu: { backgroundColor: '#16213e', borderRadius: 14, marginBottom: 20, overflow: 'hidden' },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
   menuLabel: { color: '#fff', fontSize: 15, flex: 1 },
-  signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#16213e', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#e94560' },
-  signOutText: { color: '#e94560', fontSize: 16, fontWeight: '600' },
+  signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#16213e', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#1a1a2e' },
+  signOutText: { color: '#1a1a2e', fontSize: 16, fontWeight: '600' },
 });

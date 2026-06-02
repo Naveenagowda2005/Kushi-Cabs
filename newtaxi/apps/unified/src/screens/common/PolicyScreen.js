@@ -43,9 +43,9 @@ const styles = StyleSheet.create({
   intro: { color: '#ccc', fontSize: 14, lineHeight: 22, marginBottom: 20 },
   section: { marginBottom: 24 },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  bullet: { color: '#e94560', fontSize: 14, width: 22, fontWeight: '700' },
+  bullet: { color: '#1a1a2e', fontSize: 14, width: 22, fontWeight: '700' },
   bulletText: { color: '#ddd', fontSize: 14, flex: 1, lineHeight: 22 },
   policyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#16213e' },
   policyLabel: { color: '#fff', fontSize: 15 },
-  policyAmount: { color: '#e94560', fontSize: 15, fontWeight: '700' },
+  policyAmount: { color: '#1a1a2e', fontSize: 15, fontWeight: '700' },
 });

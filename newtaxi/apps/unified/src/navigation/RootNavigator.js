@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, ROLES } from '../constants';
@@ -9,9 +9,20 @@ import SuperAdminNavigator from './SuperAdminNavigator';
 import VendorNavigator from './VendorNavigator';
 import DriverNavigator from './DriverNavigator';
 import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
+import SplashScreen from '../screens/auth/SplashScreen';
 
 export default function RootNavigator() {
   const { loading, hasSession, hasUser, getUserRole, selectedRole } = useAuth();
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    // Show splash screen for 2 seconds on app startup
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   console.log('RootNavigator render:', {
     loading,
@@ -19,7 +30,14 @@ export default function RootNavigator() {
     hasUser: hasUser(),
     userRole: getUserRole(),
     selectedRole,
+    showSplash,
   });
+
+  // Show splash screen first
+  if (showSplash) {
+    console.log('Showing splash screen');
+    return <SplashScreen />;
+  }
 
   if (loading) {
     console.log('Showing loading screen');

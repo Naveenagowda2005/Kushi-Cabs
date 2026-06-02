@@ -111,7 +111,7 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
         <Text style={styles.myTripLocation} numberOfLines={1}>{item.pickup_location}</Text>
       </View>
       <View style={styles.row}>
-        <Ionicons name="flag" size={14} color="#e94560" />
+        <Ionicons name="flag" size={14} color="#1a1a2e" />
         <Text style={styles.myTripLocation} numberOfLines={1}>{item.dropoff_location}</Text>
       </View>
       <Text style={styles.myTripDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
@@ -184,10 +184,14 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
         </View>
       )}
 
-      {/* Note 2: Tax */}
+      {/* Note 2: Tax and Toll */}
       <View style={styles.noteItem}>
         <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>State tax, toll & parking extra if applicable</Text>
+        <Text style={styles.noteText}>
+          {item.toll_included 
+            ? '✓ Toll charge included in fare' 
+            : 'State tax, toll & parking extra if applicable'}
+        </Text>
       </View>
 
       {/* Note 3: Pets */}
@@ -522,8 +526,8 @@ export default function VendorEnquiriesScreen({ navigation }) {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={activeTab === 0 ? refetchEnq : refetchTrips}
-            tintColor="#e94560"
-            colors={['#e94560']}
+            tintColor="#1a1a2e"
+            colors={['#1a1a2e']}
           />
         }
       />
@@ -551,7 +555,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 2,
   },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#e94560' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: '#1a1a2e' },
   tabText: {
     color: '#888',
     fontSize: Math.max(13, screenWidth * 0.035),
@@ -559,7 +563,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabTextActive: { color: '#fff' },
-  badge: { color: '#e94560' },
+  badge: { color: '#1a1a2e' },
   list: {
     padding: screenWidth * 0.04,
     flexGrow: 1,
@@ -586,7 +590,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenWidth * 0.04,
     paddingVertical: 10,
   },
-  errorText: { color: '#e94560', fontSize: Math.max(12, screenWidth * 0.032), flex: 1, marginRight: 8 },
+  errorText: { color: '#1a1a2e', fontSize: Math.max(12, screenWidth * 0.032), flex: 1, marginRight: 8 },
   retryText: { color: '#fff', fontSize: Math.max(12, screenWidth * 0.032), fontWeight: '600' },
   myTripCard: {
     backgroundColor: '#16213e',
@@ -602,7 +606,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  myTripFare: { color: '#e94560', fontWeight: 'bold', fontSize: Math.max(15, screenWidth * 0.04) },
+  myTripFare: { color: '#1a1a2e', fontWeight: 'bold', fontSize: Math.max(15, screenWidth * 0.04) },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, flex: 1 },
   myTripLocation: { color: '#ccc', fontSize: Math.max(12, screenWidth * 0.032), flex: 1 },
   myTripDate: { color: '#555', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 6 },
@@ -803,7 +807,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: Math.max(24, screenHeight * 0.03),
     right: Math.max(24, screenWidth * 0.06),
-    backgroundColor: '#e94560',
+    backgroundColor: '#1a1a2e',
     width: Math.max(52, screenWidth * 0.14),
     height: Math.max(52, screenWidth * 0.14),
     borderRadius: Math.max(26, screenWidth * 0.07),

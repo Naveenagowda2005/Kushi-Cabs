@@ -42,7 +42,7 @@ export default function VendorEarningsScreen() {
         <RefreshControl
           refreshing={walletLoading || txLoading}
           onRefresh={() => { refetchWallet(); refetchTx(); }}
-          tintColor="#e94560" colors={['#e94560']}
+          tintColor="#1a1a2e" colors={['#1a1a2e']}
         />
       }
     >
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
   },
-  periodBtnActive: { backgroundColor: '#e94560' },
+  periodBtnActive: { backgroundColor: '#1a1a2e' },
   periodText: { 
     color: '#888', 
     fontSize: Math.max(13, screenWidth * 0.035), 

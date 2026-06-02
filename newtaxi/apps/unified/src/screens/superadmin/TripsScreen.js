@@ -99,7 +99,12 @@ function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError,
           .createSignedUrl(filePath, 3600); // 1 hour expiry
 
         if (error) {
-          console.error('Error creating signed URL:', error);
+          // Silently fail for missing images (404 is expected)
+          if (error.message?.includes('404') || error.message?.includes('not found')) {
+            console.log('Image not found in storage (expected):', filePath);
+          } else {
+            console.error('Error creating signed URL:', error);
+          }
           setSignedUrl(null);
           onError?.();
           setLoading(false);
@@ -247,7 +252,12 @@ export default function SuperAdminTripsScreen() {
         .createSignedUrl(filePath, 3600); // 1 hour expiry
 
       if (error) {
-        console.error('Error creating signed URL for modal:', error);
+        // Silently fail for missing images (404 is expected)
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+          console.log('Image not found in storage (expected):', filePath);
+        } else {
+          console.error('Error creating signed URL for modal:', error);
+        }
         return;
       }
 
@@ -315,7 +325,12 @@ export default function SuperAdminTripsScreen() {
         .createSignedUrl(filePath, 3600); // 1 hour expiry
 
       if (error) {
-        console.error('Error creating signed URL:', error);
+        // Silently fail for missing images (404 is expected)
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+          console.log('Image not found in storage (expected):', filePath);
+        } else {
+          console.error('Error creating signed URL:', error);
+        }
         return storagePath; // Fallback to original
       }
 
@@ -365,7 +380,7 @@ export default function SuperAdminTripsScreen() {
             </Text>
           </View>
           <View style={styles.locationRow}>
-            <Ionicons name="flag" size={14} color="#e94560" />
+            <Ionicons name="flag" size={14} color="#1a1a2e" />
             <Text style={styles.locationText} numberOfLines={1}>
               {item.dropoff_location}
             </Text>
@@ -735,7 +750,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   fare: {
-    color: '#e94560',
+    color: '#1a1a2e',
     fontWeight: 'bold',
     fontSize: 16,
   },

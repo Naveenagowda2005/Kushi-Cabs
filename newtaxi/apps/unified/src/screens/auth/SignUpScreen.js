@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator,
+  Platform, ScrollView, ActivityIndicator, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, ROLES, API_CONFIG } from '../../constants';
 import { wp, hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import { glassStyles } from '../../styles/glassomorphism';
+import { useAnimatedBorder } from '../../hooks/useAnimatedBorder';
 
 export default function SignUpScreen({ navigation }) {
-  const { signUp, loading, selectedRole } = useAuth();
+  const { signUp, loading, selectedRole, setIncompleteSignupPhone } = useAuth();
   const [form, setForm] = useState({
     phone: '',
   });
@@ -43,9 +44,9 @@ export default function SignUpScreen({ navigation }) {
       try {
         console.log('Requesting OTP for new signup:', form.phone);
         
-        // Create abort controller for timeout
+        // Create abort controller for timeout (30 seconds)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         
         const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
           method: 'POST',
@@ -90,9 +91,9 @@ export default function SignUpScreen({ navigation }) {
     try {
       console.log('Verifying OTP for signup:', form.phone);
       
-      // Create abort controller for timeout
+      // Create abort controller for timeout (30 seconds)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
         method: 'POST',
@@ -132,12 +133,23 @@ export default function SignUpScreen({ navigation }) {
     const { data, error } = await signUp(form.phone, tempPassword, selectedRole);
     
     if (error) {
+      console.error('SignUp returned error:', error);
       Alert.alert('Sign Up Failed', error.message);
       return;
     }
 
-    // Navigate to registration screen with selected role and phone
-    navigation.navigate('Register', { role: selectedRole, phone: form.phone.replace(/\s/g, '') });
+    console.log('✅ SignUp successful');
+    console.log('Setting incomplete signup phone and navigating to Register...');
+    
+    // Store phone for Register screen to use
+    setIncompleteSignupPhone(form.phone);
+    
+    // Navigate directly to Register
+    console.log('📍 Navigating to Register screen');
+    navigation.navigate('Register', { 
+      role: selectedRole, 
+      phone: form.phone.replace(/\s/g, '') 
+    });
   };
 
   const handleLogin = () => {
@@ -230,10 +242,10 @@ export default function SignUpScreen({ navigation }) {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(147, 51, 234, 0.1)' }]}>
+          <View style={[styles.iconContainer, { backgroundColor: '#1a1a2e' }]}>
             <Ionicons name={roleConfig.icon} size={40} color={roleConfig.color} />
           </View>
-          <Text style={[styles.title, { color: roleConfig.color }]}>{roleConfig.title}</Text>
+          <Text style={[styles.title, { color: '#ffffff' }]}>{roleConfig.title}</Text>
           <Text style={styles.subtitle}>{roleConfig.subtitle}</Text>
           <Text style={styles.description}>{roleConfig.description}</Text>
         </View>
@@ -299,23 +311,37 @@ export default function SignUpScreen({ navigation }) {
             </View>
           )}
 
-          <TouchableOpacity
-            style={[
-              styles.signUpButton, 
-              { backgroundColor: roleConfig.color },
-              loading && styles.signUpButtonDisabled
-            ]}
-            onPress={handleSignUp}
-            disabled={loading}
+          <Animated.View
+            style={{
+              borderColor: useAnimatedBorder('#9333ea', '#00d4ff', 2000),
+              borderWidth: 2,
+              borderRadius: 12,
+              backgroundColor: roleConfig.color + 'da',
+              shadowColor: roleConfig.color,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 10,
+              elevation: 6,
+              marginTop: 8,
+            }}
           >
-            {loading ? (
-              <ActivityIndicator color={COLORS.textLight} />
-            ) : (
-              <Text style={styles.signUpButtonText}>
-                {showOtpField ? 'Verify & Create Account' : 'Send OTP'}
-              </Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.signUpButton, 
+                loading && styles.signUpButtonDisabled
+              ]}
+              onPress={handleSignUp}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.textLight} />
+              ) : (
+                <Text style={styles.signUpButtonText}>
+                  {showOtpField ? 'Verify & Create Account' : 'Send OTP'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
 
           {showOtpField && (
             <TouchableOpacity
@@ -361,7 +387,7 @@ export default function SignUpScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#001a33',
   },
   scroll: {
     flexGrow: 1,
@@ -370,6 +396,8 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: hp(3),
+    backgroundColor: '#001a33',
+    paddingVertical: 20,
   },
   iconContainer: {
     width: 70,
@@ -460,10 +488,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   signUpButton: {
-    ...glassStyles.button,
     paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 8,
   },
   signUpButtonDisabled: {
     opacity: 0.6,

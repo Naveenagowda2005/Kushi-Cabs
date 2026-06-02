@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../constants';
+import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 
 export default function SuperAdminDriversScreen({ navigation }) {
@@ -77,28 +77,30 @@ export default function SuperAdminDriversScreen({ navigation }) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            // Get drivers table row id (FK target for trips.driver_id)
-            const { data: driverRow } = await supabase
-              .from('drivers').select('id').eq('user_id', driverId).maybeSingle();
+            // Use backend API to delete user (checks for pending trips)
+            const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/delete-user`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: driverId,
+                email: `${driverId}@kushicabs.phone`
+              })
+            });
 
-            // Null out all trip FK references before deleting
-            if (driverRow?.id) {
-              await supabase.from('trips').update({ driver_id: null }).eq('driver_id', driverRow.id);
+            const result = await response.json();
+
+            if (!response.ok) {
+              // Check if error is due to pending trips
+              if (result.pendingTripsCount > 0) {
+                Alert.alert(
+                  'Cannot Delete Driver',
+                  `${result.message}\n\nPending Trips: ${result.pendingTripsCount}\nStatuses: ${result.tripStatuses?.join(', ') || 'N/A'}`
+                );
+              } else {
+                throw new Error(result.message || 'Failed to delete driver');
+              }
+              return;
             }
-            await supabase.from('trips').update({ accepted_by: null }).eq('accepted_by', driverId);
-            await supabase.from('trips').update({ created_by: null }).eq('created_by', driverId);
-
-            // Delete wallet transactions then wallet
-            const { data: wallet } = await supabase.from('wallets').select('id').eq('user_id', driverId).maybeSingle();
-            if (wallet?.id) await supabase.from('transactions').delete().eq('wallet_id', wallet.id);
-            await supabase.from('wallets').delete().eq('user_id', driverId);
-
-            // Delete documents, driver profile, then user
-            await supabase.from('documents').delete().eq('user_id', driverId);
-            await supabase.from('drivers').delete().eq('user_id', driverId);
-
-            const { error } = await supabase.from('users').delete().eq('id', driverId);
-            if (error) throw error;
 
             Alert.alert('Success', 'Driver deleted successfully');
             fetchDrivers();

@@ -192,7 +192,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
   function InfoRow({ icon, label, value, highlight }) {
     return (
       <View style={styles.infoRow}>
-        <Ionicons name={icon} size={20} color="#e94560" style={styles.infoIcon} />
+        <Ionicons name={icon} size={20} color="#1a1a2e" style={styles.infoIcon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.infoLabel}>{label}</Text>
           <Text style={[styles.infoValue, highlight && styles.infoValueHighlight]}>{value || '—'}</Text>
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a2e' },
   scroll: { padding: 20, paddingBottom: 20 },
 
-  fareCard: { backgroundColor: '#e94560', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16 },
+  fareCard: { backgroundColor: '#1a1a2e', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16 },
   fareLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
   fareAmount: { color: '#fff', fontSize: 42, fontWeight: 'bold', marginTop: 4 },
   commissionBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginTop: 10 },
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   payBtn: { backgroundColor: '#4caf50', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   gatewayBtn: { backgroundColor: '#0f3460', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 12 },
   payBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  startBtn: { backgroundColor: '#e94560', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  startBtn: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   startBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
   btnDisabled: { backgroundColor: '#444' },
 });

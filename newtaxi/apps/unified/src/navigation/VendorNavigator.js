@@ -23,7 +23,7 @@ function EnquiriesStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.vendor.primary },
+        headerStyle: { backgroundColor: '#001a33' },
         headerTintColor: COLORS.textLight,
       }}
     >
@@ -55,7 +55,7 @@ function ProfileStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.vendor.primary },
+        headerStyle: { backgroundColor: '#001a33' },
         headerTintColor: COLORS.textLight,
       }}
     >
@@ -94,8 +94,8 @@ export default function VendorNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: { 
-          backgroundColor: COLORS.vendor.primary, 
-          borderTopColor: '#16213e',
+          backgroundColor: '#001a33', 
+          borderTopColor: '#0d0f1a',
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,

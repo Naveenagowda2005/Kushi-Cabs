@@ -50,7 +50,7 @@ export default function VendorWalletScreen() {
           <RefreshControl
             refreshing={walletLoading || txLoading}
             onRefresh={() => { refetchWallet(); refetchTx(); }}
-            tintColor="#e94560" colors={['#e94560']}
+            tintColor="#1a1a2e" colors={['#1a1a2e']}
           />
         }
         ListEmptyComponent={
@@ -126,12 +126,12 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     justifyContent: 'center', 
     gap: 8, 
-    backgroundColor: '#e94560', 
+    backgroundColor: '#1a1a2e', 
     borderRadius: 12, 
     padding: screenWidth * 0.035,
     minHeight: 48, // Ensure touch target is large enough
   },
-  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#e94560' },
+  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#1a1a2e' },
   actionBtnText: { 
     color: '#fff', 
     fontSize: Math.max(13, screenWidth * 0.035), 
@@ -253,7 +253,7 @@ const modal = StyleSheet.create({
     borderColor: '#1a1a2e',
     minHeight: 44,
   },
-  methodBtnActive: { backgroundColor: '#e94560', borderColor: '#e94560' },
+  methodBtnActive: { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
   methodText: { 
     color: '#888', 
     fontWeight: '600',
@@ -261,7 +261,7 @@ const modal = StyleSheet.create({
   },
   methodTextActive: { color: '#fff' },
   confirmBtn: { 
-    backgroundColor: '#e94560', 
+    backgroundColor: '#1a1a2e', 
     borderRadius: 14, 
     padding: 16, 
     alignItems: 'center', 

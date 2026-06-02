@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: COLORS.driver.primary,
+    backgroundColor: '#001a33',
     paddingTop: 12,
   },
   title: {
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   activeTripBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e94560',
+    backgroundColor: '#1a1a2e',
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginHorizontal: 0,
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   myTripFare: {
-    color: '#e94560',
+    color: '#1a1a2e',
     fontSize: 18,
     fontWeight: '700',
     marginLeft: 12,
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tripFare: {
-    color: '#e94560',
+    color: '#1a1a2e',
     fontSize: 18,
     fontWeight: '700',
     marginLeft: 12,

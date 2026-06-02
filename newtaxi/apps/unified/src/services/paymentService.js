@@ -160,7 +160,7 @@ export async function initiateDeposit({ userId, amount, userEmail, userName, gat
       email: userEmail ?? '',
       name:  userName  ?? '',
     },
-    theme: { color: '#e94560' },
+    theme: { color: '#1a1a2e' },
   };
 
   return new Promise((resolve, reject) => {

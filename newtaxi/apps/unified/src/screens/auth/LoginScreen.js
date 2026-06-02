@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, ROLES, API_CONFIG } from '../../constants';
 import { wp, hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import { glassStyles } from '../../styles/glassomorphism';
+import { useAnimatedBorder } from '../../hooks/useAnimatedBorder';
 
 export default function LoginScreen({ navigation }) {
   const { signIn, signOut, loading, selectedRole, resetRoleSelection, hasSession } = useAuth();
@@ -504,9 +505,9 @@ export default function LoginScreen({ navigation }) {
         console.log('Requesting OTP for:', form.identifier);
         console.log('Using API URL:', API_CONFIG.SMS_API_URL);
         
-        // Create abort controller for timeout
+        // Create abort controller for timeout (30 seconds)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         
         const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
           method: 'POST',
@@ -554,9 +555,9 @@ export default function LoginScreen({ navigation }) {
     try {
       console.log('Verifying OTP for:', form.identifier);
       
-      // Create abort controller for timeout
+      // Create abort controller for timeout (30 seconds)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
         method: 'POST',
@@ -628,9 +629,9 @@ export default function LoginScreen({ navigation }) {
     try {
       console.log('Resending OTP for:', form.identifier);
       
-      // Create abort controller for timeout
+      // Create abort controller for timeout (30 seconds)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/otp`, {
         method: 'POST',
@@ -744,7 +745,7 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
           )}
           
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(147, 51, 234, 0.1)' }]}>
+          <View style={[styles.iconContainer, { backgroundColor: '#1a1a2e' }]}>
             {/* Pulse rings */}
             {selectedRole === ROLES.SUPER_ADMIN && (
               <>
@@ -863,13 +864,13 @@ export default function LoginScreen({ navigation }) {
               ]}
             >
               <Image
-                source={require('../../../logo.jpeg')}
+                source={require('../../../logo.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
             </Animated.View>
           </View>
-          <Text style={[styles.title, { color: roleConfig.color }]}>{roleConfig.title}</Text>
+          <Text style={[styles.title, { color: '#ffffff' }]}>{roleConfig.title}</Text>
           <Text style={styles.subtitle}>{roleConfig.subtitle}</Text>
         </View>
 
@@ -949,19 +950,34 @@ export default function LoginScreen({ navigation }) {
             </View>
           )}
 
-          <TouchableOpacity
-            style={[styles.loginButton, { backgroundColor: roleConfig.color }, loading && styles.loginButtonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
+          <Animated.View
+            style={{
+              borderColor: useAnimatedBorder('#9333ea', '#00d4ff', 2000),
+              borderWidth: 2,
+              borderRadius: 12,
+              backgroundColor: roleConfig.color + 'da',
+              shadowColor: roleConfig.color,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 10,
+              elevation: 6,
+              marginTop: 8,
+            }}
           >
-            {loading ? (
-              <ActivityIndicator color={COLORS.textLight} />
-            ) : (
-              <Text style={styles.loginButtonText}>
-                {showOtpField ? 'Verify & Sign In' : 'Sign In'}
-              </Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.textLight} />
+              ) : (
+                <Text style={styles.loginButtonText}>
+                  {showOtpField ? 'Verify & Sign In' : 'Sign In'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
 
           {showOtpField && (
             <TouchableOpacity
@@ -1020,7 +1036,7 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#001a33',
   },
   scroll: {
     flexGrow: 1,
@@ -1031,6 +1047,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: hp(4),
     position: 'relative',
+    backgroundColor: '#001a33',
+    paddingVertical: 20,
   },
   backButton: {
     position: 'absolute',
@@ -1178,10 +1196,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loginButton: {
-    ...glassStyles.button,
     paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 8,
   },
   loginButtonDisabled: {
     opacity: 0.6,

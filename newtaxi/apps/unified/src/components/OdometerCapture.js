@@ -57,8 +57,8 @@ export default function OdometerCapture({ label, onCapture }) {
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.pickBtn, styles.pickBtnAlt]} onPress={() => handlePick(false)} disabled={loading}>
-            <Ionicons name="image-outline" size={22} color="#e94560" />
-            <Text style={[styles.pickBtnText, { color: '#e94560' }]}>Gallery</Text>
+            <Ionicons name="image-outline" size={22} color="#1a1a2e" />
+            <Text style={[styles.pickBtnText, { color: '#1a1a2e' }]}>Gallery</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -84,13 +84,13 @@ const styles = StyleSheet.create({
   label: { color: '#fff', fontSize: 16, fontWeight: '600', marginBottom: 12 },
   preview: { width: '100%', height: 180, borderRadius: 10, marginBottom: 8, resizeMode: 'cover' },
   retake: { alignSelf: 'flex-end', marginBottom: 8 },
-  retakeText: { color: '#e94560', fontSize: 13 },
+  retakeText: { color: '#1a1a2e', fontSize: 13 },
   pickRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   pickBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#e94560', borderRadius: 10, padding: 12, gap: 8,
+    backgroundColor: '#1a1a2e', borderRadius: 10, padding: 12, gap: 8,
   },
-  pickBtnAlt: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#e94560' },
+  pickBtnAlt: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#1a1a2e' },
   pickBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   kmRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   kmLabel: { color: '#888', fontSize: 13 },

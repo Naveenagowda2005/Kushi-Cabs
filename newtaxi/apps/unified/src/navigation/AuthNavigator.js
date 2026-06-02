@@ -9,11 +9,14 @@ import SignUpScreen from '../screens/auth/SignUpScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import OtpScreen from '../screens/auth/OtpScreen';
 import PolicyScreen from '../screens/common/PolicyScreen';
+import DriverDocumentUploadScreen from '../screens/driver/DriverDocumentUploadScreen';
+import DriverOnboardingTimelineScreen from '../screens/driver/DriverOnboardingTimelineScreen';
+import WaitingForApprovalScreen from '../screens/driver/WaitingForApprovalScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function AuthNavigator() {
-  const { selectedRole, hasSession, hasUser } = useAuth();
+  const { selectedRole, hasSession, hasUser, session, incompleteSignupPhone } = useAuth();
 
   const getRoleColor = () => {
     switch (selectedRole) {
@@ -41,13 +44,29 @@ export default function AuthNavigator() {
     }
   };
 
+  // Extract phone from auth user's email (format: {phone}@kushicabs.phone)
+  const getPhoneFromEmail = () => {
+    const email = session?.user?.email;
+    if (email && email.endsWith('@kushicabs.phone')) {
+      return email.replace('@kushicabs.phone', '');
+    }
+    return '';
+  };
+
   // Determine initial route based on auth state
   const getInitialRouteName = () => {
+    // If we have incomplete signup phone, user just completed signup - show Register
+    if (incompleteSignupPhone && selectedRole) {
+      console.log('AuthNavigator: Incomplete signup detected, starting with Register');
+      return 'Register';
+    }
+    
     // If user has session but no profile, go directly to Register
     if (hasSession() && !hasUser() && selectedRole) {
       console.log('AuthNavigator: User has session but no profile, starting with Register');
       return 'Register';
     }
+    
     // Otherwise start with Login
     return 'Login';
   };
@@ -97,13 +116,37 @@ export default function AuthNavigator() {
           title: `Complete ${getRoleTitle()} Registration`,
           headerLeft: hasSession() && !hasUser() ? null : undefined, // Hide back button if completing registration
         }} 
-        initialParams={{ role: selectedRole }}
+        initialParams={{ role: selectedRole, phone: incompleteSignupPhone || getPhoneFromEmail() }}
       />
       <Stack.Screen 
         name="Otp" 
         component={OtpScreen} 
         options={{ 
           title: 'Verify Phone' 
+        }} 
+      />
+      <Stack.Screen 
+        name="DriverDocumentUpload" 
+        component={DriverDocumentUploadScreen} 
+        options={{ 
+          title: 'Upload Documents',
+          headerLeft: () => null, // Hide back button - must complete document upload
+        }} 
+      />
+      <Stack.Screen 
+        name="DriverOnboardingTimeline" 
+        component={DriverOnboardingTimelineScreen} 
+        options={{ 
+          title: 'Your Onboarding Journey',
+          headerLeft: () => null, // Hide back button during onboarding
+        }} 
+      />
+      <Stack.Screen 
+        name="WaitingForApproval" 
+        component={WaitingForApprovalScreen} 
+        options={{ 
+          title: 'Waiting for Approval',
+          headerLeft: () => null, // Hide back button - must wait for approval
         }} 
       />
     </Stack.Navigator>

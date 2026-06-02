@@ -148,7 +148,7 @@ export default function EnquiryCard({ trip, onPress }) {
       </View>
 
       <View style={styles.row}>
-        <Ionicons name="flag" size={16} color="#e94560" />
+        <Ionicons name="flag" size={16} color="#1a1a2e" />
         <View style={styles.locationContent}>
           <Text style={styles.locationLabel}>Dropoff</Text>
           <Text style={styles.location} numberOfLines={2}>{trip.dropoff_location}</Text>
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: screenWidth * 0.04,
     right: screenWidth * 0.04,
-    backgroundColor: '#e94560',
+    backgroundColor: '#1a1a2e',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,

@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, ROLES } from '../../constants';
+import { useAnimatedBorder } from '../../hooks/useAnimatedBorder';
 
 const roleOptions = [
   {
@@ -148,7 +149,7 @@ export default function RoleSelectionScreen() {
             ]}
           >
             <Image
-              source={require('../../../logo.jpeg')}
+              source={require('../../../logo.png')}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -159,46 +160,12 @@ export default function RoleSelectionScreen() {
 
         <View style={styles.rolesContainer}>
           {roleOptions.map((option) => (
-            <TouchableOpacity
+            <RoleCard
               key={option.role}
-              style={[
-                styles.roleCard,
-                { borderColor: option.color }
-              ]}
+              option={option}
               onPress={() => handleRoleSelect(option.role)}
               disabled={loading}
-              activeOpacity={0.8}
-            >
-              <View style={styles.roleCardContent}>
-                <View style={[styles.iconContainer, { backgroundColor: option.color + '15' }]}>
-                  <Ionicons 
-                    name={option.icon} 
-                    size={40} 
-                    color={option.color} 
-                  />
-                </View>
-                
-                <View style={styles.roleInfo}>
-                  <Text style={[styles.roleTitle, { color: option.color }]}>
-                    {option.title}
-                  </Text>
-                  <Text style={styles.roleSubtitle}>
-                    {option.subtitle}
-                  </Text>
-                  <Text style={styles.roleDescription}>
-                    {option.description}
-                  </Text>
-                </View>
-                
-                <View style={styles.arrowContainer}>
-                  <Ionicons 
-                    name="chevron-forward" 
-                    size={24} 
-                    color={option.color} 
-                  />
-                </View>
-              </View>
-            </TouchableOpacity>
+            />
           ))}
         </View>
 
@@ -221,10 +188,68 @@ export default function RoleSelectionScreen() {
   );
 }
 
+// Animated Role Card Component
+function RoleCard({ option, onPress, disabled }) {
+  const borderColor = useAnimatedBorder(option.color, '#00d4ff', 2000);
+
+  return (
+    <Animated.View
+      style={{
+        borderColor: borderColor,
+        borderWidth: 2,
+        borderRadius: 16,
+        backgroundColor: COLORS.surface,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+      }}
+    >
+      <TouchableOpacity
+        style={styles.roleCard}
+        onPress={onPress}
+        disabled={disabled}
+        activeOpacity={0.8}
+      >
+        <View style={styles.roleCardContent}>
+          <View style={[styles.iconContainer, { backgroundColor: option.color + '15' }]}>
+            <Ionicons 
+              name={option.icon} 
+              size={40} 
+              color={option.color} 
+            />
+          </View>
+          
+          <View style={styles.roleInfo}>
+            <Text style={[styles.roleTitle, { color: option.color }]}>
+              {option.title}
+            </Text>
+            <Text style={styles.roleSubtitle}>
+              {option.subtitle}
+            </Text>
+            <Text style={styles.roleDescription}>
+              {option.description}
+            </Text>
+          </View>
+          
+          <View style={styles.arrowContainer}>
+            <Ionicons 
+              name="chevron-forward" 
+              size={24} 
+              color={option.color} 
+            />
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#001a33',
   },
   scrollView: {
     flex: 1,
@@ -238,6 +263,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 24,
     paddingBottom: 24,
+    backgroundColor: '#001a33',
   },
   logoContainer: {
     width: 100,
@@ -276,9 +302,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   roleCard: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'transparent',
     borderRadius: 16,
-    borderWidth: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

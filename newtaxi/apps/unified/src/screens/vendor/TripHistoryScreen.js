@@ -80,7 +80,7 @@ export default function VendorTripHistoryScreen() {
           <Text style={styles.location} numberOfLines={1}>{item.pickup_location}</Text>
         </View>
         <View style={styles.row}>
-          <Ionicons name="flag" size={14} color="#e94560" />
+          <Ionicons name="flag" size={14} color="#1a1a2e" />
           <Text style={styles.location} numberOfLines={1}>{item.dropoff_location}</Text>
         </View>
 
@@ -143,7 +143,7 @@ export default function VendorTripHistoryScreen() {
         renderItem={({ item }) => <TripCard item={item} />}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchTrips} tintColor="#e94560" colors={['#e94560']} />
+          <RefreshControl refreshing={loading} onRefresh={fetchTrips} tintColor="#1a1a2e" colors={['#1a1a2e']} />
         }
         ListEmptyComponent={
           !loading && (
@@ -160,7 +160,7 @@ export default function VendorTripHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f3460' },
-  header: { backgroundColor: '#16213e', padding: 20, paddingTop: 60 },
+  header: { backgroundColor: '#001a33', padding: 20, paddingTop: 60 },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#888', fontSize: 13, marginTop: 4 },
   statsRow: { flexDirection: 'row', backgroundColor: '#16213e', paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#0f3460' },
@@ -169,13 +169,13 @@ const styles = StyleSheet.create({
   statLabel: { color: '#888', fontSize: 11, marginTop: 2 },
   tabs: { flexDirection: 'row', backgroundColor: '#16213e', paddingHorizontal: 4, paddingBottom: 4 },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  tabActive: { backgroundColor: '#e94560' },
+  tabActive: { backgroundColor: '#1a1a2e' },
   tabText: { color: '#888', fontSize: 12, fontWeight: '600' },
   tabTextActive: { color: '#fff' },
   list: { padding: 16, paddingBottom: 100 },
   card: { backgroundColor: '#16213e', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#1a1a2e' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  fare: { color: '#e94560', fontWeight: 'bold', fontSize: 16 },
+  fare: { color: '#1a1a2e', fontWeight: 'bold', fontSize: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   location: { color: '#ccc', fontSize: 13, flex: 1 },
   meta: { color: '#888', fontSize: 12, flex: 1 },
