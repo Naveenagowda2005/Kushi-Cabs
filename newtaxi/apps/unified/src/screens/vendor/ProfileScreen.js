@@ -203,10 +203,12 @@ export default function VendorProfileScreen({ navigation }) {
         </View>
         <Text style={styles.name}>{user?.full_name || 'Vendor'}</Text>
         <Text style={styles.phone}>{user?.phone}</Text>
+        {user?.id && (
+          <Text style={styles.userId}>ID: {user.id}</Text>
+        )}
         {vendor?.company_name && <Text style={styles.company}>{vendor.company_name}</Text>}
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>Vendor</Text>
-          {commissionValue && <Text style={styles.commissionText}>{commissionValue}% commission</Text>}
         </View>
       </View>
 
@@ -374,6 +376,7 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
   name: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   phone: { color: '#888', fontSize: 14, marginBottom: 4 },
+  userId: { color: '#555', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
   company: { color: '#aaa', fontSize: 13, marginBottom: 8 },
   roleBadge: { backgroundColor: '#e9456020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#e94560', alignItems: 'center' },
   roleText: { color: '#e94560', fontSize: 12, fontWeight: '600' },

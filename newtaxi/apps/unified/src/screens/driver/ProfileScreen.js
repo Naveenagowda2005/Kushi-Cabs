@@ -178,6 +178,9 @@ export default function DriverProfileScreen({ navigation }) {
         <Text style={styles.photoHint}>Tap to change photo</Text>
         <Text style={styles.name}>{user?.full_name || 'Driver'}</Text>
         <Text style={styles.phone}>{user?.phone}</Text>
+        {user?.id && (
+          <Text style={styles.userId}>ID: {user.id}</Text>
+        )}
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>Driver</Text>
         </View>
@@ -351,6 +354,7 @@ const styles = StyleSheet.create({
   photoHint: { color: '#555', fontSize: 11, marginBottom: 8 },
   name: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   phone: { color: '#888', fontSize: 14, marginBottom: 8 },
+  userId: { color: '#555', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
   roleBadge: { backgroundColor: '#4caf5020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#4caf50' },
   roleText: { color: '#4caf50', fontSize: 12, fontWeight: '600' },
 
