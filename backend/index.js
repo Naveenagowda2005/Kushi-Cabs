@@ -55,11 +55,12 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`✅ Taxi SMS backend listening on http://127.0.0.1:${port}`);
-  console.log(`✅ Access from phone at: http://192.168.1.114:${port}`);
+  console.log(`✅ Access from phone at: http://172.28.108.178:${port}`);
   console.log(`📱 API endpoints:`);
   console.log(`   - POST /sms/otp - Send OTP`);
   console.log(`   - POST /sms/verify - Verify OTP`);
   console.log(`   - POST /admin/delete-user - Delete user`);
+  console.log(`   - POST /admin/update-admin-phone - Update admin phone`);
   console.log(`   - GET /admin/user/:userId - Get user info`);
   console.log(`   - GET /health - Health check`);
 });

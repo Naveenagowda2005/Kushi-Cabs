@@ -59,8 +59,8 @@ const DocumentUploadCard = ({
   };
 
   const handleUploadPress = () => {
-    // DRIVER_SELFIE always uses camera
-    if (documentType === 'DRIVER_SELFIE') {
+    // DRIVER_SELFIE and VENDOR_SELFIE always uses camera
+    if (documentType === 'DRIVER_SELFIE' || documentType === 'VENDOR_SELFIE') {
       onUpload(documentType, true);
     } else {
       Alert.alert(

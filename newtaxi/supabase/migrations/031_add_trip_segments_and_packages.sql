@@ -22,8 +22,8 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS return_location TEXT;
 
 -- Insert trip segments
 INSERT INTO trip_segments (name, description) VALUES
-  ('One-way', 'Single journey from pickup to dropoff'),
   ('Round trips', 'Return journey with pickup and return location'),
+  ('One-way', 'Single journey from pickup to dropoff'),
   ('Airport transfers', 'Dedicated airport transfer service'),
   ('Local Packages', 'Local area packages with fixed distances')
 ON CONFLICT (name) DO NOTHING;

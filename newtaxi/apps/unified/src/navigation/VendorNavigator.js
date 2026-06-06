@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { View, ActivityIndicator } from 'react-native';
 import { COLORS } from '../constants';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
-// Vendor screens - we'll create these next
+// Vendor screens
 import VendorEnquiriesScreen from '../screens/vendor/EnquiriesScreen';
 import VendorEnquiryDetailScreen from '../screens/vendor/EnquiryDetailScreen';
 import VendorCreateTripScreen from '../screens/vendor/CreateTripScreen';
@@ -13,8 +16,11 @@ import VendorTripHistoryScreen from '../screens/vendor/TripHistoryScreen';
 import VendorWalletScreen from '../screens/vendor/WalletScreen';
 import VendorProfileScreen from '../screens/vendor/ProfileScreen';
 import VendorSettingsScreen from '../screens/vendor/SettingsScreen';
+import VendorDocumentUploadScreen from '../screens/vendor/VendorDocumentUploadScreen';
+import VendorWaitingForApprovalScreen from '../screens/vendor/VendorWaitingForApprovalScreen';
 import CompletedTripDetailScreen from '../screens/driver/CompletedTripDetailScreen';
 import PolicyScreen from '../screens/common/PolicyScreen';
+import ViewPolicyScreen from '../screens/common/ViewPolicyScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -84,11 +90,146 @@ function ProfileStack() {
         component={PolicyScreen}
         options={{ title: 'Cancellation Policy' }}
       />
+      <Stack.Screen
+        name="ViewPolicy"
+        component={ViewPolicyScreen}
+        options={({ route }) => ({
+          title: route.params?.policyType === 'privacy_policy' ? 'Privacy Policy'
+            : route.params?.policyType === 'terms_conditions' ? 'Terms & Conditions'
+            : route.params?.policyType === 'cancellation_policy' ? 'Cancellation Policy'
+            : route.params?.policyType === 'refund_policy' ? 'Refund Policy'
+            : route.params?.policyType === 'safety_guidelines' ? 'Safety Guidelines'
+            : 'Policy',
+        })}
+      />
     </Stack.Navigator>
   );
 }
 
 export default function VendorNavigator() {
+  const { user } = useAuth();
+  const [verificationStatus, setVerificationStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let isMounted = true;
+
+    const checkVerificationStatus = async () => {
+      try {
+        // Add cache busting query parameter to force fresh data
+        const timestamp = new Date().getTime();
+        
+        const { data, error } = await supabase
+          .from('vendor_verification_status')
+          .select('overall_status, approved_at, rejected_at')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!isMounted) return;
+
+        // Handle table doesn't exist error (PGRST205)
+        if (error?.code === 'PGRST205') {
+          console.log('VendorNavigator: vendor_verification_status table not created yet - setting to not_started');
+          setVerificationStatus('not_started');
+          setLoading(false);
+          return;
+        }
+
+        // Handle no record found error (PGRST116) - new vendor without documents
+        if (error?.code === 'PGRST116') {
+          console.log('VendorNavigator: No verification record found - setting to not_started');
+          setVerificationStatus('not_started');
+          setLoading(false);
+          return;
+        }
+
+        // Other errors
+        if (error) {
+          console.error('VendorNavigator: Error checking vendor verification status:', error);
+          // Default to not_started on error
+          setVerificationStatus('not_started');
+          setLoading(false);
+          return;
+        }
+
+        // Success - set the status from database
+        const newStatus = data?.overall_status || 'not_started';
+        console.log('VendorNavigator: Status from DB:', newStatus, 'Approved:', data?.approved_at, 'Rejected:', data?.rejected_at);
+        console.log('VendorNavigator: FULL RECORD:', JSON.stringify(data, null, 2));
+        
+        // Update state only if status changed
+        setVerificationStatus((prevStatus) => {
+          if (prevStatus !== newStatus) {
+            console.log('VendorNavigator: ✅ Status CHANGED from', prevStatus, 'to', newStatus);
+          }
+          return newStatus;
+        });
+      } catch (error) {
+        console.error('VendorNavigator: Error in vendor verification check:', error);
+        // Default to not_started on error
+        setVerificationStatus('not_started');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Check on mount only - no polling in the navigator
+    // Polling will be handled by VendorWaitingForApprovalScreen instead
+    checkVerificationStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
+        <ActivityIndicator size="large" color={COLORS.vendor.primary} />
+      </View>
+    );
+  }
+
+  // If vendor is not approved (pending, rejected, or not_started), show waiting screen
+  // They can access document upload from the waiting screen
+  if (verificationStatus === 'pending' || verificationStatus === 'rejected' || verificationStatus === 'not_started') {
+    console.log('VendorNavigator: Vendor not approved (status:', verificationStatus, ') - showing waiting screen');
+    return (
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: true,
+          headerStyle: { backgroundColor: '#001a33' },
+          headerTintColor: COLORS.textLight,
+        }}
+      >
+        <Stack.Screen
+          name="WaitingForApproval"
+          component={VendorWaitingForApprovalScreen}
+          options={{
+            title: 'Waiting for Approval',
+            headerBackVisible: false,
+            headerLeft: () => null, // Disable back button on main screen
+          }}
+        />
+        {/* Allow access to document upload even while waiting */}
+        <Stack.Screen
+          name="UploadDocuments"
+          component={VendorDocumentUploadScreen}
+          options={{
+            title: 'Upload Documents',
+            headerBackVisible: true,
+          }}
+        />
+      </Stack.Navigator>
+    );
+  }
+
+  // If vendor is approved, show normal vendor app
+  console.log('VendorNavigator: Vendor approved - showing dashboard');
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({

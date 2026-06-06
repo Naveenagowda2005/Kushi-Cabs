@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-export default function EnquiryCard({ trip, onPress }) {
+export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
   const [carType, setCarType] = useState(null);
   const [seaterType, setSeaterType] = useState(null);
   const [fuelType, setFuelType] = useState(null);
@@ -101,7 +101,10 @@ export default function EnquiryCard({ trip, onPress }) {
       activeOpacity={0.8}
     >
       <View style={styles.header}>
-        <Text style={styles.tripType}>{segmentName?.toUpperCase() || 'ONE WAY TRIP'}</Text>
+        <View style={styles.tripTypeContainer}>
+          <Ionicons name="car-outline" size={16} color="#888" />
+          <Text style={styles.tripType}>{segmentName?.toUpperCase() || 'ONE WAY TRIP'}</Text>
+        </View>
         <View style={styles.paymentBadge}>
           <Text style={styles.paymentText}>Paid by Cash</Text>
         </View>
@@ -111,33 +114,6 @@ export default function EnquiryCard({ trip, onPress }) {
         <Ionicons name="cash-outline" size={16} color="#fff" />
         <Text style={styles.fareText}>₹{trip.fare_amount}</Text>
       </View>
-
-      {/* Fare Breakdown */}
-      {(commissionAmount > 0 || customerPreAdvance > 0) && (
-        <View style={styles.breakdownBox}>
-          <Text style={styles.breakdownTitle}>Fare Breakdown</Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Total Fare</Text>
-            <Text style={styles.breakdownValue}>₹{trip.fare_amount.toFixed(2)}</Text>
-          </View>
-          {commissionAmount > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Commission Charged</Text>
-              <Text style={[styles.breakdownValue, { color: '#ff6b6b' }]}>-₹{Math.abs(commissionAmount).toFixed(2)}</Text>
-            </View>
-          )}
-          {customerPreAdvance > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Customer Pre-Advance</Text>
-              <Text style={[styles.breakdownValue, { color: '#2196f3' }]}>₹{Math.abs(customerPreAdvance).toFixed(2)}</Text>
-            </View>
-          )}
-          <View style={[styles.breakdownRow, styles.breakdownTotal]}>
-            <Text style={styles.breakdownTotalLabel}>Driver Earning</Text>
-            <Text style={styles.breakdownTotalValue}>₹{(trip.fare_amount - Math.abs(commissionAmount)).toFixed(2)}</Text>
-          </View>
-        </View>
-      )}
 
       <View style={styles.row}>
         <Ionicons name="location" size={16} color="#4caf50" />
@@ -162,6 +138,24 @@ export default function EnquiryCard({ trip, onPress }) {
           <View style={styles.locationContent}>
             <Text style={styles.locationLabel}>Return Location</Text>
             <Text style={styles.location} numberOfLines={2}>{trip.return_location}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Return Date - for Round trips */}
+      {trip.return_date && (
+        <View style={styles.row}>
+          <Ionicons name="calendar-outline" size={16} color="#2196f3" />
+          <View style={styles.locationContent}>
+            <Text style={styles.locationLabel}>Return Date</Text>
+            <Text style={styles.location}>
+              {new Date(trip.return_date).toLocaleDateString('en-IN', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })}
+            </Text>
           </View>
         </View>
       )}
@@ -208,6 +202,34 @@ export default function EnquiryCard({ trip, onPress }) {
         </View>
       )}
 
+      {/* Extra Charges Display */}
+      <View style={styles.extraChargesContainer}>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="cash-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Toll: {trip.toll_included ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="document-text-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Tax: {trip.state_tax_included ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="paw-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Pet: {trip.pet_travelling ? 'Allowed' : 'Not Allowed'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
       {/* Notes Section */}
       <View style={styles.notesHeader}>
         <Text style={styles.notesTitle}>Notes:</Text>
@@ -223,16 +245,12 @@ export default function EnquiryCard({ trip, onPress }) {
         </View>
       )}
 
-      {/* Note 2: Tax */}
+      {/* Note 2: Additional Info */}
       <View style={styles.noteItem}>
         <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>State tax, toll & parking extra if applicable</Text>
-      </View>
-
-      {/* Note 3: Pets */}
-      <View style={styles.noteItem}>
-        <Ionicons name="paw-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>Pets travelling - additional charges apply</Text>
+        <Text style={styles.noteText}>
+          Driver must accept all charges conditions before accepting trip
+        </Text>
       </View>
 
       {/* Trip Creator Details - if pre-advance exceeds commission */}
@@ -264,6 +282,32 @@ export default function EnquiryCard({ trip, onPress }) {
           </View>
         </View>
       )}
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtonsContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.acceptButton]}
+          activeOpacity={0.7}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onAccept?.(trip);
+          }}
+        >
+          <Ionicons name="checkmark-circle" size={18} color="#4caf50" />
+          <Text style={styles.acceptButtonText}>Accept</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.cancelButton]}
+          activeOpacity={0.7}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onCancel?.();
+          }}
+        >
+          <Ionicons name="close-circle" size={18} color="#f44336" />
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -283,6 +327,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  tripTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   tripType: {
     color: '#888',
@@ -375,6 +424,28 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontSize: Math.max(11, screenWidth * 0.028),
     fontWeight: '500',
+  },
+  extraChargesContainer: {
+    gap: 8,
+    marginVertical: 10,
+  },
+  extraChargesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chargeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ff9800',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  chargeBadgeText: {
+    color: '#fff',
+    fontSize: Math.max(10, screenWidth * 0.028),
+    fontWeight: '600',
   },
   carrierNote: {
     flexDirection: 'row',
@@ -552,5 +623,41 @@ const styles = StyleSheet.create({
     fontSize: Math.max(10, screenWidth * 0.027),
     fontWeight: '600',
     flex: 1,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#0f3460',
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+  },
+  acceptButton: {
+    backgroundColor: '#4caf5011',
+    borderColor: '#4caf50',
+  },
+  acceptButtonText: {
+    color: '#4caf50',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#f4433611',
+    borderColor: '#f44336',
+  },
+  cancelButtonText: {
+    color: '#f44336',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '600',
   },
 });

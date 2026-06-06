@@ -23,7 +23,7 @@ export default function DriverTripHistoryScreen({ navigation }) {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*, creator:created_by(full_name, phone, roles(name))')
+        .select('*, creator:created_by(full_name, phone, roles(name)), segment:segment_id(name)')
         .or(`accepted_by.eq.${user.id},driver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
@@ -96,6 +96,11 @@ export default function DriverTripHistoryScreen({ navigation }) {
       >
         <View style={styles.cardHeader}>
           <TripStatusBadge status={item.status} />
+          <View style={styles.tripTypeBadge}>
+            <Text style={styles.tripTypeText}>
+              {item.segment?.name?.toUpperCase() || 'ONE WAY'}
+            </Text>
+          </View>
           <Text style={styles.fare}>₹{item.fare_amount}</Text>
         </View>
 
@@ -104,33 +109,36 @@ export default function DriverTripHistoryScreen({ navigation }) {
           <Text style={styles.location} numberOfLines={1}>{item.pickup_location}</Text>
         </View>
         <View style={styles.row}>
-          <Ionicons name="flag" size={14} color="#1a1a2e" />
+          <Ionicons name="flag" size={14} color="#888" />
           <Text style={styles.location} numberOfLines={1}>{item.dropoff_location}</Text>
         </View>
+        {item.return_location && (
+          <View style={styles.row}>
+            <Ionicons name="return-up-back-outline" size={14} color="#ff9800" />
+            <Text style={styles.location} numberOfLines={1}>{item.return_location}</Text>
+          </View>
+        )}
 
         {/* Show passenger info only for completed trips (commission was paid) */}
         {isCompleted && item.passenger_name && (
           <View style={styles.row}>
             <Ionicons name="person-outline" size={14} color="#888" />
             <Text style={styles.meta}>{item.passenger_name}</Text>
-            {item.passenger_phone && (
-              <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.passenger_phone}`)}>
-                <Ionicons name="call-outline" size={16} color="#4caf50" />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {item.commission_amount > 0 && (
-          <View style={styles.row}>
-            <Ionicons name="trending-up-outline" size={14} color="#4caf50" />
-            <Text style={styles.commission}>Commission paid: ₹{item.commission_amount}</Text>
           </View>
         )}
 
         <View style={styles.cardFooter}>
-          <Text style={styles.date}>{new Date(item.created_at).toLocaleString()}</Text>
+          <Ionicons name="calendar-outline" size={12} color="#555" />
+          <Text style={styles.date}>Created: {new Date(item.created_at).toLocaleString()}</Text>
         </View>
+        {isCompleted && item.completed_at && (
+          <View style={styles.cardFooter}>
+            <Ionicons name="checkmark-circle-outline" size={12} color="#4caf50" />
+            <Text style={[styles.date, { color: '#4caf50' }]}>
+              Completed: {new Date(item.completed_at).toLocaleString()}
+            </Text>
+          </View>
+        )}
 
         {/* Action buttons row */}
         <View style={styles.actionButtonsRow}>
@@ -235,8 +243,10 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#fff' },
   list: { padding: 16, paddingBottom: 100 },
   card: { backgroundColor: '#16213e', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#1a1a2e' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  fare: { color: '#1a1a2e', fontWeight: 'bold', fontSize: 16 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 6 },
+  fare: { color: '#4caf50', fontWeight: 'bold', fontSize: 16 },
+  tripTypeBadge: { backgroundColor: '#0f3460', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, flex: 1 },
+  tripTypeText: { color: '#888', fontSize: 10, fontWeight: '600', textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   location: { color: '#ccc', fontSize: 13, flex: 1 },
   meta: { color: '#aaa', fontSize: 12, flex: 1 },

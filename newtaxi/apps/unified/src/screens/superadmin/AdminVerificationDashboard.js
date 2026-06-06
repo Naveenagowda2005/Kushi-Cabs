@@ -254,7 +254,7 @@ const AdminVerificationDashboard = () => {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-done-circle-outline" size={48} color={COLORS.success} />
-            <Text style={styles.emptyStateText}>All documents verified!</Text>
+            <Text style={styles.emptyStateText} numberOfLines={2}>All documents verified!</Text>
           </View>
         }
         contentContainerStyle={styles.listContent}
@@ -355,9 +355,14 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   emptyStateText: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: 12,
+    textAlign: 'center',
+    paddingHorizontal: 30,
+    flexWrap: 'wrap',
+    width: '85%',
+    numberOfLines: 2,
   },
   driverCard: {
     backgroundColor: COLORS.surface,

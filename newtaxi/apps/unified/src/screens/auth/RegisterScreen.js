@@ -75,8 +75,12 @@ export default function RegisterScreen({ route, navigation }) {
         console.log('RegisterScreen: Redirecting driver to document upload');
         // Navigate directly to document upload screen
         navigation.navigate('DriverDocumentUpload');
+      } else if (role === ROLES.VENDOR) {
+        console.log('RegisterScreen: Redirecting vendor to document upload');
+        // Navigate to vendor document upload screen
+        navigation.navigate('VendorDocumentUpload');
       } else {
-        // For vendors, show success and they can proceed to dashboard
+        // For other roles, show success and they can proceed to dashboard
         Alert.alert('Success', 'Registration completed successfully!', [
           { text: 'OK' }
         ]);
@@ -95,6 +99,7 @@ export default function RegisterScreen({ route, navigation }) {
   const getButtonText = () => {
     switch (role) {
       case ROLES.DRIVER: return 'Next Step';
+      case ROLES.VENDOR: return 'Next Step';
       default: return 'Complete Registration';
     }
   };

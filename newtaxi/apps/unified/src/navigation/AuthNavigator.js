@@ -12,6 +12,8 @@ import PolicyScreen from '../screens/common/PolicyScreen';
 import DriverDocumentUploadScreen from '../screens/driver/DriverDocumentUploadScreen';
 import DriverOnboardingTimelineScreen from '../screens/driver/DriverOnboardingTimelineScreen';
 import WaitingForApprovalScreen from '../screens/driver/WaitingForApprovalScreen';
+import VendorDocumentUploadScreen from '../screens/vendor/VendorDocumentUploadScreen';
+import VendorWaitingForApprovalScreen from '../screens/vendor/VendorWaitingForApprovalScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -144,6 +146,22 @@ export default function AuthNavigator() {
       <Stack.Screen 
         name="WaitingForApproval" 
         component={WaitingForApprovalScreen} 
+        options={{ 
+          title: 'Waiting for Approval',
+          headerLeft: () => null, // Hide back button - must wait for approval
+        }} 
+      />
+      <Stack.Screen 
+        name="VendorDocumentUpload" 
+        component={VendorDocumentUploadScreen} 
+        options={{ 
+          title: 'Upload Documents',
+          headerLeft: () => null, // Hide back button - must complete document upload
+        }} 
+      />
+      <Stack.Screen 
+        name="VendorWaitingForApproval" 
+        component={VendorWaitingForApprovalScreen} 
         options={{ 
           title: 'Waiting for Approval',
           headerLeft: () => null, // Hide back button - must wait for approval

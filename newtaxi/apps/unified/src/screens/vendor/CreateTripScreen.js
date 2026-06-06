@@ -12,28 +12,36 @@ import { TRIP_STATUS } from '../../constants';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import CustomDateTimePicker from '../../components/DateTimePicker';
 
-export default function VendorCreateTripScreen({ navigation }) {
+export default function VendorCreateTripScreen({ navigation, route }) {
   const { user } = useAuth();
   const { vendor } = useVendorProfile(user?.id);
   const { settings, refetch: refetchSettings } = useAppSettings();
+  
+  // Get edit mode params from route
+  const editingTrip = route?.params?.trip;
+  const editMode = route?.params?.editMode || false;
 
   const [form, setForm] = useState({
-    pickupLocation:   '',
-    dropoffLocation:  '',
-    returnLocation:   '',
-    fareAmount:       '',
-    commissionAmount: '',
-    customerPreAdvance: '',
-    passengerName:    '',
-    passengerPhone:   '',
-    scheduledAt:      new Date(),
-    carType:          '',
-    carModel:         '',
-    seaterType:       '',
-    fuelType:         '',
-    segment:          '',
-    package:          '',
-    tollIncluded:     false,
+    pickupLocation:   editingTrip?.pickup_location || '',
+    dropoffLocation:  editingTrip?.dropoff_location || '',
+    returnLocation:   editingTrip?.return_location || '',
+    returnDate:       editingTrip?.return_date ? new Date(editingTrip.return_date) : null,
+    fareAmount:       editingTrip?.fare_amount?.toString() || '',
+    commissionAmount: editingTrip?.commission_amount?.toString() || '',
+    customerPreAdvance: editingTrip?.customer_pre_advance?.toString() || '',
+    passengerName:    editingTrip?.passenger_name || '',
+    passengerPhone:   editingTrip?.passenger_phone || '',
+    scheduledAt:      editingTrip?.scheduled_at ? new Date(editingTrip.scheduled_at) : new Date(),
+    carType:          editingTrip?.car_type || '',
+    carModel:         editingTrip?.car_model || '',
+    seaterType:       editingTrip?.seater_type || '',
+    fuelType:         editingTrip?.fuel_type || '',
+    segment:          editingTrip?.segment_id || '',
+    package:          editingTrip?.package_id || '',
+    tollIncluded:     editingTrip?.toll_included || false,
+    stateTaxIncluded: editingTrip?.state_tax_included || false,
+    petTravelling:    editingTrip?.pet_travelling || false,
+    fixedKm:          editingTrip?.fixed_km?.toString() || '',
   });
   const [loading, setLoading] = useState(false);
   const [carTypes, setCarTypes] = useState([]);
@@ -71,8 +79,8 @@ export default function VendorCreateTripScreen({ navigation }) {
     try {
       const { data } = await supabase
         .from('trip_segments')
-        .select('id, name')
-        .order('name');
+        .select('id, name, display_order')
+        .order('display_order', { ascending: true });
       
       if (data) setSegments(data);
     } catch (error) {
@@ -116,11 +124,21 @@ export default function VendorCreateTripScreen({ navigation }) {
       fetchCarModelsForType(value);
     }
 
-    // Fetch packages when segment changes
+    // Handle segment changes
     if (field === 'segment' && value) {
       fetchPackagesForSegment(value);
       // Reset package selection when segment changes
       setForm((prev) => ({ ...prev, package: '' }));
+      
+      // If changing to non-Round trip, clear return fields
+      const selectedSegment = segments.find(s => s.id === value);
+      if (selectedSegment?.name !== 'Round trips') {
+        setForm((prev) => ({ 
+          ...prev, 
+          returnLocation: '',
+          returnDate: null 
+        }));
+      }
     }
   }
 
@@ -129,8 +147,11 @@ export default function VendorCreateTripScreen({ navigation }) {
     if (!form.pickupLocation.trim())    return 'Pickup location is required.';
     if (!form.dropoffLocation.trim())   return 'Drop-off location is required.';
     if (form.segment === 'Round trips' && !form.returnLocation.trim()) return 'Return location is required for round trips.';
+    if (form.segment === 'Round trips' && !form.returnDate) return 'Return date is required for round trips.';
     if (!form.passengerName.trim())     return 'Passenger name is required.';
     if (!form.passengerPhone.trim())    return 'Passenger phone is required.';
+    const fixedKm = parseFloat(form.fixedKm);
+    if (!fixedKm || fixedKm <= 0)       return 'Enter a valid fixed KM.';
     const fare = parseFloat(form.fareAmount);
     if (!fare || fare <= 0)             return 'Enter a valid fare amount.';
     const commission = parseFloat(form.commissionAmount);
@@ -147,14 +168,19 @@ export default function VendorCreateTripScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('trips').insert({
+      // Get the selected segment
+      const selectedSegment = segments.find(s => s.id === form.segment);
+      const isRoundTrip = selectedSegment?.name === 'Round trips';
+      
+      const tripData = {
         pickup_location:      form.pickupLocation.trim(),
         dropoff_location:     form.dropoffLocation.trim(),
-        return_location:      form.returnLocation.trim() || null,
+        return_location:      isRoundTrip ? (form.returnLocation.trim() || null) : null,
+        return_date:          isRoundTrip ? (form.returnDate ? form.returnDate.toISOString() : null) : null,
+        fixed_km:             parseFloat(form.fixedKm),
         fare_amount:          parseFloat(form.fareAmount),
         commission_amount:    parseFloat(form.commissionAmount),
         customer_pre_advance: parseFloat(form.customerPreAdvance) || 0,
-        commission_paid:      false,
         scheduled_at:         form.scheduledAt ? form.scheduledAt.toISOString() : new Date().toISOString(),
         passenger_name:       form.passengerName.trim(),
         passenger_phone:      form.passengerPhone.trim(),
@@ -164,24 +190,51 @@ export default function VendorCreateTripScreen({ navigation }) {
         fuel_type:            form.fuelType,
         segment_id:           form.segment,
         package_id:           form.package || null,
-        status:               TRIP_STATUS.PENDING,
-        vendor_id:            vendor?.id || null,
-        created_by:           user.id,
-        is_published:         false,
         toll_included:        form.tollIncluded,
-      });
+        state_tax_included:   form.stateTaxIncluded,
+        pet_travelling:       form.petTravelling,
+      };
+
+      let error;
+      
+      if (editMode && editingTrip?.id) {
+        // UPDATE existing trip
+        const result = await supabase.from('trips').update(tripData).eq('id', editingTrip.id);
+        error = result.error;
+      } else {
+        // INSERT new trip
+        const result = await supabase.from('trips').insert({
+          ...tripData,
+          commission_paid:  false,
+          status:           TRIP_STATUS.PENDING,
+          vendor_id:        vendor?.id || null,
+          created_by:       user.id,
+          is_published:     false,
+        });
+        error = result.error;
+      }
 
       if (error) throw error;
 
+      const commission = parseFloat(form.commissionAmount) || 0;
+      const customerPreAdvance = parseFloat(form.customerPreAdvance) || 0;
       const commissionToPay = Math.max(0, commission - customerPreAdvance);
       
+      const message = editMode 
+        ? '✅ Trip Updated'
+        : '✅ Trip Created';
+      
+      const description = editMode
+        ? 'Trip has been updated successfully!'
+        : commissionToPay > 0
+        ? `Trip created successfully!\nYou can publish it to drivers from your trips list.\nDrivers must pay ₹${commissionToPay.toFixed(2)} commission to unlock customer details.`
+        : customerPreAdvance > 0
+        ? `Trip created successfully!\nYou can publish it to drivers from your trips list.\nCustomer pre-advance (₹${customerPreAdvance.toFixed(2)}) covers the commission.`
+        : `Trip created successfully!\nYou can publish it to drivers from your trips list.`;
+      
       Alert.alert(
-        '✅ Trip Created',
-        commissionToPay > 0
-          ? `Trip created successfully!\nYou can publish it to drivers from your trips list.\nDrivers must pay ₹${commissionToPay.toFixed(2)} commission to unlock customer details.`
-          : customerPreAdvance > 0
-          ? `Trip created successfully!\nYou can publish it to drivers from your trips list.\nCustomer pre-advance (₹${customerPreAdvance.toFixed(2)}) covers the commission.`
-          : `Trip created successfully!\nYou can publish it to drivers from your trips list.`,
+        message,
+        description,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (err) {
@@ -207,6 +260,13 @@ export default function VendorCreateTripScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+
+        {editMode && (
+          <View style={styles.editModeBanner}>
+            <Ionicons name="pencil-outline" size={16} color="#2196f3" />
+            <Text style={styles.editModeBannerText}>Editing Trip - Changes will update the existing trip</Text>
+          </View>
+        )}
 
         <View style={styles.sectionHeader}>
           <Ionicons name="layers-outline" size={18} color="#1a1a2e" />
@@ -270,10 +330,25 @@ export default function VendorCreateTripScreen({ navigation }) {
 
         {/* Return Location - Only for Round Trips */}
         {selectedSegmentName === 'Round trips' && (
-          <Field label="Return Location *" icon="location-outline"
-            placeholder="e.g. Return pickup point"
-            value={form.returnLocation} onChangeText={(v) => update('returnLocation', v)} />
+          <>
+            <Field label="Return Location *" icon="location-outline"
+              placeholder="e.g. Return pickup point"
+              value={form.returnLocation} onChangeText={(v) => update('returnLocation', v)} />
+
+            <CustomDateTimePicker
+              label="Return Date *"
+              value={form.returnDate}
+              onChange={(date) => update('returnDate', date)}
+              mode="date"
+              placeholder="Select return date"
+            />
+          </>
         )}
+
+        <Field label="Fixed KM *" icon="map-outline"
+          placeholder="e.g. 50"
+          value={form.fixedKm} onChangeText={(v) => update('fixedKm', v)}
+          keyboardType="decimal-pad" />
 
         <Field label="Fare Amount (₹) *" icon="cash-outline"
           placeholder="e.g. 500"
@@ -384,6 +459,84 @@ export default function VendorCreateTripScreen({ navigation }) {
           </View>
         </View>
 
+        {/* State Tax Toggle */}
+        <View style={styles.toggleWrapper}>
+          <View style={styles.toggleLabel}>
+            <Ionicons name="document-text-outline" size={16} color="#ff9800" />
+            <Text style={styles.toggleLabelText}>State Tax Included in Fare</Text>
+          </View>
+          <View style={styles.toggleButtonGroup}>
+            <TouchableOpacity
+              style={[styles.toggleButton, !form.stateTaxIncluded && styles.toggleButtonActive]}
+              onPress={() => update('stateTaxIncluded', false)}
+            >
+              <Text style={[styles.toggleButtonText, !form.stateTaxIncluded && styles.toggleButtonTextActive]}>
+                No
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, form.stateTaxIncluded && styles.toggleButtonActive]}
+              onPress={() => update('stateTaxIncluded', true)}
+            >
+              <Text style={[styles.toggleButtonText, form.stateTaxIncluded && styles.toggleButtonTextActive]}>
+                Yes
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Pet Travelling Toggle */}
+        <View style={styles.toggleWrapper}>
+          <View style={styles.toggleLabel}>
+            <Ionicons name="paw-outline" size={16} color="#ff9800" />
+            <Text style={styles.toggleLabelText}>Pet Travelling</Text>
+          </View>
+          <View style={styles.toggleButtonGroup}>
+            <TouchableOpacity
+              style={[styles.toggleButton, !form.petTravelling && styles.toggleButtonActive]}
+              onPress={() => update('petTravelling', false)}
+            >
+              <Text style={[styles.toggleButtonText, !form.petTravelling && styles.toggleButtonTextActive]}>
+                No
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, form.petTravelling && styles.toggleButtonActive]}
+              onPress={() => update('petTravelling', true)}
+            >
+              <Text style={[styles.toggleButtonText, form.petTravelling && styles.toggleButtonTextActive]}>
+                Yes
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Extra Charges Summary */}
+        <View style={styles.chargesSummaryBox}>
+          <Text style={styles.chargesSummaryTitle}>Extra Charges Summary</Text>
+          <View style={styles.chargesSummaryRow}>
+            <Ionicons name="cash-outline" size={14} color="#ff9800" />
+            <Text style={styles.chargesSummaryLabel}>Toll:</Text>
+            <Text style={[styles.chargesSummaryValue, form.tollIncluded ? styles.included : styles.excluded]}>
+              {form.tollIncluded ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+          <View style={styles.chargesSummaryRow}>
+            <Ionicons name="document-text-outline" size={14} color="#ff9800" />
+            <Text style={styles.chargesSummaryLabel}>State Tax:</Text>
+            <Text style={[styles.chargesSummaryValue, form.stateTaxIncluded ? styles.included : styles.excluded]}>
+              {form.stateTaxIncluded ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+          <View style={styles.chargesSummaryRow}>
+            <Ionicons name="paw-outline" size={14} color="#ff9800" />
+            <Text style={styles.chargesSummaryLabel}>Pet:</Text>
+            <Text style={[styles.chargesSummaryValue, form.petTravelling ? styles.included : styles.excluded]}>
+              {form.petTravelling ? 'Allowed' : 'Not Allowed'}
+            </Text>
+          </View>
+        </View>
+
         <View style={styles.sectionHeader}>
           <Ionicons name="car-outline" size={18} color="#2196f3" />
           <Text style={styles.sectionTitle}>Vehicle Details</Text>
@@ -491,8 +644,8 @@ export default function VendorCreateTripScreen({ navigation }) {
           {loading
             ? <ActivityIndicator color="#fff" />
             : <>
-                <Ionicons name="add-circle-outline" size={22} color="#fff" />
-                <Text style={styles.createBtnText}>Post Trip</Text>
+                <Ionicons name={editMode ? "pencil-outline" : "add-circle-outline"} size={22} color="#fff" />
+                <Text style={styles.createBtnText}>{editMode ? 'Update Trip' : 'Post Trip'}</Text>
               </>
           }
         </TouchableOpacity>
@@ -523,6 +676,24 @@ function Field({ label, icon, placeholder, value, onChangeText, keyboardType }) 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f3460' },
   scroll: { padding: 20, paddingBottom: 60 },
+  editModeBanner: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1e3a8a',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#2196f3',
+  },
+  editModeBannerText: {
+    color: '#2196f3',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 12 },
   sectionTitle: { color: '#ccc', fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   fieldWrapper: { marginBottom: 14 },
@@ -599,5 +770,50 @@ const styles = StyleSheet.create({
   picker: {
     color: '#fff',
     backgroundColor: '#16213e',
+  },
+  chargesSummaryBox: {
+    backgroundColor: '#16213e',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+  },
+  chargesSummaryTitle: {
+    color: '#aaa',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  chargesSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#0f3460',
+  },
+  chargesSummaryLabel: {
+    color: '#aaa',
+    fontSize: 12,
+    flex: 1,
+  },
+  chargesSummaryValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  included: {
+    backgroundColor: '#4caf5033',
+    color: '#4caf50',
+  },
+  excluded: {
+    backgroundColor: '#f4433633',
+    color: '#f44336',
   },
 });

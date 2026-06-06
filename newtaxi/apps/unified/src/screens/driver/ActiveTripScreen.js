@@ -308,6 +308,12 @@ export default function DriverActiveTripScreen({ route, navigation }) {
             <Ionicons name="flag" size={14} color="#1a1a2e" />
             <Text style={styles.doneTripText} numberOfLines={1}>{trip.dropoff_location}</Text>
           </View>
+          {trip.return_location && (
+            <View style={styles.doneRow}>
+              <Ionicons name="return-up-back-outline" size={14} color="#ff9800" />
+              <Text style={styles.doneTripText} numberOfLines={1}>Return: {trip.return_location}</Text>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.replace('Dashboard')}>
@@ -327,6 +333,12 @@ export default function DriverActiveTripScreen({ route, navigation }) {
           <Row icon="location" color="#4caf50" text={activeTrip.pickup_location} />
           <View style={styles.divider} />
           <Row icon="flag" color="#1a1a2e" text={activeTrip.dropoff_location} />
+          {activeTrip.return_location && (
+            <>
+              <View style={styles.divider} />
+              <Row icon="return-up-back-outline" color="#ff9800" text={`Return: ${activeTrip.return_location}`} />
+            </>
+          )}
           {activeTrip.passenger_name && (
             <>
               <View style={styles.divider} />
@@ -336,6 +348,12 @@ export default function DriverActiveTripScreen({ route, navigation }) {
           <View style={styles.farePill}>
             <Text style={styles.fareText}>₹{activeTrip.fare_amount}</Text>
           </View>
+          {activeTrip.fixed_km && (
+            <View style={[styles.farePill, { backgroundColor: '#1565c0', marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+              <Ionicons name="speedometer-outline" size={13} color="#fff" />
+              <Text style={styles.fareText}>{activeTrip.fixed_km} km fixed</Text>
+            </View>
+          )}
         </View>
 
         {/* STEP: capture start odometer */}
@@ -461,7 +479,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                           <Text style={styles.detailValue}>₹{fareAmount.toFixed(2)}</Text>
                         </View>
                         <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Commission Charged by Driver:</Text>
+                          <Text style={styles.detailLabel}>Commission:</Text>
                           <Text style={[styles.detailValue, { color: '#ff6b6b' }]}>-₹{commissionAmount.toFixed(2)}</Text>
                         </View>
                         <View style={styles.detailRow}>
@@ -499,7 +517,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                       
                       <View style={styles.paymentDetails}>
                         <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Trip Distance:</Text>
+                          <Text style={styles.detailLabel}>Distance Travelled:</Text>
                           <Text style={styles.detailValue}>
                             {endCapture?.km && startCapture?.km 
                               ? (endCapture.km - startCapture.km).toFixed(2) 
@@ -514,7 +532,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                         </View>
                         {commissionAmount > 0 && (
                           <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Commission Charged by Driver:</Text>
+                            <Text style={styles.detailLabel}>Commission:</Text>
                             <Text style={[styles.detailValue, { color: '#ff6b6b' }]}>-₹{commissionAmount.toFixed(2)}</Text>
                           </View>
                         )}
@@ -656,10 +674,10 @@ const styles = StyleSheet.create({
   scroll: { padding: 16 },
   stepBar: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#16213e', paddingHorizontal: 16, paddingVertical: 12 },
   stepItem: { alignItems: 'center', flex: 1 },
-  stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#333', marginBottom: 4 },
-  stepDotActive: { backgroundColor: '#1a1a2e' },
-  stepLabel: { color: '#555', fontSize: 10 },
-  stepLabelActive: { color: '#1a1a2e' },
+  stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#444', marginBottom: 4 },
+  stepDotActive: { backgroundColor: '#4caf50' },
+  stepLabel: { color: '#666', fontSize: 10 },
+  stepLabelActive: { color: '#4caf50' },
   tripCard: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
   rowText: { color: '#fff', fontSize: 15, flex: 1 },
@@ -688,8 +706,8 @@ const styles = StyleSheet.create({
   paymentDetails: { width: '100%', backgroundColor: '#0f3460', borderRadius: 10, padding: 16, marginBottom: 24 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   detailRowTotal: { borderTopWidth: 1, borderTopColor: '#1a1a2e', paddingTop: 12, marginTop: 8 },
-  detailLabel: { color: '#aaa', fontSize: 14 },
-  detailValue: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  detailLabel: { color: '#aaa', fontSize: 13, flex: 1, flexWrap: 'wrap', paddingRight: 8 },
+  detailValue: { color: '#fff', fontSize: 15, fontWeight: '600', textAlign: 'right' },
   detailValueTotal: { color: '#4caf50', fontSize: 18, fontWeight: '700' },
   detailValueVendor: { color: '#ff9800', fontSize: 18, fontWeight: '700' },
   actionBtnConfirm: { backgroundColor: '#4caf50', width: '100%' },

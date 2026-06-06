@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions,
 } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
 import { COLORS } from '../constants';
 
 import SuperAdminDashboardScreen  from '../screens/superadmin/DashboardScreen';
@@ -14,6 +16,8 @@ import SuperAdminCommissionScreen from '../screens/superadmin/CommissionScreen';
 import SuperAdminWalletsScreen    from '../screens/superadmin/WalletsScreen';
 import SuperAdminSettingsScreen   from '../screens/superadmin/SettingsScreen';
 import AdminVerificationDashboard from '../screens/superadmin/AdminVerificationDashboard';
+import AdminVendorVerificationDashboard from '../screens/superadmin/AdminVendorVerificationDashboard';
+import PolicyManagementScreen from '../screens/superadmin/PolicyManagementScreen';
 
 const Stack = createNativeStackNavigator();
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -23,7 +27,8 @@ const TABS = [
   { key: 'Trips',      label: 'Trips',      icon: 'list-outline',          component: SuperAdminTripsScreen },
   { key: 'Drivers',    label: 'Drivers',    icon: 'people-outline',        component: SuperAdminDriversScreen },
   { key: 'Vendors',    label: 'Vendors',    icon: 'business-outline',      component: SuperAdminVendorsScreen },
-  { key: 'Verification', label: 'Verification', icon: 'document-outline',  component: AdminVerificationDashboard },
+  { key: 'DriverVerif', label: 'Driver\nVerification', icon: 'checkmark-outline',  component: AdminVerificationDashboard },
+  { key: 'VendorVerif', label: 'Vendor\nVerification', icon: 'checkmark-outline',  component: AdminVendorVerificationDashboard },
   { key: 'Commission', label: 'Commission', icon: 'trending-up-outline',   component: SuperAdminCommissionScreen },
   { key: 'Wallets',    label: 'Wallets',    icon: 'wallet-outline',        component: SuperAdminWalletsScreen },
   { key: 'Settings',   label: 'Settings',   icon: 'settings-outline',      component: SuperAdminSettingsScreen },
@@ -34,15 +39,50 @@ function ScreenWrapper({ component: Screen, navigation: parentNav }) {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main">
-        {(props) => <Screen {...props} />}
+        {(props) => <Screen {...props} navigation={props.navigation} />}
       </Stack.Screen>
+      {/* Extra screens for navigation within settings */}
+      <Stack.Screen 
+        name="PolicyManagement" 
+        component={PolicyManagementScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
 
 export default function SuperAdminNavigator() {
   const [activeTab, setActiveTab] = useState(0);
+  const [showPolicyManagement, setShowPolicyManagement] = useState(false);
   const tabScrollRef = useRef(null);
+  const [pendingDriverCount, setPendingDriverCount] = useState(0);
+  const [pendingVendorCount, setPendingVendorCount] = useState(0);
+
+  const fetchPendingCounts = async () => {
+    try {
+      // Use RPC to bypass RLS (super admin uses mock session)
+      const { data: drivers } = await supabase
+        .rpc('get_driver_verifications_pending_count');
+
+      const { data: vendors } = await supabase
+        .rpc('get_vendor_verifications', { p_status: 'pending' });
+
+      setPendingDriverCount(drivers || 0);
+      setPendingVendorCount(vendors?.length || 0);
+    } catch (error) {
+      console.error('Error fetching pending counts:', error);
+    }
+  };
+
+  // Fetch counts on mount and whenever tab changes
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchPendingCounts();
+      // Refresh every 10 seconds when navigator is focused
+      const interval = setInterval(fetchPendingCounts, 10000);
+      return () => clearInterval(interval);
+    }, [])
+  );
 
   function handleTabPress(index) {
     setActiveTab(index);
@@ -54,21 +94,7 @@ export default function SuperAdminNavigator() {
 
   return (
     <View style={styles.container}>
-      {/* Screens — all mounted, only active one visible */}
-      {TABS.map((tab, index) => (
-        <View
-          key={tab.key}
-          style={[styles.screen, index !== activeTab && styles.screenHidden]}
-          pointerEvents={index === activeTab ? 'auto' : 'none'}
-        >
-          <tab.component navigation={{ navigate: (tabName) => {
-            const tabIndex = TABS.findIndex(t => t.key === tabName);
-            if (tabIndex !== -1) handleTabPress(tabIndex);
-          }}} />
-        </View>
-      ))}
-
-      {/* Scrollable bottom tab bar */}
+      {/* Scrollable top tab bar (moved to header) */}
       <View style={styles.tabBar}>
         <ScrollView
           ref={tabScrollRef}
@@ -80,6 +106,14 @@ export default function SuperAdminNavigator() {
         >
           {TABS.map((tab, index) => {
             const isActive = activeTab === index;
+            // Get pending count for verification tabs
+            let badgeCount = 0;
+            if (tab.key === 'DriverVerif') {
+              badgeCount = pendingDriverCount;
+            } else if (tab.key === 'VendorVerif') {
+              badgeCount = pendingVendorCount;
+            }
+
             return (
               <TouchableOpacity
                 key={tab.key}
@@ -96,8 +130,16 @@ export default function SuperAdminNavigator() {
                     size={20}
                     color={isActive ? '#fff' : COLORS.textSecondary}
                   />
+                  {/* Badge with pending count */}
+                  {(tab.key === 'DriverVerif' || tab.key === 'VendorVerif') && (
+                    <View style={[styles.badge, badgeCount === 0 && styles.badgeZero]}>
+                      <Text style={[styles.badgeText, badgeCount === 0 && styles.badgeTextZero]}>
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]} numberOfLines={2}>
                   {tab.label}
                 </Text>
               </TouchableOpacity>
@@ -105,6 +147,36 @@ export default function SuperAdminNavigator() {
           })}
         </ScrollView>
       </View>
+
+      {/* Screens — all mounted, only active one visible */}
+      {!showPolicyManagement ? (
+        <>
+          {TABS.map((tab, index) => (
+            <View
+              key={tab.key}
+              style={[styles.screen, index !== activeTab && styles.screenHidden]}
+              pointerEvents={index === activeTab ? 'auto' : 'none'}
+            >
+              <tab.component navigation={{ 
+                navigate: (screenName) => {
+                  if (screenName === 'PolicyManagement') {
+                    setShowPolicyManagement(true);
+                  } else {
+                    const tabIndex = TABS.findIndex(t => t.key === screenName);
+                    if (tabIndex !== -1) handleTabPress(tabIndex);
+                  }
+                }
+              }} />
+            </View>
+          ))}
+        </>
+      ) : (
+        <View style={styles.screen}>
+          <PolicyManagementScreen navigation={{ 
+            goBack: () => setShowPolicyManagement(false)
+          }} />
+        </View>
+      )}
     </View>
   );
 }
@@ -122,13 +194,13 @@ const styles = StyleSheet.create({
 
   tabBar: {
     backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
     paddingBottom: 10,
-    paddingTop: 0,          // remove top padding — line sits at the very top
+    paddingTop: 20,
     elevation: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
   },
@@ -140,8 +212,8 @@ const styles = StyleSheet.create({
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    minWidth: 72,
+    paddingHorizontal: 6,
+    minWidth: 80,
     paddingBottom: 4,
   },
   tabLine: {
@@ -166,11 +238,40 @@ const styles = StyleSheet.create({
   tabIconWrapActive: {
     backgroundColor: COLORS.superAdmin.primary,
   },
-  tabLabel: {
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ff5252',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.surface,
+  },
+  badgeZero: {
+    backgroundColor: '#4caf50',
+  },
+  badgeText: {
     fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+    paddingHorizontal: 4,
+  },
+  badgeTextZero: {
+    color: '#fff',
+  },
+  tabLabel: {
+    fontSize: 7.5,
     fontWeight: '500',
     color: COLORS.textSecondary,
     textAlign: 'center',
+    maxWidth: 75,
+    numberOfLines: 2,
+    flexWrap: 'wrap',
+    lineHeight: 10,
   },
   tabLabelActive: {
     color: COLORS.superAdmin.primary,

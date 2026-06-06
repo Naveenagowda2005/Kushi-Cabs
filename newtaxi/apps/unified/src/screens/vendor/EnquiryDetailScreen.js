@@ -6,7 +6,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useVendorProfile } from '../../hooks/useVendorProfile';
-import { acceptEnquiry } from '../../services/tripService';
 import { supabase } from '../../lib/supabase';
 import { TRIP_STATUS } from '../../constants';
 import TripStatusBadge from '../../components/TripStatusBadge';
@@ -18,6 +17,10 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
   const [accepting, setAccepting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
+  // Check if current user is the trip creator or super admin
+  const isCreator = trip.created_by === user?.id;
+  const isSuperAdmin = user?.role === 'super_admin';
+
   async function handleAccept() {
     Alert.alert(
       'Accept Enquiry',
@@ -28,18 +31,28 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
           text: 'Accept',
           onPress: async () => {
             setAccepting(true);
-            const result = await acceptEnquiry(trip.id, user.id);
-            setAccepting(false);
+            try {
+              // Direct database update - no time window check
+              const { error } = await supabase
+                .from('trips')
+                .update({
+                  status: TRIP_STATUS.ACCEPTED,
+                  accepted_by: user.id,
+                  vendor_id: vendor.id,
+                  accepted_at: new Date().toISOString(),
+                })
+                .eq('id', trip.id);
 
-            if (!result.success) {
-              Alert.alert('Could Not Accept', result.error);
-              navigation.goBack();
-              return;
+              if (error) throw error;
+
+              Alert.alert('Success', 'Trip accepted successfully!', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+              ]);
+            } catch (err) {
+              Alert.alert('Could Not Accept', err.message);
+            } finally {
+              setAccepting(false);
             }
-
-            Alert.alert('Success', 'Trip accepted successfully!', [
-              { text: 'OK', onPress: () => navigation.goBack() },
-            ]);
           },
         },
       ]

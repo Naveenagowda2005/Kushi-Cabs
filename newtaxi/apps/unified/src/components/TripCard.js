@@ -121,33 +121,6 @@ export default function TripCard({ trip, onPress }) {
         )}
       </View>
 
-      {/* Fare Breakdown */}
-      {(commissionAmount > 0 || customerPreAdvance > 0) && (
-        <View style={styles.breakdownBox}>
-          <Text style={styles.breakdownTitle}>Fare Breakdown</Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Total Fare</Text>
-            <Text style={styles.breakdownValue}>₹{trip.fare_amount.toFixed(2)}</Text>
-          </View>
-          {commissionAmount > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Commission Charged</Text>
-              <Text style={[styles.breakdownValue, { color: '#ff6b6b' }]}>-₹{Math.abs(commissionAmount).toFixed(2)}</Text>
-            </View>
-          )}
-          {customerPreAdvance > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Customer Pre-Advance</Text>
-              <Text style={[styles.breakdownValue, { color: '#2196f3' }]}>₹{Math.abs(customerPreAdvance).toFixed(2)}</Text>
-            </View>
-          )}
-          <View style={[styles.breakdownRow, styles.breakdownTotal]}>
-            <Text style={styles.breakdownTotalLabel}>Driver Earning</Text>
-            <Text style={styles.breakdownTotalValue}>₹{(trip.fare_amount - Math.abs(commissionAmount)).toFixed(2)}</Text>
-          </View>
-        </View>
-      )}
-
       {/* Pickup */}
       <View style={styles.row}>
         <Ionicons name="location" size={16} color="#4caf50" />

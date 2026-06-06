@@ -16,13 +16,18 @@ export default function RootNavigator() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    // Show splash screen for 2 seconds on app startup
+    // Show splash screen for 2 seconds on app startup, but minimum 1 second
     const timer = setTimeout(() => {
+      console.log('Splash screen timer done, current state:', {
+        loading,
+        hasSession: hasSession(),
+        hasUser: hasUser(),
+      });
       setShowSplash(false);
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [loading]);
 
   console.log('RootNavigator render:', {
     loading,

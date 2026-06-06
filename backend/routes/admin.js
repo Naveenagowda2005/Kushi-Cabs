@@ -291,6 +291,226 @@ router.post('/delete-user', async (req, res) => {
 });
 
 /**
+ * POST /admin/create-dummy-driver
+ * Creates a fully approved dummy driver account for emergency use.
+ * - Creates auth account
+ * - Creates users, drivers, driver_verification_status (approved) records
+ * - No document upload required — driver can log in and take trips immediately
+ */
+router.post('/create-dummy-driver', async (req, res) => {
+  try {
+    const { phone, fullName } = req.body;
+    if (!phone) return res.status(400).json({ error: 'phone is required' });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Admin credentials not configured' });
+
+    const phoneDigits = phone.replace(/[^0-9]/g, '');
+    if (phoneDigits.length !== 10) {
+      return res.status(400).json({ error: 'Phone must be 10 digits' });
+    }
+
+    const email = `${phoneDigits}@kushicabs.phone`;
+    const password = `OTP-${phoneDigits}-kushicabs`;
+    const name = fullName?.trim() || `Dummy Driver ${phoneDigits.slice(-4)}`;
+
+    console.log(`🤖 Creating dummy driver: ${name} (${phoneDigits})`);
+
+    // 1. Get driver role ID
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from('roles')
+      .select('id')
+      .eq('name', 'driver')
+      .single();
+
+    if (roleError || !roleData) {
+      return res.status(500).json({ error: 'Driver role not found' });
+    }
+
+    // 2. Create or reset auth account
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    if (listError) return res.status(500).json({ error: listError.message });
+
+    let authUserId;
+    const existing = users.find(u => u.email === email);
+
+    if (existing) {
+      await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+        password, email_confirm: true
+      });
+      authUserId = existing.id;
+      console.log(`♻️  Reusing existing auth account: ${authUserId}`);
+    } else {
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email, password, email_confirm: true, user_metadata: { phone: phoneDigits }
+      });
+      if (createError) return res.status(500).json({ error: createError.message });
+      authUserId = newUser.user.id;
+      console.log(`✅ Auth account created: ${authUserId}`);
+    }
+
+    // 3. Upsert users table
+    const { error: userError } = await supabaseAdmin
+      .from('users')
+      .upsert({
+        id: authUserId,
+        email,
+        phone: phoneDigits,
+        full_name: name,
+        role_id: roleData.id,
+        is_active: true,
+        verification_status: 'approved',
+      }, { onConflict: 'id' });
+
+    if (userError) return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
+
+    // 4. Upsert drivers table
+    const { error: driverError } = await supabaseAdmin
+      .from('drivers')
+      .upsert({
+        user_id: authUserId,
+        license_number: `DUMMY-${phoneDigits}`,
+        vehicle_number: `DUMMY-${phoneDigits}`,
+        is_available: true,
+        is_online: false,
+      }, { onConflict: 'user_id' });
+
+    if (driverError) return res.status(500).json({ error: 'Failed to create driver record: ' + driverError.message });
+
+    // 5. Get driver record id
+    const { data: driverRow } = await supabaseAdmin
+      .from('drivers')
+      .select('id')
+      .eq('user_id', authUserId)
+      .single();
+
+    // 6. Upsert driver_verification_status as approved (skip document check)
+    const { error: dvsError } = await supabaseAdmin
+      .from('driver_verification_status')
+      .upsert({
+        driver_id: authUserId,
+        overall_status: 'approved',
+        all_documents_submitted: true,
+        submitted_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+      }, { onConflict: 'driver_id' });
+
+    if (dvsError) {
+      console.warn('⚠️ Could not create driver_verification_status:', dvsError.message);
+      // Not fatal — DriverNavigator fallback will handle via users.verification_status
+    } else {
+      console.log('✅ driver_verification_status set to approved');
+    }
+
+    console.log(`🎉 Dummy driver ready: ${name} | Phone: ${phoneDigits}`);
+
+    res.json({
+      success: true,
+      message: `Dummy driver created successfully`,
+      driver: { name, phone: phoneDigits, userId: authUserId },
+    });
+
+  } catch (error) {
+    console.error('create-dummy-driver error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /admin/dummy-drivers
+ * List all dummy driver accounts
+ */
+router.get('/dummy-drivers', async (req, res) => {
+  try {
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Admin credentials not configured' });
+
+    const { data: roleData } = await supabaseAdmin
+      .from('roles').select('id').eq('name', 'driver').single();
+
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .select('id, full_name, phone, is_active, verification_status, created_at')
+      .eq('role_id', roleData.id)
+      .ilike('full_name', 'Dummy%')
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, drivers: data || [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /admin/update-admin-phone
+ * Update super admin phone number in both database and auth.users
+ */
+router.post('/update-admin-phone', async (req, res) => {
+  try {
+    const { userId, oldPhone, newPhone, newEmail } = req.body;
+
+    if (!userId || !oldPhone || !newPhone || !newEmail) {
+      return res.status(400).json({ error: 'userId, oldPhone, newPhone, and newEmail are required' });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: 'Supabase admin credentials not configured' });
+    }
+
+    console.log(`📞 Updating admin phone: ${oldPhone} → ${newPhone}`);
+
+    const oldEmail = `${oldPhone}@kushicabs.phone`;
+    const password = `OTP-${newPhone}-kushicabs`;
+
+    // Step 1: Find auth user by old email
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    if (listError) return res.status(500).json({ error: listError.message });
+
+    const authUser = users.find(u => u.email === oldEmail);
+    
+    if (!authUser) {
+      console.log(`⚠️  Auth user not found for email: ${oldEmail}`);
+      return res.status(404).json({ error: 'Auth user not found' });
+    }
+
+    console.log(`Found auth user: ${authUser.id}`);
+
+    // Step 2: Check if new email already exists
+    const newEmailExists = users.find(u => u.email === newEmail && u.id !== authUser.id);
+    if (newEmailExists) {
+      return res.status(400).json({ error: 'New phone number already in use' });
+    }
+
+    // Step 3: Update auth user email and password
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+      email: newEmail,
+      password: password,
+      email_confirm: true
+    });
+
+    if (updateError) {
+      console.error('❌ Error updating auth user:', updateError.message);
+      return res.status(500).json({ error: 'Failed to update auth user', details: updateError.message });
+    }
+
+    console.log(`✅ Auth user updated with new email: ${newEmail}`);
+
+    res.json({
+      success: true,
+      message: 'Admin phone updated successfully',
+      authUserId: authUser.id,
+      oldEmail: oldEmail,
+      newEmail: newEmail
+    });
+
+  } catch (error) {
+    console.error('❌ UPDATE ADMIN PHONE ERROR:', error);
+    res.status(500).json({
+      error: 'Failed to update admin phone',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /admin/user/:userId
  * Get user details from database
  */

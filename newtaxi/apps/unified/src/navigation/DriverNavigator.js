@@ -15,6 +15,7 @@ import DriverCompletedTripDetailScreen from '../screens/driver/CompletedTripDeta
 import DriverWalletScreen from '../screens/driver/WalletScreen';
 import DriverProfileScreen from '../screens/driver/ProfileScreen';
 import PolicyScreen from '../screens/common/PolicyScreen';
+import ViewPolicyScreen from '../screens/common/ViewPolicyScreen';
 import DriverDocumentUploadScreen from '../screens/driver/DriverDocumentUploadScreen';
 import DriverVerificationStatusScreen from '../screens/driver/DriverVerificationStatusScreen';
 import WaitingForApprovalScreen from '../screens/driver/WaitingForApprovalScreen';
@@ -92,6 +93,18 @@ function ProfileStack() {
         component={PolicyScreen}
         options={{ title: 'Cancellation Policy' }}
       />
+      <Stack.Screen
+        name="ViewPolicy"
+        component={ViewPolicyScreen}
+        options={({ route }) => ({
+          title: route.params?.policyType === 'privacy_policy' ? 'Privacy Policy'
+            : route.params?.policyType === 'terms_conditions' ? 'Terms & Conditions'
+            : route.params?.policyType === 'cancellation_policy' ? 'Cancellation Policy'
+            : route.params?.policyType === 'refund_policy' ? 'Refund Policy'
+            : route.params?.policyType === 'safety_guidelines' ? 'Safety Guidelines'
+            : 'Policy',
+        })}
+      />
     </Stack.Navigator>
   );
 }
@@ -107,6 +120,7 @@ export default function DriverNavigator() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // First check driver_verification_status table
         const { data: verificationStatus, error } = await supabase
           .from('driver_verification_status')
           .select('overall_status')
@@ -115,7 +129,6 @@ export default function DriverNavigator() {
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error checking verification status:', error);
-          // On error, assume not approved - show waiting screen
           setShowWaitingScreen(true);
           setLoading(false);
           return;
@@ -123,15 +136,35 @@ export default function DriverNavigator() {
 
         console.log('DriverNavigator: Verification status:', verificationStatus?.overall_status);
 
-        // ONLY allow dashboard access if overall_status is 'approved'
-        // Everything else: pending_review, rejected, or no record → Show WaitingForApprovalScreen
         if (verificationStatus?.overall_status === 'approved') {
-          // Approved - show dashboard
-          console.log('DriverNavigator: Driver approved - showing dashboard');
           setShowWaitingScreen(false);
+        } else if (!verificationStatus) {
+          // No verification record — check users.verification_status directly (for dummy drivers)
+          const { data: userData } = await supabase
+            .from('users')
+            .select('verification_status')
+            .eq('id', user.id)
+            .single();
+
+          console.log('DriverNavigator: users.verification_status:', userData?.verification_status);
+
+          if (userData?.verification_status === 'approved') {
+            // Approved at user level — also create the missing dvs record so future checks work
+            await supabase
+              .from('driver_verification_status')
+              .upsert({
+                driver_id: user.id,
+                overall_status: 'approved',
+                all_documents_submitted: true,
+                submitted_at: new Date().toISOString(),
+                approved_at: new Date().toISOString(),
+              }, { onConflict: 'driver_id' });
+
+            setShowWaitingScreen(false);
+          } else {
+            setShowWaitingScreen(true);
+          }
         } else {
-          // Not approved (pending_review, rejected, or no status) - show waiting screen
-          console.log('DriverNavigator: Driver not approved - showing waiting screen');
           setShowWaitingScreen(true);
         }
       } catch (err) {

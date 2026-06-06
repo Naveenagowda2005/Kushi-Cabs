@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { ROLES, API_CONFIG } from '../constants';
 
@@ -31,6 +32,38 @@ export const AuthProvider = ({ children }) => {
       try {
         console.log('AuthProvider: initAuth starting...');
         
+        // Check for super admin session in AsyncStorage first (React Native)
+        try {
+          const superAdminSessionStr = await AsyncStorage.getItem('superAdminSession');
+          console.log('AuthProvider: Checking AsyncStorage for superAdminSession:', !!superAdminSessionStr);
+          
+          if (superAdminSessionStr) {
+            console.log('AuthProvider: Found super admin session in AsyncStorage');
+            const superAdminSession = JSON.parse(superAdminSessionStr);
+            console.log('AuthProvider: Parsed session:', { 
+              hasUserId: !!superAdminSession?.user?.id,
+              email: superAdminSession?.user?.email 
+            });
+            
+            // ✅ SET SESSION FIRST - this is critical!
+            console.log('AuthProvider: Setting session from AsyncStorage');
+            setSession(superAdminSession);
+            console.log('AuthProvider: Session set, now fetching profile');
+            
+            if (superAdminSession?.user?.id) {
+              console.log('AuthProvider: Restoring user profile from session');
+              await fetchUserProfile(superAdminSession.user.id);
+              console.log('AuthProvider: User profile restored');
+              console.log('AuthProvider: Session persisted, hasSession will now return true');
+              return; // Early return if super admin session restored
+            }
+          }
+        } catch (e) {
+          console.log('AuthProvider: Could not restore super admin session:', e.message);
+        }
+        
+        console.log('AuthProvider: No AsyncStorage session found, checking Supabase...');
+        
         // Get initial session with timeout
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) =>
@@ -39,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
         const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
         
-        console.log('AuthProvider: Got session result:', { hasSession: !!session, error: error?.message });
+        console.log('AuthProvider: Got Supabase session result:', { hasSession: !!session, error: error?.message });
         
         if (error) {
           console.error('AuthProvider: Error getting session:', error);
@@ -47,11 +80,14 @@ export const AuthProvider = ({ children }) => {
           return;
         }
         
-        console.log('AuthProvider: Initial session:', !!session);
+        console.log('AuthProvider: Setting Supabase session');
         setSession(session);
         if (session?.user) {
+          console.log('AuthProvider: Session found, fetching profile');
           await fetchUserProfile(session.user.id);
         } else {
+          console.log('AuthProvider: No session, clearing everything');
+          setUser(null);
           setSelectedRole(null);
           setLoading(false);
         }
@@ -67,15 +103,23 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('AuthProvider: Setting up auth listener...');
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          console.log('AuthProvider: Auth state change:', event, !!session);
-          setSession(session);
+        async (event, supabaseSession) => {
+          console.log('AuthProvider: Auth state change:', event, !!supabaseSession);
           
-          if (session?.user) {
+          // Check if this is a Supabase session (has JWT token) or if we already have super admin mock session
+          // If there's no Supabase session and event is INITIAL_SESSION, leave the super admin mock session alone
+          if (!supabaseSession && event === 'INITIAL_SESSION') {
+            console.log('AuthProvider: INITIAL_SESSION with no Supabase session - keeping existing session (super admin mock)');
+            return; // Don't clear the existing super admin mock session
+          }
+          
+          setSession(supabaseSession);
+          
+          if (supabaseSession?.user) {
             if (event === 'TOKEN_REFRESHED' && fetchingRef.current) return;
-            await fetchUserProfile(session.user.id);
+            await fetchUserProfile(supabaseSession.user.id);
           } else {
-            console.log('AuthProvider: No session, clearing user and role');
+            console.log('AuthProvider: No Supabase session, clearing user and role');
             setUser(null);
             setSelectedRole(null);
             setLoading(false);
@@ -92,7 +136,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (userId) => {
     try {
-      console.log('Unified fetchUserProfile called for user:', userId);
+      console.log('fetchUserProfile: Starting for user:', userId);
       fetchingRef.current = true;
 
       const queryPromise = supabase
@@ -119,27 +163,32 @@ export const AuthProvider = ({ children }) => {
 
       const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
-      console.log('Unified user profile query result:', { data, error: error?.message });
+      console.log('fetchUserProfile: Query result:', { 
+        hasData: !!data,
+        error: error?.message,
+        dataId: data?.id
+      });
 
       if (error) {
-        console.error('Unified Error fetching user profile:', error);
+        console.error('fetchUserProfile: Error fetching user profile:', error);
         setUser(null);
         setLoading(false);
       } else if (data) {
-        console.log('Unified setting user profile:', data);
+        console.log('fetchUserProfile: Setting user:', data.id, data.roles?.name);
         setUser(data);
         if (data.roles?.name) {
-          console.log('Unified auto-selecting role:', data.roles.name);
+          console.log('fetchUserProfile: Auto-selecting role:', data.roles.name);
           setSelectedRole(data.roles.name);
         }
+        console.log('fetchUserProfile: Setting loading to false');
         setLoading(false);
       } else {
-        console.log('Unified: No user profile found for authenticated user ID:', userId);
+        console.log('fetchUserProfile: No user profile found');
         setUser(null);
         setLoading(false);
       }
     } catch (err) {
-      console.error('Unified fetchUserProfile error:', err.message);
+      console.error('fetchUserProfile: Exception:', err.message);
       setUser(null);
       setLoading(false);
     } finally {
@@ -174,8 +223,11 @@ export const AuthProvider = ({ children }) => {
         
         console.log('Super Admin: Phone digits:', phoneDigits);
         
-        // For super_admin, verify phone exists in database and has super_admin role
         // OTP verification already happened (SMS was verified)
+        // The 'password' parameter here is actually the OTP code from SMS
+        console.log('Super Admin: OTP already verified via SMS');
+        
+        // For super_admin, verify phone exists in database and has super_admin role
         const { data: adminData, error: adminError } = await supabase
           .from('users')
           .select('id, email, phone, full_name, role_id, roles(name)')
@@ -199,9 +251,8 @@ export const AuthProvider = ({ children }) => {
 
         console.log('Super Admin verified - OTP was already verified via SMS');
 
-        // For super admin, we bypass Supabase Auth entirely
-        // We set both session and user from database without JWT
-        // The session is minimal - just enough for the app to recognize authenticated state
+        // For super admin, create mock session (OTP verification is sufficient)
+        // We set both session and user from database
         const mockSession = {
           user: {
             id: adminData.id,
@@ -213,13 +264,25 @@ export const AuthProvider = ({ children }) => {
         };
 
         // Set both session and user - this allows app to navigate
+        console.log('Super Admin: Setting session and user state');
         setSession(mockSession);
         setUser(adminData);
         if (adminData.roles?.name) {
+          console.log('Super Admin: Setting selected role:', adminData.roles.name);
           setSelectedRole(adminData.roles.name);
         }
         
-        console.log('Super Admin session and user set - redirecting to dashboard');
+        // Persist super admin session to AsyncStorage for persistence across reloads
+        try {
+          await AsyncStorage.setItem('superAdminSession', JSON.stringify(mockSession));
+          console.log('Super Admin: Session persisted to AsyncStorage');
+          const stored = await AsyncStorage.getItem('superAdminSession');
+          console.log('Super Admin: Verification - AsyncStorage contains:', !!stored);
+        } catch (e) {
+          console.warn('Super Admin: Could not persist session to AsyncStorage:', e.message);
+        }
+        
+        console.log('Super Admin: Session and user set - redirecting to dashboard');
         
         return { data: { user: adminData, session: mockSession }, error: null };
       }
@@ -266,17 +329,15 @@ export const AuthProvider = ({ children }) => {
           if (verificationStatus) {
             console.log('Driver verification status:', verificationStatus?.overall_status);
             
-            // If documents not yet submitted, block login - they must upload first
-            if (!verificationStatus.all_documents_submitted) {
+            // If already approved, allow login immediately (handles dummy drivers)
+            if (verificationStatus.overall_status === 'approved') {
+              console.log('Driver is approved - allowing login');
+            } else if (!verificationStatus.all_documents_submitted) {
+              // Documents not yet submitted, block login
               throw new Error('Please upload your documents first.');
             }
-            
-            // ALL other statuses (pending_review, approved, rejected) → allow login
-            // DriverNavigator will show the correct screen based on status:
-            // - pending_review → WaitingForApproval screen
-            // - approved       → Driver dashboard
-            // - rejected       → WaitingForApproval screen (shows rejected docs to re-upload)
-            console.log('Driver login allowed - status:', verificationStatus.overall_status);
+            // ALL other statuses (pending_review, pending, rejected) → allow login
+            // DriverNavigator will show the correct screen based on status
           } else {
             // No verification status record - new driver, must upload documents
             throw new Error('Please upload your documents first.');
@@ -395,6 +456,15 @@ export const AuthProvider = ({ children }) => {
   const signOut = async () => {
     try {
       setLoading(true);
+      
+      // Clear super admin session from AsyncStorage
+      try {
+        await AsyncStorage.removeItem('superAdminSession');
+        console.log('Super admin session cleared from AsyncStorage');
+      } catch (e) {
+        console.warn('Could not clear super admin session from AsyncStorage:', e.message);
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       

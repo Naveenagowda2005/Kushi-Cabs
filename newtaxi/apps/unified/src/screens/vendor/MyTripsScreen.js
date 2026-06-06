@@ -1,7 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert, ActivityIndicator, Modal,
+  RefreshControl, Alert, ActivityIndicator, Modal, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,7 +25,6 @@ export default function VendorMyTripsScreen({ navigation }) {
         .from('trips')
         .select('*')
         .eq('created_by', user.id)
-        .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -114,7 +113,30 @@ export default function VendorMyTripsScreen({ navigation }) {
     );
   };
 
-  const TripItem = ({ item }) => (
+  const TripItem = ({ item }) => {
+    const [segmentName, setSegmentName] = useState(null);
+
+    useEffect(() => {
+      const fetchSegment = async () => {
+        if (item.segment_id) {
+          try {
+            const { data } = await supabase
+              .from('trip_segments')
+              .select('name')
+              .eq('id', item.segment_id)
+              .maybeSingle();
+            if (data) {
+              setSegmentName(data.name);
+            }
+          } catch (error) {
+            console.error('Error fetching segment:', error);
+          }
+        }
+      };
+      fetchSegment();
+    }, [item.segment_id]);
+
+    return (
     <TouchableOpacity
       style={styles.tripCard}
       onPress={() => {
@@ -123,14 +145,33 @@ export default function VendorMyTripsScreen({ navigation }) {
       }}
       activeOpacity={0.8}
     >
+      {/* Trip Type Badge */}
+      <View style={styles.tripTypeBadge}>
+        <Ionicons name="tag-outline" size={14} color="#2196f3" />
+        <Text style={styles.tripTypeBadgeText}>{segmentName || 'ONE WAY'}</Text>
+      </View>
+
       <View style={styles.tripHeader}>
         <View style={styles.tripInfo}>
           <Text style={styles.tripLocations} numberOfLines={2}>
             {item.pickup_location} → {item.dropoff_location}
           </Text>
+          {item.return_location && (
+            <View style={styles.returnLocationRow}>
+              <Ionicons name="location-outline" size={12} color="#2196f3" />
+              <Text style={styles.tripReturnLocation} numberOfLines={1}>
+                Return: {item.return_location}
+              </Text>
+            </View>
+          )}
           <Text style={styles.tripDate}>
-            {new Date(item.created_at).toLocaleDateString()}
+            Departure: {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : 'ASAP'}
           </Text>
+          {item.return_date && (
+            <Text style={styles.tripReturnDate}>
+              Return: {new Date(item.return_date).toLocaleDateString()}
+            </Text>
+          )}
         </View>
         <View style={styles.tripRight}>
           <Text style={styles.tripFare}>₹{item.fare_amount}</Text>
@@ -147,6 +188,10 @@ export default function VendorMyTripsScreen({ navigation }) {
 
       <View style={styles.tripDetails}>
         <View style={styles.detailRow}>
+          <Ionicons name="map-outline" size={14} color="#2196f3" />
+          <Text style={styles.detailText}>{item.fixed_km || 'N/A'} km</Text>
+        </View>
+        <View style={styles.detailRow}>
           <Ionicons name="car-outline" size={14} color="#2196f3" />
           <Text style={styles.detailText}>{item.car_type || 'N/A'}</Text>
         </View>
@@ -160,11 +205,46 @@ export default function VendorMyTripsScreen({ navigation }) {
         </View>
       </View>
 
+      {/* Extra Charges Display */}
+      <View style={styles.extraChargesContainer}>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="cash-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Toll: {item.toll_included ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="document-text-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Tax: {item.state_tax_included ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="paw-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Pet: {item.pet_travelling ? 'Allowed' : 'Not Allowed'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
       <View style={styles.tripFooter}>
         <Text style={styles.commissionText}>
           Commission: ₹{item.commission_amount}
         </Text>
         <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => navigation.navigate('CreateTrip', { trip: item, editMode: true })}
+          >
+            <Ionicons name="pencil-outline" size={14} color="#2196f3" />
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
           {item.is_published ? (
             <TouchableOpacity
               style={[styles.actionBtn, styles.unpublishBtn]}
@@ -199,7 +279,8 @@ export default function VendorMyTripsScreen({ navigation }) {
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -246,7 +327,7 @@ export default function VendorMyTripsScreen({ navigation }) {
             </View>
 
             {selectedTrip && (
-              <View style={styles.modalBody}>
+              <ScrollView style={styles.modalBody} contentContainerStyle={styles.modalBodyContent}>
                 <View style={styles.detailSection}>
                   <Text style={styles.sectionLabel}>Locations</Text>
                   <View style={styles.locationBox}>
@@ -264,8 +345,33 @@ export default function VendorMyTripsScreen({ navigation }) {
                         <Text style={styles.locationValueText}>{selectedTrip.dropoff_location}</Text>
                       </View>
                     </View>
+                    {selectedTrip.return_location && (
+                      <View style={styles.locationRow}>
+                        <Ionicons name="location" size={16} color="#2196f3" />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={styles.locationLabelText}>Return Location</Text>
+                          <Text style={styles.locationValueText}>{selectedTrip.return_location}</Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
+
+                {selectedTrip.return_date && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionLabel}>Return Date</Text>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoValue}>
+                        {new Date(selectedTrip.return_date).toLocaleDateString('en-IN', {
+                          weekday: 'short',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  </View>
+                )}
 
                 <View style={styles.detailSection}>
                   <Text style={styles.sectionLabel}>Passenger</Text>
@@ -288,6 +394,12 @@ export default function VendorMyTripsScreen({ navigation }) {
                       <Text style={styles.infoLabel}>Commission</Text>
                       <Text style={styles.infoValue}>₹{selectedTrip.commission_amount}</Text>
                     </View>
+                    {selectedTrip.fixed_km && (
+                      <View style={styles.pricingRow}>
+                        <Text style={styles.infoLabel}>Fixed KM</Text>
+                        <Text style={styles.infoValue}>{selectedTrip.fixed_km} km</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
 
@@ -309,7 +421,45 @@ export default function VendorMyTripsScreen({ navigation }) {
                   </View>
                 </View>
 
+                <View style={styles.detailSection}>
+                  <Text style={styles.sectionLabel}>Extra Charges</Text>
+                  <View style={styles.infoBox}>
+                    <View style={styles.chargeRow}>
+                      <Ionicons name="cash-outline" size={14} color="#ff9800" />
+                      <Text style={styles.chargeLabel}>Toll Included</Text>
+                      <Text style={[styles.chargeBadge, selectedTrip.toll_included ? styles.badgeYes : styles.badgeNo]}>
+                        {selectedTrip.toll_included ? 'Yes' : 'No'}
+                      </Text>
+                    </View>
+                    <View style={styles.chargeRow}>
+                      <Ionicons name="document-text-outline" size={14} color="#ff9800" />
+                      <Text style={styles.chargeLabel}>State Tax Included</Text>
+                      <Text style={[styles.chargeBadge, selectedTrip.state_tax_included ? styles.badgeYes : styles.badgeNo]}>
+                        {selectedTrip.state_tax_included ? 'Yes' : 'No'}
+                      </Text>
+                    </View>
+                    <View style={styles.chargeRow}>
+                      <Ionicons name="paw-outline" size={14} color="#ff9800" />
+                      <Text style={styles.chargeLabel}>Pet</Text>
+                      <Text style={[styles.chargeBadge, selectedTrip.pet_travelling ? styles.badgeYes : styles.badgeNo]}>
+                        {selectedTrip.pet_travelling ? 'Yes' : 'No'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+
                 <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.editBtn, { flex: 1 }]}
+                    onPress={() => {
+                      navigation.navigate('CreateTrip', { trip: selectedTrip, editMode: true });
+                      setShowModal(false);
+                    }}
+                  >
+                    <Ionicons name="pencil-outline" size={16} color="#2196f3" />
+                    <Text style={styles.editBtnText}>Edit</Text>
+                  </TouchableOpacity>
                   {selectedTrip.is_published ? (
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.unpublishBtn, { flex: 1 }]}
@@ -364,6 +514,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#0f3460',
   },
+  tripTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2196f333',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  tripTypeBadgeText: {
+    color: '#2196f3',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   tripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -371,6 +539,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tripInfo: { flex: 1 },
+  returnLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 4,
+  },
   tripLocations: {
     color: '#fff',
     fontSize: 14,
@@ -381,12 +556,23 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 12,
   },
+  tripReturnDate: {
+    color: '#2196f3',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  tripReturnLocation: {
+    color: '#2196f3',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
   tripRight: {
     alignItems: 'flex-end',
     marginLeft: 12,
   },
   tripFare: {
-    color: '#1a1a2e',
+    color: '#4caf50',
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 6,
@@ -431,6 +617,43 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  extraChargesContainer: {
+    gap: 8,
+    marginBottom: 10,
+  },
+  extraChargesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  extraChargesLabel: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  chargeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ff9800',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  chargeBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ff9800',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  chargeBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   tripFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -453,6 +676,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
+  },
+  editBtn: {
+    backgroundColor: '#2196f311',
+    borderColor: '#2196f3',
+  },
+  editBtnText: {
+    color: '#2196f3',
+    fontSize: 12,
+    fontWeight: '600',
   },
   publishBtn: {
     backgroundColor: '#4caf5011',
@@ -525,6 +757,10 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+    flex: 1,
+  },
+  modalBodyContent: {
+    paddingBottom: 20,
   },
   detailSection: {
     marginBottom: 20,
@@ -588,6 +824,35 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontSize: 12,
     fontWeight: '500',
+  },
+  chargeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a2e',
+  },
+  chargeLabel: {
+    color: '#aaa',
+    fontSize: 12,
+    flex: 1,
+  },
+  chargeBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  badgeYes: {
+    backgroundColor: '#4caf5033',
+    color: '#4caf50',
+  },
+  badgeNo: {
+    backgroundColor: '#f4433633',
+    color: '#f44336',
   },
   modalActions: {
     flexDirection: 'row',

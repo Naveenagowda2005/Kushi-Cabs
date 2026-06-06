@@ -209,9 +209,6 @@ export default function SuperAdminDashboardScreen({ navigation }) {
           </View>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.profileButton} onPress={() => Alert.alert('Profile', 'Profile screen coming soon')}>
-            <Ionicons name="person-circle-outline" size={40} color={COLORS.superAdmin.primary} />
-          </TouchableOpacity>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={() =>
@@ -298,7 +295,7 @@ const styles = StyleSheet.create({
   userName: { fontSize: getResponsiveFontSize(24), fontWeight: 'bold', color: COLORS.text, marginTop: 4 },
   companyName: { fontSize: getResponsiveFontSize(14), color: COLORS.superAdmin.primary, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
-  profileButton: { padding: 8, marginRight: 8 },
+  profileButton: { padding: 8, marginLeft: 'auto' },
   logoutButton: { padding: 8 },
   statsContainer: { paddingHorizontal: getResponsivePadding(24) },
   statCard: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 12, borderLeftWidth: 4, elevation: 2 },

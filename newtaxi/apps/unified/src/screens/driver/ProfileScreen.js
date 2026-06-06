@@ -70,9 +70,11 @@ export default function DriverProfileScreen({ navigation }) {
   useFocusEffect(useCallback(() => { loadDocuments(); }, [loadDocuments]));
 
   const menuItems = [
-    { icon: 'document-text-outline', label: 'Terms & Conditions', onPress: () => navigation.navigate('Terms') },
-    { icon: 'warning-outline',        label: 'Cancellation Policy', onPress: () => navigation.navigate('CancellationPolicy') },
-    { icon: 'help-circle-outline',    label: 'Help & Support',      onPress: () => {} },
+    { icon: 'document-text-outline', label: 'Privacy Policy', onPress: () => navigation.navigate('ViewPolicy', { policyType: 'privacy_policy' }) },
+    { icon: 'document-text-outline', label: 'Terms & Conditions', onPress: () => navigation.navigate('ViewPolicy', { policyType: 'terms_conditions' }) },
+    { icon: 'close-circle-outline', label: 'Cancellation Policy', onPress: () => navigation.navigate('ViewPolicy', { policyType: 'cancellation_policy' }) },
+    { icon: 'cash-outline', label: 'Refund Policy', onPress: () => navigation.navigate('ViewPolicy', { policyType: 'refund_policy' }) },
+    { icon: 'warning-outline', label: 'Safety Guidelines', onPress: () => navigation.navigate('ViewPolicy', { policyType: 'safety_guidelines' }) },
   ];
 
   // ── Update a single document inline ──────────────────────────────────────

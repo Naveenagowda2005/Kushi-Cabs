@@ -25,15 +25,18 @@ const TABS = ['Available', 'My Trips'];
 
 // Separate component for My Trip Card
 function MyTripCard({ item, navigation, onCancel, onDelete }) {
+  const { user } = useAuth();
   const [carTypeName, setCarTypeName] = useState(null);
   const [seaterTypeName, setSeaterTypeName] = useState(null);
   const [fuelTypeName, setFuelTypeName] = useState(null);
   const [creatorName, setCreatorName] = useState(null);
   const [creatorPhone, setCreatorPhone] = useState(null);
+  const [segmentName, setSegmentName] = useState('One-way');
 
   useEffect(() => {
-    const fetchCarDetails = async () => {
+    const fetchData = async () => {
       try {
+        // Fetch car details
         if (item.car_type) {
           const { data: carTypeData } = await supabase
             .from('car_types')
@@ -60,13 +63,18 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
             .maybeSingle();
           if (fuelData) setFuelTypeName(fuelData.name);
         }
-      } catch (error) {
-        console.error('Error fetching car details:', error);
-      }
-    };
 
-    const fetchCreatorDetails = async () => {
-      try {
+        // Fetch segment name - EXACT SAME LOGIC AS ENQUIRYCARD
+        if (item.segment_id) {
+          const { data: segmentData } = await supabase
+            .from('trip_segments')
+            .select('name')
+            .eq('id', item.segment_id)
+            .maybeSingle();
+          if (segmentData) setSegmentName(segmentData.name);
+        }
+
+        // Fetch creator details
         if (item.created_by) {
           const { data: creator } = await supabase
             .from('users')
@@ -79,13 +87,12 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
           }
         }
       } catch (error) {
-        console.error('Error fetching creator details:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
-    fetchCarDetails();
-    fetchCreatorDetails();
-  }, [item.car_type, item.seater_type, item.fuel_type, item.created_by]);
+    fetchData();
+  }, [item.car_type, item.seater_type, item.fuel_type, item.created_by, item.segment_id]);
 
   const canCancel = item.status === TRIP_STATUS.ACCEPTED || item.status === TRIP_STATUS.IN_PROGRESS;
   const canDelete = item.status === TRIP_STATUS.PENDING;
@@ -102,6 +109,14 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
       onPress={() => navigation.navigate('EnquiryDetail', { trip: item, readOnly: true })}
       activeOpacity={0.8}
     >
+      {/* Trip Type Badge */}
+      <View style={styles.tripTypeBadgeRow}>
+        <View style={styles.tripTypeBadge}>
+          <Ionicons name="tag-outline" size={14} color="#888" />
+          <Text style={styles.tripTypeBadgeText}>{String(segmentName || 'ONE WAY').toUpperCase()}</Text>
+        </View>
+      </View>
+
       <View style={styles.myTripHeader}>
         <TripStatusBadge status={item.status} />
         <Text style={styles.myTripFare}>₹{item.fare_amount}</Text>
@@ -114,7 +129,16 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
         <Ionicons name="flag" size={14} color="#1a1a2e" />
         <Text style={styles.myTripLocation} numberOfLines={1}>{item.dropoff_location}</Text>
       </View>
-      <Text style={styles.myTripDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
+      {item.return_location && (
+        <View style={styles.row}>
+          <Ionicons name="location-outline" size={14} color="#2196f3" />
+          <Text style={[styles.myTripLocation, { color: '#2196f3', fontWeight: '600' }]} numberOfLines={1}>Return: {item.return_location}</Text>
+        </View>
+      )}
+      <Text style={styles.myTripDate}>Departure: {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : 'ASAP'}</Text>
+      {item.return_date && (
+        <Text style={styles.myTripReturnDate}>Return: {new Date(item.return_date).toLocaleDateString()}</Text>
+      )}
 
       {/* Fare Breakdown */}
       {(commissionAmount > 0 || customerPreAdvance > 0) && (
@@ -169,7 +193,35 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
         </>
       )}
 
-      {/* Tax and Extra Charges Note */}
+      {/* Extra Charges Display */}
+      <View style={styles.extraChargesContainer}>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="cash-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Toll: {item.toll_included ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="document-text-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Tax: {item.state_tax_included ? 'Included' : 'Excluded'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.extraChargesRow}>
+          <View style={styles.chargeBadge}>
+            <Ionicons name="paw-outline" size={12} color="#fff" />
+            <Text style={styles.chargeBadgeText}>
+              Pet: {item.pet_travelling ? 'Allowed' : 'Not Allowed'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Additional Notes */}
       <View style={styles.notesHeader}>
         <Text style={styles.notesTitle}>Notes:</Text>
       </View>
@@ -184,20 +236,12 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
         </View>
       )}
 
-      {/* Note 2: Tax and Toll */}
+      {/* Note 2: Additional Info */}
       <View style={styles.noteItem}>
         <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
         <Text style={styles.noteText}>
-          {item.toll_included 
-            ? '✓ Toll charge included in fare' 
-            : 'State tax, toll & parking extra if applicable'}
+          Driver must accept all charges conditions before accepting trip
         </Text>
-      </View>
-
-      {/* Note 3: Pets */}
-      <View style={styles.noteItem}>
-        <Ionicons name="paw-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>Pets travelling - additional charges apply</Text>
       </View>
 
       {/* Trip Creator Details - if pre-advance exceeds commission */}
@@ -228,6 +272,17 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
             <Text style={styles.creatorDetailValue}>₹{(customerPreAdvance - commissionAmount).toFixed(2)}</Text>
           </View>
         </View>
+      )}
+
+      {/* Edit button — for trip creator and super admin */}
+      {(item.created_by === user?.id || user?.role === 'super_admin') && (
+        <TouchableOpacity
+          style={styles.editBtn}
+          onPress={() => navigation.navigate('CreateTrip', { trip: item, editMode: true })}
+        >
+          <Ionicons name="pencil-outline" size={16} color="#2196f3" />
+          <Text style={styles.editBtnText}>Edit Trip</Text>
+        </TouchableOpacity>
       )}
 
       {/* Publish/Unpublish button — only for pending trips */}
@@ -382,6 +437,46 @@ export default function VendorEnquiriesScreen({ navigation }) {
 
   const isLoading = activeTab === 0 ? loadingEnq : loadingTrips;
 
+  async function handleAcceptTrip(trip) {
+    if (!vendor?.id) {
+      Alert.alert('Error', 'Vendor profile not found. Please contact support.');
+      return;
+    }
+    Alert.alert(
+      'Accept Trip',
+      `Accept this trip from ${trip.pickup_location} to ${trip.dropoff_location}?\n\nCommission: ₹${trip.commission_amount || 0}`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Accept',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('trips')
+                .update({
+                  status: TRIP_STATUS.ACCEPTED,
+                  accepted_by: user.id,
+                  vendor_id: vendor.id,
+                  accepted_at: new Date().toISOString(),
+                })
+                .eq('id', trip.id);
+
+              if (error) throw error;
+
+              Alert.alert('✅ Trip Accepted', 'You have successfully accepted this trip!');
+              refetchEnq();
+              refetchTrips();
+            } catch (err) {
+              console.error('Accept trip error:', err);
+              Alert.alert('Error', err.message || 'Failed to accept trip');
+            }
+          },
+        },
+      ]
+    );
+  }
+
   async function handleCancelTrip(tripId) {
     Alert.alert(
       'Cancel Trip',
@@ -455,6 +550,8 @@ export default function VendorEnquiriesScreen({ navigation }) {
       <EnquiryCard
         trip={item}
         onPress={() => navigation.navigate('EnquiryDetail', { trip: item })}
+        onAccept={(trip) => handleAcceptTrip(trip)}
+        onCancel={() => {}}
       />
     );
   }
@@ -600,16 +697,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1a1a2e',
   },
+  tripTypeBadgeRow: {
+    marginBottom: 10,
+  },
+  tripTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2196f333',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  tripTypeBadgeText: {
+    color: '#2196f3',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   myTripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
   },
-  myTripFare: { color: '#1a1a2e', fontWeight: 'bold', fontSize: Math.max(15, screenWidth * 0.04) },
+  myTripFare: { color: '#4caf50', fontWeight: 'bold', fontSize: Math.max(15, screenWidth * 0.04) },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, flex: 1 },
   myTripLocation: { color: '#ccc', fontSize: Math.max(12, screenWidth * 0.032), flex: 1 },
   myTripDate: { color: '#555', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 6 },
+  myTripReturnDate: { color: '#ff9800', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 4, fontWeight: '600' },
   carDetailsRow: {
     flexDirection: 'row',
     gap: 10,
@@ -630,6 +748,28 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontSize: Math.max(10, screenWidth * 0.028),
     fontWeight: '500',
+  },
+  extraChargesContainer: {
+    gap: 8,
+    marginVertical: 10,
+  },
+  extraChargesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chargeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ff9800',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  chargeBadgeText: {
+    color: '#fff',
+    fontSize: Math.max(10, screenWidth * 0.028),
+    fontWeight: '600',
   },
   carrierNote: {
     flexDirection: 'row',
@@ -754,6 +894,23 @@ const styles = StyleSheet.create({
     borderColor: '#ff9800',
     gap: 6,
     backgroundColor: '#ff980011',
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2196f3',
+    gap: 6,
+    backgroundColor: '#2196f311',
+  },
+  editBtnText: {
+    color: '#2196f3',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '600',
   },
   publishBtnActive: {
     backgroundColor: '#4caf5011',

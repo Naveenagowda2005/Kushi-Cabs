@@ -15,10 +15,12 @@ export function useAvailableEnquiries() {
     try {
       setError(null);
       // Show all pending trips to vendors (both created by admin and other vendors)
+      // But exclude trips that have already been accepted (accepted_by IS NULL means not yet accepted)
       const { data, error } = await supabase
         .from('trips')
         .select('*')
         .eq('status', TRIP_STATUS.PENDING)
+        .is('accepted_by', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

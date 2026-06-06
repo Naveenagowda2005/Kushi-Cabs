@@ -213,7 +213,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
             <View style={styles.commissionBadge}>
               <Ionicons name="trending-up-outline" size={14} color="#fff" />
               <Text style={styles.commissionBadgeText}>
-                Commission Charged: ₹{commissionAmount.toFixed(2)}
+                Commission: ₹{commissionAmount.toFixed(2)}
                 {customerPreAdvance > 0 && ` (₹${Math.abs(customerPreAdvance).toFixed(2)} pre-advance covers it)`}
               </Text>
             </View>
@@ -274,14 +274,6 @@ export default function DriverTripDetailScreen({ route, navigation }) {
                   : `Commission is covered by customer pre-advance. Tap "Accept Trip" to unlock customer details.`
                 }
               </Text>
-              <View style={styles.lockedRow}>
-                <Ionicons name="person-outline" size={16} color="#555" />
-                <Text style={styles.lockedValue}>••••••••••</Text>
-              </View>
-              <View style={styles.lockedRow}>
-                <Ionicons name="call-outline" size={16} color="#555" />
-                <Text style={styles.lockedValue}>••••••••••</Text>
-              </View>
             </View>
           )}
         </View>

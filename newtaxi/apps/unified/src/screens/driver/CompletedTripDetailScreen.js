@@ -66,20 +66,13 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
           <Text style={styles.sectionTitle}>Fare Breakdown</Text>
           <DetailRow label="Total Fare" value={`₹${fareAmount.toFixed(2)}`} />
           {commissionAmount > 0 && (
-            <DetailRow label="Commission Charged by Driver" value={`-₹${commissionAmount.toFixed(2)}`} color="#ff6b6b" />
+            <DetailRow label="Commission:" value={`-₹${commissionAmount.toFixed(2)}`} color="#ff6b6b" />
           )}
           {customerPreAdvance > 0 && (
             <DetailRow label="Customer Pre-Advance" value={`₹${customerPreAdvance.toFixed(2)}`} color="#2196f3" />
           )}
           <View style={styles.divider} />
           <DetailRow label="Total Driver Earnings" value={`₹${driverEarning.toFixed(2)}`} color="#4caf50" />
-        </View>
-
-        {/* Collection Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Collection Details</Text>
-          <DetailRow label="Collect from Passenger" value={`₹${collectedFromPassenger.toFixed(2)}`} color="#4caf50" />
-          <DetailRow label="Collect from Trip Creator" value={`₹${collectedFromCreator.toFixed(2)}`} color="#ff9800" />
         </View>
 
         {/* Trip Information */}
@@ -102,26 +95,6 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
             />
           )}
         </View>
-
-        {/* Passenger Details */}
-        {trip.passenger_name && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Passenger Details</Text>
-            <DetailRow label="Name" value={trip.passenger_name} />
-            {trip.passenger_phone && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Phone</Text>
-                <TouchableOpacity 
-                  style={styles.phoneButton}
-                  onPress={handleCallPassenger}
-                >
-                  <Ionicons name="call" size={14} color="#fff" />
-                  <Text style={styles.phoneButtonText}>{trip.passenger_phone}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
 
         {/* Odometer Details */}
         {(trip.start_km || trip.end_km) && (
