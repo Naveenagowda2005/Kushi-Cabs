@@ -35,7 +35,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
   const fetchDummyDrivers = useCallback(async () => {
     try {
       setLoadingDummy(true);
-      const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/dummy-drivers`);
+      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/dummy-drivers`);
       const result = await response.json();
       if (result.success) setDummyDrivers(result.drivers || []);
     } catch (e) {
@@ -55,7 +55,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     }
     try {
       setCreatingDummy(true);
-      const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/create-dummy-driver`, {
+      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/create-dummy-driver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: digits, fullName: dummyName.trim() || undefined }),
@@ -110,7 +110,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         const newEmail = `${phoneDigits}@kushicabs.phone`;
         
         // Call backend to update auth account with new phone
-        const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/update-admin-phone`, {
+        const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/update-admin-phone`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 

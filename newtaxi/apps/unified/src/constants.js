@@ -219,6 +219,7 @@ const getApiUrl = () => {
 
 export const API_CONFIG = {
   SMS_API_URL: getApiUrl(),
+  ADMIN_API_URL: 'https://kushi-cabs-production.up.railway.app', // Always use Railway for admin ops (needs Supabase service role)
 };
 
 export const ROLES = {

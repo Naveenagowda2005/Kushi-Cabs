@@ -78,7 +78,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/delete-user`, {
+            const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/delete-user`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
