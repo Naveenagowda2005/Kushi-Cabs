@@ -1,6 +1,13 @@
 import { Linking, Platform } from 'react-native';
-import RazorpayCheckout from 'react-native-razorpay';
 import { supabase } from '../lib/supabase';
+
+// Safely import RazorpayCheckout — not available in Expo Go
+let RazorpayCheckout = null;
+try {
+  RazorpayCheckout = require('react-native-razorpay').default;
+} catch (e) {
+  console.warn('react-native-razorpay not available (Expo Go). Payment will be disabled.');
+}
 
 // Replace with your Razorpay Key ID from dashboard.razorpay.com
 const RAZORPAY_KEY_ID = 'rzp_test_SknzQ9p24mWj7T';
@@ -164,6 +171,10 @@ export async function initiateDeposit({ userId, amount, userEmail, userName, gat
   };
 
   return new Promise((resolve, reject) => {
+    if (!RazorpayCheckout) {
+      reject(new Error('Razorpay is not available in this build. Please use the production app.'));
+      return;
+    }
     RazorpayCheckout.open(options)
       .then(async (paymentData) => {
         // Payment successful — credit wallet

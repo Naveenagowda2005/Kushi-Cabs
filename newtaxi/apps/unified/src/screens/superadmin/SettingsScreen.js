@@ -11,7 +11,7 @@ import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 
 export default function SuperAdminSettingsScreen({ navigation }) {
-  const { user, refreshUserProfile } = useAuth();
+  const { user, refreshUserProfile, signOut } = useAuth();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
@@ -124,8 +124,17 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         const result = await response.json();
         if (!response.ok) {
           console.warn('Could not update auth account:', result.error);
-          // Don't fail the entire operation, continue with local update
         }
+
+        // Phone changed — sign out and ask to re-login with new number
+        await refreshUserProfile();
+        setIsEditing(false);
+        Alert.alert(
+          '✅ Phone Updated',
+          `Your phone number has been changed to ${phoneDigits}.\n\nPlease log in again with the new number.`,
+          [{ text: 'OK', onPress: () => signOut() }]
+        );
+        return;
       }
 
       await refreshUserProfile();
