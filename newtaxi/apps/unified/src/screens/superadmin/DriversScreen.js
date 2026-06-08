@@ -70,7 +70,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
     ]);
   };
 
-  const deleteDriver = async (driverId) => {
+  const deleteDriver = async (driverId, driverPhone) => {
     Alert.alert('Delete Driver', 'Are you sure? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -83,7 +83,8 @@ export default function SuperAdminDriversScreen({ navigation }) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 userId: driverId,
-                email: `${driverId}@kushicabs.phone`
+                phone: driverPhone,
+                email: `${driverPhone}@kushicabs.phone`
               })
             });
 
@@ -136,7 +137,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
           <Ionicons name={driver.is_active ? 'ban-outline' : 'checkmark-circle-outline'} size={16} color={driver.is_active ? COLORS.error : COLORS.success} />
           <Text style={[styles.actionButtonText, { color: driver.is_active ? COLORS.error : COLORS.success }]}>{driver.is_active ? 'Block' : 'Activate'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.error + '20' }]} onPress={() => deleteDriver(driver.id)}>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.error + '20' }]} onPress={() => deleteDriver(driver.id, driver.users?.phone || driver.phone)}>
           <Ionicons name="trash-outline" size={16} color={COLORS.error} />
           <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
         </TouchableOpacity>

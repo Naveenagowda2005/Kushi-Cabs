@@ -71,20 +71,20 @@ export default function SuperAdminVendorsScreen({ navigation }) {
     ]);
   };
 
-  const deleteVendor = async (vendorId) => {
+  const deleteVendor = async (vendorId, vendorPhone) => {
     Alert.alert('Delete Vendor', 'Are you sure? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            // Use backend API to delete user (checks for pending trips)
             const response = await fetch(`${API_CONFIG.SMS_API_URL}/admin/delete-user`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 userId: vendorId,
-                email: `${vendorId}@kushicabs.phone`
+                phone: vendorPhone,
+                email: `${vendorPhone}@kushicabs.phone`
               })
             });
 
@@ -136,7 +136,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
           <Ionicons name={vendor.is_active ? 'ban-outline' : 'checkmark-circle-outline'} size={16} color={vendor.is_active ? COLORS.error : COLORS.success} />
           <Text style={[styles.actionButtonText, { color: vendor.is_active ? COLORS.error : COLORS.success }]}>{vendor.is_active ? 'Block' : 'Activate'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.error + '20' }]} onPress={() => deleteVendor(vendor.id)}>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.error + '20' }]} onPress={() => deleteVendor(vendor.id, vendor.users?.phone || vendor.phone)}>
           <Ionicons name="trash-outline" size={16} color={COLORS.error} />
           <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
         </TouchableOpacity>
