@@ -176,17 +176,51 @@ router.post('/delete-user', async (req, res) => {
     console.log('✅ No pending trips found - safe to delete');
 
     // Step 1a: Delete all associated trips (to avoid foreign key violations)
-    console.log(`Step 1a: Deleting all trips created by user ${userId}...`);
-    const { error: tripsError } = await supabaseAdmin
+    // Delete trips where user is either the creator OR the accepted driver
+    console.log(`Step 1a: Deleting all trips related to user ${userId}...`);
+    
+    // First, get all trips that reference this user as driver to clear driver_id
+    const { data: tripsAsDriver } = await supabaseAdmin
+      .from('trips')
+      .select('id')
+      .eq('accepted_by', userId);
+    
+    // Clear driver references in trips where this user was accepted_by
+    if (tripsAsDriver && tripsAsDriver.length > 0) {
+      const { error: clearError } = await supabaseAdmin
+        .from('trips')
+        .update({ accepted_by: null, driver_id: null })
+        .eq('accepted_by', userId);
+      
+      if (clearError) {
+        console.warn('⚠️  Warning: Could not clear driver references:', clearError.message);
+      } else {
+        console.log(`✅ Cleared driver references from ${tripsAsDriver.length} trips`);
+      }
+    }
+    
+    // Delete trips created by user
+    const { error: tripsError1 } = await supabaseAdmin
       .from('trips')
       .delete()
       .eq('created_by', userId);
 
-    if (tripsError) {
-      console.error('⚠️  Error deleting trips:', tripsError.message);
-      // Continue anyway - might have no trips
+    if (tripsError1) {
+      console.error('⚠️  Error deleting trips (created):', tripsError1.message);
     } else {
-      console.log('✅ Trips deleted');
+      console.log('✅ Trips (created by user) deleted');
+    }
+
+    // Delete remaining trips where user is referenced
+    const { error: tripsError2 } = await supabaseAdmin
+      .from('trips')
+      .delete()
+      .eq('accepted_by', userId);
+
+    if (tripsError2) {
+      console.error('⚠️  Error deleting trips (accepted):', tripsError2.message);
+    } else {
+      console.log('✅ Trips (accepted by user) deleted');
     }
 
     // Step 1b: Delete from Supabase Auth
@@ -210,7 +244,11 @@ router.post('/delete-user', async (req, res) => {
 
     if (dbError) {
       console.error('❌ Database deletion error:', dbError);
-      return res.status(500).json({ error: 'Database deletion failed', details: dbError.message });
+      return res.status(500).json({ 
+        error: 'Database deletion failed', 
+        details: dbError.message,
+        code: dbError.code 
+      });
     }
 
     console.log('✅ Database user deleted');

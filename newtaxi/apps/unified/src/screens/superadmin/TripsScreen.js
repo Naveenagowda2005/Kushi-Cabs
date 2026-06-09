@@ -530,8 +530,21 @@ export default function SuperAdminTripsScreen() {
                             .eq('id', item.id);
 
                           if (error) throw error;
-                          Alert.alert('Success', item.is_published ? 'Trip unpublished' : 'Trip published to drivers');
-                          fetchTrips();
+                          
+                          // Update local state immediately for instant UI feedback
+                          setTrips(prevTrips =>
+                            prevTrips.map(trip =>
+                              trip.id === item.id
+                                ? { ...trip, is_published: !trip.is_published }
+                                : trip
+                            )
+                          );
+                          
+                          // Show different message based on current published state
+                          const successMsg = item.is_published 
+                            ? 'Trip unpublished successfully' 
+                            : 'Trip published to drivers';
+                          Alert.alert('Success', successMsg);
                         } catch (err) {
                           Alert.alert('Error', err.message);
                         }

@@ -9,6 +9,7 @@ import SignUpScreen from '../screens/auth/SignUpScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import OtpScreen from '../screens/auth/OtpScreen';
 import PolicyScreen from '../screens/common/PolicyScreen';
+import ViewPolicyScreen from '../screens/common/ViewPolicyScreen';
 import DriverDocumentUploadScreen from '../screens/driver/DriverDocumentUploadScreen';
 import DriverOnboardingTimelineScreen from '../screens/driver/DriverOnboardingTimelineScreen';
 import WaitingForApprovalScreen from '../screens/driver/WaitingForApprovalScreen';
@@ -103,13 +104,33 @@ export default function AuthNavigator() {
       />
       <Stack.Screen
         name="Terms"
-        component={PolicyScreen}
+        component={ViewPolicyScreen}
         options={{ title: 'Terms & Conditions' }}
+        initialParams={{ policyType: 'terms_conditions' }}
       />
       <Stack.Screen
         name="CancellationPolicy"
-        component={PolicyScreen}
+        component={ViewPolicyScreen}
         options={{ title: 'Cancellation Policy' }}
+        initialParams={{ policyType: 'cancellation_policy' }}
+      />
+      <Stack.Screen
+        name="PrivacyPolicy"
+        component={ViewPolicyScreen}
+        options={{ title: 'Privacy Policy' }}
+        initialParams={{ policyType: 'privacy_policy' }}
+      />
+      <Stack.Screen
+        name="RefundPolicy"
+        component={ViewPolicyScreen}
+        options={{ title: 'Refund Policy' }}
+        initialParams={{ policyType: 'refund_policy' }}
+      />
+      <Stack.Screen
+        name="SafetyGuidelines"
+        component={ViewPolicyScreen}
+        options={{ title: 'Safety Guidelines' }}
+        initialParams={{ policyType: 'safety_guidelines' }}
       />
       <Stack.Screen 
         name="Register" 

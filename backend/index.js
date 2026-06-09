@@ -55,7 +55,7 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`✅ Taxi SMS backend listening on http://127.0.0.1:${port}`);
-  console.log(`✅ Access from phone at: http://RAILWAY_DEPLOYMENT:${port}`);
+  console.log(`✅ Access from phone at: http://192.168.1.110:${port}`);
   console.log(`📱 API endpoints:`);
   console.log(`   - POST /sms/otp - Send OTP`);
   console.log(`   - POST /sms/verify - Verify OTP`);

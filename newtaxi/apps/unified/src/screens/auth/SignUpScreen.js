@@ -362,19 +362,55 @@ export default function SignUpScreen({ navigation }) {
             <TouchableOpacity style={styles.checkbox} onPress={() => setAgreed(prev => !prev)}>
               <Ionicons name={agreed ? 'checkbox' : 'square-outline'} size={20} color={agreed ? roleConfig.color : COLORS.textSecondary} />
             </TouchableOpacity>
-            <Text style={styles.termsText}>
-              I agree to the{' '}
-              <Text style={[styles.link, { color: roleConfig.color }]} onPress={() => navigation.navigate('Terms')}>Terms & Conditions</Text>
-              {' '}and{' '}
-              <Text style={[styles.link, { color: roleConfig.color }]} onPress={() => navigation.navigate('CancellationPolicy')}>Cancellation Policy</Text>
-              {' '}and{' '}
-              <Text style={[styles.link, { color: roleConfig.color }]} onPress={() => navigation.navigate('PrivacyPolicy')}>Privacy Policy</Text>
-            </Text>
+            <View style={styles.policiesListContainer}>
+              <Text style={styles.termsLabel}>I agree to all policies:</Text>
+              <View style={styles.policiesList}>
+                <TouchableOpacity 
+                  style={[styles.policyLink, { backgroundColor: roleConfig.color + '15', borderColor: roleConfig.color + '40' }]}
+                  onPress={() => navigation.navigate('Terms', { policyType: 'terms_conditions' })}
+                >
+                  <Ionicons name="document-text-outline" size={14} color={roleConfig.color} />
+                  <Text style={[styles.policyLinkText, { color: roleConfig.color }]}>Terms</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.policyLink, { backgroundColor: roleConfig.color + '15', borderColor: roleConfig.color + '40' }]}
+                  onPress={() => navigation.navigate('CancellationPolicy', { policyType: 'cancellation_policy' })}
+                >
+                  <Ionicons name="close-circle-outline" size={14} color={roleConfig.color} />
+                  <Text style={[styles.policyLinkText, { color: roleConfig.color }]}>Cancellation</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.policyLink, { backgroundColor: roleConfig.color + '15', borderColor: roleConfig.color + '40' }]}
+                  onPress={() => navigation.navigate('PrivacyPolicy', { policyType: 'privacy_policy' })}
+                >
+                  <Ionicons name="shield-outline" size={14} color={roleConfig.color} />
+                  <Text style={[styles.policyLinkText, { color: roleConfig.color }]}>Privacy</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.policyLink, { backgroundColor: roleConfig.color + '15', borderColor: roleConfig.color + '40' }]}
+                  onPress={() => navigation.navigate('RefundPolicy', { policyType: 'refund_policy' })}
+                >
+                  <Ionicons name="cash-outline" size={14} color={roleConfig.color} />
+                  <Text style={[styles.policyLinkText, { color: roleConfig.color }]}>Refund</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.policyLink, { backgroundColor: roleConfig.color + '15', borderColor: roleConfig.color + '40' }]}
+                  onPress={() => navigation.navigate('SafetyGuidelines', { policyType: 'safety_guidelines' })}
+                >
+                  <Ionicons name="warning-outline" size={14} color={roleConfig.color} />
+                  <Text style={[styles.policyLinkText, { color: roleConfig.color }]}>Safety</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account?</Text>
+          <Text style={styles.footerText}>Already have an account? </Text>
           <TouchableOpacity onPress={handleLogin}>
             <Text style={[styles.loginLink, { color: roleConfig.color }]}>Sign In</Text>
           </TouchableOpacity>
@@ -501,18 +537,49 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
+    gap: 0,
+    marginTop: 20,
+    paddingHorizontal: 8,
   },
   termsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: 12,
     paddingHorizontal: 4,
+    gap: 8,
   },
   checkbox: {
-    marginRight: 8,
+    marginTop: 2,
+    marginRight: 4,
+  },
+  policiesListContainer: {
+    flex: 1,
+  },
+  termsLabel: {
+    color: COLORS.textSecondary,
+    fontSize: getResponsiveFontSize(11),
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  policiesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  policyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  policyLinkText: {
+    fontSize: getResponsiveFontSize(11),
+    fontWeight: '600',
   },
   termsText: {
     color: COLORS.textSecondary,

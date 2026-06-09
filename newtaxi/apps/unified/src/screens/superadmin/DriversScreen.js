@@ -98,7 +98,9 @@ export default function SuperAdminDriversScreen({ navigation }) {
                   `${result.message}\n\nPending Trips: ${result.pendingTripsCount}\nStatuses: ${result.tripStatuses?.join(', ') || 'N/A'}`
                 );
               } else {
-                throw new Error(result.message || 'Failed to delete driver');
+                // Show the actual error from backend
+                const errorMsg = result.details || result.message || result.error || 'Failed to delete driver';
+                throw new Error(errorMsg);
               }
               return;
             }

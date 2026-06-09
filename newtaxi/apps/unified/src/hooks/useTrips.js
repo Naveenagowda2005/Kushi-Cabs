@@ -12,7 +12,7 @@ export function useAvailableTrips() {
       setError(null);
       const { data, error } = await supabase
         .from('trips')
-        .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, created_by')
+        .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling')
         .eq('status', TRIP_STATUS.PENDING)
         .eq('is_published', true)
         .order('created_at', { ascending: false });

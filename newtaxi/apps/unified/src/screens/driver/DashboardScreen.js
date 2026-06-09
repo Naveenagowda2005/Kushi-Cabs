@@ -13,20 +13,19 @@ import { useRealtimeTrips } from '../../hooks/useRealtimeTrips';
 import { supabase } from '../../lib/supabase';
 import TripCard from '../../components/TripCard';
 import WalletBanner from '../../components/WalletBanner';
-import { acceptTrip } from '../../services/tripService';
-import { notifyTripAccepted } from '../../services/notificationService';
 import { COLORS } from '../../constants';
 
 export default function DriverDashboardScreen({ navigation }) {
   const { user, signOut } = useAuth();
   
-  const { trips, loading, refetch } = useAvailableTrips();
+  const { trips: availableTrips, loading, refetch } = useAvailableTrips();
   const { isOnline, toggling, toggleOnline } = useDriverStatus(user?.id);
   const { wallet } = useWallet(user?.id);
   const { trip: activeTrip, refetch: refetchActiveTrip } = useActiveTrip(user?.id);
   const [activeTab, setActiveTab] = useState(0); // 0 = Available, 1 = Trip History
   const [completedTrips, setCompletedTrips] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [displayTrips, setDisplayTrips] = useState([]);
 
   // Fetch all trips with creator details (including in_progress, completed, cancelled, etc.)
   const fetchCompletedTrips = useCallback(async () => {
@@ -58,6 +57,11 @@ export default function DriverDashboardScreen({ navigation }) {
       fetchCompletedTrips();
     }, [refetchActiveTrip, fetchCompletedTrips])
   );
+
+  // Sync available trips to display trips (for skip functionality)
+  useEffect(() => {
+    setDisplayTrips(availableTrips);
+  }, [availableTrips]);
 
   // If driver already has an active/in-progress trip, redirect to ActiveTrip screen
   // BUT only if they're on the Available tab (tab 0), not on Trip History tab
@@ -93,38 +97,16 @@ export default function DriverDashboardScreen({ navigation }) {
     },
   });
 
-  const handleAcceptTrip = async (tripId) => {
-    Alert.alert(
-      'Accept Trip',
-      'Do you want to accept this trip?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Accept',
-          onPress: async () => {
-            try {
-              const result = await acceptTrip(tripId, user?.id);
-              if (result.success) {
-                await notifyTripAccepted();
-                Alert.alert('Success', 'Trip accepted successfully!');
-                refetch();
-              } else {
-                Alert.alert('Error', result.error || 'Failed to accept trip');
-              }
-            } catch (error) {
-              console.error('Error accepting trip:', error);
-              Alert.alert('Error', 'Failed to accept trip');
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const TripCardComponent = ({ item }) => (
     <TripCard 
       trip={item} 
       onPress={() => navigation.navigate('TripDetail', { trip: item })}
+      onAccept={(trip) => navigation.navigate('TripDetail', { trip })}
+      onCancel={() => {
+        // Skip this trip - remove it from the display list
+        console.log('Skipped trip:', item.id);
+        setDisplayTrips(displayTrips.filter(t => t.id !== item.id));
+      }}
     />
   );
 
@@ -206,7 +188,7 @@ export default function DriverDashboardScreen({ navigation }) {
         >
           <Text style={[styles.tabText, activeTab === 0 && styles.tabTextActive]}>
             Available
-            {trips.length > 0 && <Text style={styles.badge}> {trips.length}</Text>}
+            {displayTrips.length > 0 && ` ${displayTrips.length}`}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -233,7 +215,7 @@ export default function DriverDashboardScreen({ navigation }) {
         </View>
       ) : activeTab === 0 ? (
         <FlatList
-          data={trips}
+          data={displayTrips}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <TripCardComponent item={item} />}
           contentContainerStyle={styles.list}
@@ -445,10 +427,6 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: COLORS.textLight,
-  },
-  badge: {
-    color: COLORS.driver.secondary,
-    fontWeight: '700',
   },
   offlineWrap: {
     flex: 1, 

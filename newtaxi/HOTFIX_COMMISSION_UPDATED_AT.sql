@@ -1,10 +1,7 @@
 -- ============================================================
--- FIX: deduct_commission format() type specifier error
--- Migration: 058_fix_deduct_commission_format.sql
--- ============================================================
--- ERROR: unrecognized format() type specifier "."
--- CAUSE: format() with %s followed by %% or special chars
--- FIX: Replace format() calls with plain string concatenation
+-- HOTFIX: Remove updated_at reference from deduct_commission
+-- This fixes: column "updated_at" of relation "trips" does not exist
+-- Run this immediately in Supabase SQL Editor
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION deduct_commission(
@@ -93,7 +90,7 @@ BEGIN
     'Commission ' || v_commission_value::text || '% on trip'
   );
 
-  -- Update trip with commission amount
+  -- Update trip with commission amount (NO updated_at - trips table doesn't have this column)
   UPDATE trips SET
     commission_amount = v_commission
   WHERE id = p_trip_id;

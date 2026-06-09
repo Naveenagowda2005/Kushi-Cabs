@@ -53,8 +53,14 @@ export default function VendorMyTripsScreen({ navigation }) {
 
       if (error) throw error;
 
+      // Update local state immediately for instant UI feedback
+      setTrips(prevTrips =>
+        prevTrips.map(trip =>
+          trip.id === tripId ? { ...trip, is_published: true } : trip
+        )
+      );
+
       Alert.alert('✅ Published', 'Trip is now visible to all drivers');
-      fetchMyTrips();
     } catch (err) {
       console.error('Error publishing trip:', err.message);
       Alert.alert('Error', 'Failed to publish trip');
@@ -73,8 +79,14 @@ export default function VendorMyTripsScreen({ navigation }) {
 
       if (error) throw error;
 
+      // Update local state immediately for instant UI feedback
+      setTrips(prevTrips =>
+        prevTrips.map(trip =>
+          trip.id === tripId ? { ...trip, is_published: false } : trip
+        )
+      );
+
       Alert.alert('✅ Unpublished', 'Trip is no longer visible to drivers');
-      fetchMyTrips();
     } catch (err) {
       console.error('Error unpublishing trip:', err.message);
       Alert.alert('Error', 'Failed to unpublish trip');

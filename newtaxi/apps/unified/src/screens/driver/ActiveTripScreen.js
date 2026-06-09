@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator, Modal, Linking,
+  TouchableOpacity, Alert, ActivityIndicator, Modal, Linking, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useActiveTrip } from '../../hooks/useTrips';
 import { useAppSettings } from '../../hooks/useAppSettings';
-import OdometerCapture from '../../components/OdometerCapture';
 import NavigationMap from '../../components/NavigationMap';
-import { uploadOdometerImage } from '../../services/uploadService';
 import { startTrip } from '../../services/tripService';
 import { TRIP_STATUS } from '../../constants';
 import { supabase } from '../../lib/supabase';
@@ -25,14 +23,13 @@ export default function DriverActiveTripScreen({ route, navigation }) {
   const activeTrip = trip ?? routeTrip;
 
   const [step, setStep] = useState(STEPS.ACCEPTED);
-  const [startCapture, setStartCapture] = useState(null);
-  const [endCapture, setEndCapture] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [showNavigationMap, setShowNavigationMap] = useState(false);
   const [completedTrip, setCompletedTrip] = useState(null); // stores trip + creator info after completion
-  const [endOdometerUrl, setEndOdometerUrl] = useState(null); // Store URL for payment confirmation
   const [creatorName, setCreatorName] = useState(null);
   const [creatorPhone, setCreatorPhone] = useState(null);
+  const [startKm, setStartKm] = useState('');
+  const [endKm, setEndKm] = useState('');
 
   useEffect(() => {
     if (!activeTrip) return;
@@ -41,21 +38,6 @@ export default function DriverActiveTripScreen({ route, navigation }) {
       setShowNavigationMap(true);
     }
     if (activeTrip.status === TRIP_STATUS.COMPLETED) setStep(STEPS.DONE);
-
-    // Auto-populate captured data from database if available
-    if (activeTrip.start_km && activeTrip.start_odometer_url) {
-      setStartCapture({
-        km: activeTrip.start_km,
-        imageData: activeTrip.start_odometer_url,
-      });
-    }
-    if (activeTrip.end_km && activeTrip.end_odometer_url) {
-      setEndCapture({
-        km: activeTrip.end_km,
-        imageData: activeTrip.end_odometer_url,
-      });
-      setEndOdometerUrl(activeTrip.end_odometer_url);
-    }
 
     // Fetch trip creator details
     const fetchCreatorDetails = async () => {
@@ -93,17 +75,18 @@ export default function DriverActiveTripScreen({ route, navigation }) {
   }, [activeTrip]);
 
   async function handleStartTrip() {
-    if (!startCapture?.imageData || !startCapture?.km) {
-      Alert.alert('Required', 'Please capture the odometer image and enter the KM reading.');
+    if (!startKm) {
+      Alert.alert('Error', 'Please enter the starting odometer reading');
       return;
     }
+
     setUploading(true);
     try {
-      const url = await uploadOdometerImage(startCapture.imageData, activeTrip.id, 'start');
+      // Start trip with manual KM entry (no image)
       await startTrip({
         tripId: activeTrip.id,
-        startOdometerUrl: url,
-        startKm: startCapture.km,
+        startOdometerUrl: null,
+        startKm: parseFloat(startKm),
         userId: user.id,
       });
       await refetch();
@@ -117,15 +100,15 @@ export default function DriverActiveTripScreen({ route, navigation }) {
   }
 
   async function handleEndTrip() {
-    if (!endCapture?.imageData || !endCapture?.km) {
-      Alert.alert('Required', 'Please capture the end odometer image and enter the KM reading.');
+    if (!endKm) {
+      Alert.alert('Error', 'Please enter the ending odometer reading');
       return;
     }
 
     setUploading(true);
     try {
-      const url = await uploadOdometerImage(endCapture.imageData, activeTrip.id, 'end');
-      setEndOdometerUrl(url);
+      // End trip with manual KM entry - go to payment step
+      // Store end KM in state for payment screen to use
       setStep(STEPS.PAYMENT);
     } catch (err) {
       Alert.alert('Error', err.message);
@@ -137,14 +120,18 @@ export default function DriverActiveTripScreen({ route, navigation }) {
   async function handleConfirmPayment() {
     setUploading(true);
     try {
-      // Mark trip completed — no wallet credit (fare collected offline)
+      // Calculate distance traveled
+      const distance = endKm && startKm 
+        ? parseFloat(endKm) - parseFloat(startKm)
+        : 0;
+
+      // Mark trip completed with end KM — no wallet credit (fare collected offline)
       const { error: tripError } = await supabase
         .from('trips')
         .update({
           status:           'completed',
           completed_at:     new Date().toISOString(),
-          end_odometer_url: endOdometerUrl,
-          end_km:           endCapture.km,
+          end_km:           parseFloat(endKm) || null,
         })
         .eq('id', activeTrip.id);
 
@@ -296,7 +283,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
         <Ionicons name="checkmark-circle" size={80} color="#4caf50" />
         <Text style={styles.doneTitle}>Trip Completed!</Text>
         <Text style={styles.doneEarnings}>₹{driverEarning.toFixed(2)}</Text>
-        <Text style={styles.doneSubtext}>Your Earning</Text>
+        <Text style={styles.doneSubtext}>Your Total Earning</Text>
 
         {/* Trip summary */}
         <View style={styles.doneTripCard}>
@@ -356,14 +343,34 @@ export default function DriverActiveTripScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* STEP: capture start odometer */}
+        {/* STEP: accept and start trip */}
         {step === STEPS.ACCEPTED && (
           <>
-            <OdometerCapture label="Start Odometer" onCapture={setStartCapture} />
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>Enter starting odometer reading</Text>
+            </View>
+
+            {/* Start KM Input */}
+            <View style={styles.odometerCard}>
+              <View style={styles.odometerHeader}>
+                <Ionicons name="speedometer-outline" size={18} color="#4caf50" />
+                <Text style={styles.odometerLabel}>Starting Odometer (KM)</Text>
+              </View>
+              <TextInput
+                style={styles.odometerInput}
+                placeholder="Enter starting KM"
+                placeholderTextColor="#666"
+                value={startKm}
+                onChangeText={setStartKm}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.odometerHint}>Please enter the odometer reading before starting the trip</Text>
+            </View>
+
             <TouchableOpacity
-              style={[styles.actionBtn, (!startCapture || uploading) && styles.actionBtnDisabled]}
+              style={[styles.actionBtn, uploading && styles.actionBtnDisabled]}
               onPress={handleStartTrip}
-              disabled={!startCapture || uploading}
+              disabled={uploading}
             >
               {uploading
                 ? <ActivityIndicator color="#fff" />
@@ -387,11 +394,28 @@ export default function DriverActiveTripScreen({ route, navigation }) {
               <Ionicons name="map" size={20} color="#fff" />
               <Text style={styles.navigationBtnText}>Open Navigation</Text>
             </TouchableOpacity>
-            <OdometerCapture label="End Odometer" onCapture={setEndCapture} />
+
+            {/* End KM Input */}
+            <View style={styles.odometerCard}>
+              <View style={styles.odometerHeader}>
+                <Ionicons name="speedometer-outline" size={18} color="#ff9800" />
+                <Text style={styles.odometerLabel}>Ending Odometer (KM)</Text>
+              </View>
+              <TextInput
+                style={styles.odometerInput}
+                placeholder="Enter ending KM"
+                placeholderTextColor="#666"
+                value={endKm}
+                onChangeText={setEndKm}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.odometerHint}>Please enter the odometer reading before ending the trip</Text>
+            </View>
+
             <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnComplete, (!endCapture || uploading) && styles.actionBtnDisabled]}
+              style={[styles.actionBtn, styles.actionBtnComplete, uploading && styles.actionBtnDisabled]}
               onPress={handleEndTrip}
-              disabled={!endCapture || uploading}
+              disabled={uploading}
             >
               {uploading
                 ? <ActivityIndicator color="#fff" />
@@ -519,9 +543,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Distance Travelled:</Text>
                           <Text style={styles.detailValue}>
-                            {endCapture?.km && startCapture?.km 
-                              ? (endCapture.km - startCapture.km).toFixed(2) 
-                              : activeTrip?.end_km && activeTrip?.start_km
+                            {activeTrip?.end_km && activeTrip?.start_km
                               ? (activeTrip.end_km - activeTrip.start_km).toFixed(2)
                               : 'N/A'} km
                           </Text>
@@ -718,7 +740,7 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: '#f44336', fontSize: 15, fontWeight: '600' },
   doneTitle: { color: '#fff', fontSize: 28, fontWeight: 'bold', marginTop: 20 },
   doneEarnings: { color: '#4caf50', fontSize: 42, fontWeight: 'bold', marginTop: 8 },
-  doneSubtext: { color: '#888', fontSize: 14, marginTop: 4 },
+  doneSubtext: { color: '#888', fontSize: 14, marginTop: 4, marginBottom: 16, fontWeight: '500' },
   doneTripCard: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginTop: 16, marginBottom: 8, width: '90%', gap: 6 },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   doneTripText: { color: '#ccc', fontSize: 13, flex: 1 },
@@ -736,4 +758,22 @@ const styles = StyleSheet.create({
   creatorDetailLabel: { color: '#888', fontSize: 12, fontWeight: '600', minWidth: 80 },
   creatorDetailValue: { color: '#fff', fontSize: 12, fontWeight: '600', flex: 1 },
   callBtn: { backgroundColor: '#ff9800', borderRadius: 6, padding: 6, justifyContent: 'center', alignItems: 'center' },
+  odometerCard: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#0f3460' },
+  odometerHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  odometerLabel: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  odometerInput: { 
+    backgroundColor: '#0f3460',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2196f3',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  odometerHint: { color: '#888', fontSize: 12, fontStyle: 'italic' },
+  infoBox: { backgroundColor: '#0a2a4a', borderRadius: 10, padding: 14, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#2196f3' },
+  infoText: { color: '#2196f3', fontSize: 14, fontWeight: '600' },
 });

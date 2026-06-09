@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
-export default function TripCard({ trip, onPress }) {
+export default function TripCard({ trip, onPress, onAccept, onCancel }) {
   const [carType, setCarType] = useState(null);
   const [seaterType, setSeaterType] = useState(null);
   const [fuelType, setFuelType] = useState(null);
@@ -95,10 +95,13 @@ export default function TripCard({ trip, onPress }) {
     commissionAmount,
     customerPreAdvance,
     commissionToPay,
+    toll_included: trip.toll_included,
+    state_tax_included: trip.state_tax_included,
+    pet_travelling: trip.pet_travelling,
   });
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <View style={styles.card}>
       {/* Header: Trip type and Payment method */}
       <View style={styles.header}>
         <Text style={styles.tripType}>{segmentName?.toUpperCase() || 'ONE WAY TRIP'}</Text>
@@ -182,6 +185,42 @@ export default function TripCard({ trip, onPress }) {
         </View>
       )}
 
+      {/* Toll & Tax & Pet Indicators */}
+      <View style={styles.inclusionsRow}>
+        <View style={[styles.inclusionBadge, trip.toll_included ? styles.includedBadge : styles.excludedBadge]}>
+          <Ionicons 
+            name={trip.toll_included ? "checkmark-circle-outline" : "close-circle-outline"} 
+            size={12} 
+            color={trip.toll_included ? "#4caf50" : "#ff9800"}
+          />
+          <Text style={[styles.inclusionText, trip.toll_included ? styles.includedText : styles.excludedText]}>
+            Toll {trip.toll_included ? "✓" : "✗"}
+          </Text>
+        </View>
+        <View style={[styles.inclusionBadge, trip.state_tax_included ? styles.includedBadge : styles.excludedBadge]}>
+          <Ionicons 
+            name={trip.state_tax_included ? "checkmark-circle-outline" : "close-circle-outline"} 
+            size={12} 
+            color={trip.state_tax_included ? "#4caf50" : "#ff9800"}
+          />
+          <Text style={[styles.inclusionText, trip.state_tax_included ? styles.includedText : styles.excludedText]}>
+            Tax {trip.state_tax_included ? "✓" : "✗"}
+          </Text>
+        </View>
+        {trip.pet_travelling === true && (
+          <View style={[styles.inclusionBadge, styles.petBadge]}>
+            <Ionicons 
+              name="paw-outline" 
+              size={12} 
+              color="#ff6b6b"
+            />
+            <Text style={[styles.inclusionText, styles.petText]}>
+              🐾 Pet
+            </Text>
+          </View>
+        )}
+      </View>
+
       {/* Departure Time */}
       <View style={styles.departureRow}>
         <Ionicons name="calendar-outline" size={14} color="#4caf50" />
@@ -197,33 +236,26 @@ export default function TripCard({ trip, onPress }) {
         <Text style={styles.lockText}>Pay commission to unlock customer details</Text>
       </View>
 
-      {/* Notes Section */}
-      <View style={styles.notesHeader}>
-        <Text style={styles.notesTitle}>Notes:</Text>
+      {/* Action Buttons */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity 
+          style={styles.cancelBtn} 
+          onPress={() => onCancel?.()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close-circle-outline" size={16} color="#f44336" />
+          <Text style={styles.cancelBtnText}>Skip</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.acceptBtn} 
+          onPress={() => onAccept?.(trip)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+          <Text style={styles.acceptBtnText}>Accept Trip</Text>
+        </TouchableOpacity>
       </View>
-
-      {/* Note 1: Carrier */}
-      {(carType || seaterType) && (
-        <View style={styles.noteItem}>
-          <Ionicons name="alert-circle-outline" size={12} color="#ff9800" />
-          <Text style={styles.noteText}>
-            Carrier must have {carType || 'required'} with {seaterType || 'required'} seating
-          </Text>
-        </View>
-      )}
-
-      {/* Note 2: Tax */}
-      <View style={styles.noteItem}>
-        <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>State tax, toll & parking extra if applicable</Text>
-      </View>
-
-      {/* Note 3: Pets */}
-      <View style={styles.noteItem}>
-        <Ionicons name="paw-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>Pets travelling - additional charges apply</Text>
-      </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -344,6 +376,49 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontSize: 11,
     fontWeight: '500',
+  },
+  inclusionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 10,
+    flexWrap: 'wrap',
+  },
+  inclusionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: 1,
+    flex: 1,
+    minWidth: '45%',
+  },
+  includedBadge: {
+    backgroundColor: '#0a2a0a',
+    borderColor: '#4caf5066',
+  },
+  excludedBadge: {
+    backgroundColor: '#2a1a00',
+    borderColor: '#ff980066',
+  },
+  inclusionText: {
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
+  },
+  includedText: {
+    color: '#4caf50',
+  },
+  excludedText: {
+    color: '#ff9800',
+  },
+  petBadge: {
+    backgroundColor: '#4a1a1a',
+    borderColor: '#ff6b6b66',
+  },
+  petText: {
+    color: '#ff6b6b',
   },
   lockRow: {
     flexDirection: 'row',
@@ -505,5 +580,47 @@ const styles = StyleSheet.create({
     color: '#4caf50',
     fontSize: 12,
     fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#0f3460',
+  },
+  acceptBtn: {
+    flex: 1,
+    backgroundColor: '#4caf50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  acceptBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: '#f4433622',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#f44336',
+  },
+  cancelBtnText: {
+    color: '#f44336',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -24,7 +24,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const TABS = ['Available', 'My Trips'];
 
 // Separate component for My Trip Card
-function MyTripCard({ item, navigation, onCancel, onDelete }) {
+function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
   const { user } = useAuth();
   const [carTypeName, setCarTypeName] = useState(null);
   const [seaterTypeName, setSeaterTypeName] = useState(null);
@@ -296,8 +296,8 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
             Alert.alert(
               item.is_published ? 'Unpublish Trip' : 'Publish Trip',
               item.is_published 
-                ? 'Remove this trip from driver visibility?'
-                : 'Make this trip visible to all drivers?',
+                ? 'This trip will no longer be visible to drivers. You can republish it later.'
+                : 'Make this trip visible to all drivers so they can accept it.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -310,8 +310,14 @@ function MyTripCard({ item, navigation, onCancel, onDelete }) {
                         .eq('id', item.id);
 
                       if (error) throw error;
-                      Alert.alert('Success', item.is_published ? 'Trip unpublished' : 'Trip published to drivers');
-                      onCancel?.();
+                      
+                      // Show different message based on current published state
+                      const successMsg = item.is_published 
+                        ? 'Trip unpublished successfully' 
+                        : 'Trip published to drivers';
+                      Alert.alert('Success', successMsg);
+                      // Refresh the list after publish/unpublish
+                      onPublish?.();
                     } catch (err) {
                       Alert.alert('Error', err.message);
                     }
@@ -569,6 +575,9 @@ export default function VendorEnquiriesScreen({ navigation }) {
           handleDeleteTrip(item.id);
           refetchTrips();
         }}
+        onPublish={() => {
+          // Removed - no need to refetch since we already updated local state
+        }}
       />
     );
   }
@@ -730,6 +739,7 @@ const styles = StyleSheet.create({
   myTripReturnDate: { color: '#ff9800', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 4, fontWeight: '600' },
   carDetailsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginVertical: 8,
     paddingVertical: 6,
@@ -742,12 +752,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#1a2744',
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: '#2196f3',
   },
   carDetailText: {
     color: '#2196f3',
-    fontSize: Math.max(10, screenWidth * 0.028),
-    fontWeight: '500',
+    fontSize: Math.max(11, screenWidth * 0.03),
+    fontWeight: '600',
+    textAlign: 'center',
   },
   extraChargesContainer: {
     gap: 8,

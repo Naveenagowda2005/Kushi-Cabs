@@ -206,7 +206,7 @@ const getApiUrl = () => {
   }
   
   // Fallback for local development
-  const MACHINE_IP = '192.168.1.111';
+  const MACHINE_IP = '192.168.1.110';
   
   if (Platform.OS === 'android') {
     return `http://${MACHINE_IP}:4000`;
@@ -219,7 +219,7 @@ const getApiUrl = () => {
 
 export const API_CONFIG = {
   SMS_API_URL: getApiUrl(),
-  ADMIN_API_URL: 'https://kushi-cabs-production.up.railway.app', // Always use Railway for admin ops (needs Supabase service role)
+  ADMIN_API_URL: getApiUrl(), // Use the same local backend URL for admin ops
 };
 
 export const ROLES = {
