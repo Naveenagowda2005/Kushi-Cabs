@@ -36,13 +36,23 @@ router.post('/otp', async (req, res, next) => {
 router.post('/verify', async (req, res, next) => {
   try {
     const { to, otp } = req.body;
+    console.log(`🔐 Verify OTP Request: phone=${to}, otp=${otp}`);
+    
     if (!to || !otp) {
+      console.error('❌ Missing phone or OTP');
       return res.status(400).json({ success: false, error: 'Missing phone number or OTP' });
     }
 
     const verified = verifyOtp(to, otp);
-    res.json({ success: verified, verified });
+    console.log(`✅ OTP Verification Result: ${verified ? 'SUCCESS' : 'FAILED'}`);
+    
+    res.json({ 
+      success: verified, 
+      verified,
+      message: verified ? 'OTP verified successfully' : 'Invalid or expired OTP'
+    });
   } catch (error) {
+    console.error('❌ OTP Verify Error:', error);
     next(error);
   }
 });
