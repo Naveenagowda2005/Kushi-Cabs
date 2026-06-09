@@ -23,12 +23,21 @@ router.post('/otp', async (req, res, next) => {
 
     const otp = createOtp(to);
     const ttlMinutes = Math.max(1, Math.floor(Number(process.env.OTP_TTL_SECONDS || 300) / 60));
-    // OTP message matching the registered template exactly
-    const text = `${otp} is your Kushi Cabs OTP. Do not share with anyone.`;
+    
+    // Try multiple formats - HiTech may have strict template matching
+    // Format 1: Simple format (most common)
+    let text = `${otp} is your Kushi Cabs OTP`;
+    
+    // Log what we're sending for debugging
+    console.log(`📱 Sending OTP: ${otp} to ${to}`);
+    console.log(`📨 Message: ${text}`);
+    
     const result = await sendSms({ to, message: text, isOtp: true });
 
-    res.json({ success: true, otpSent: true, purpose, result });
+    console.log(`✅ SMS Send Result:`, result);
+    res.json({ success: true, otpSent: true, purpose, otp: otp, result });
   } catch (error) {
+    console.error(`❌ SMS Send Error:`, error);
     next(error);
   }
 });
