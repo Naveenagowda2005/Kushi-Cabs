@@ -94,27 +94,19 @@ async function sendSms({ to, message, senderId, isOtp = false }) {
   // Add template ID for OTP messages
   if (isOtp && STPL_OTP_TEMPLATE_ID && STPL_API_QUERY_TEMPLATE_FIELD) {
     params[STPL_API_QUERY_TEMPLATE_FIELD] = STPL_OTP_TEMPLATE_ID;
-    console.log(`📋 Using OTP Template ID: ${STPL_OTP_TEMPLATE_ID}`);
   }
-
-  console.log(`🔄 Sending SMS to ${recipients.join(',')} with params:`, params);
   
-  try {
-    const response = await axios.post(STPL_API_URL, null, { params, timeout: 20000 });
-    console.log(`✅ SMS API Response:`, response.status, response.data);
-    return {
-      status: response.status,
-      data: response.data,
-      params,
-    };
-  } catch (error) {
-    console.error(`❌ SMS API Error:`, error.message);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data: ${JSON.stringify(error.response.data)}`);
-    }
-    throw error;
-  }
+  // Don't send country code - let HiTech use default
+  // if (STPL_API_QUERY_COUNTRY_FIELD && STPL_COUNTRY_CODE) {
+  //   params[STPL_API_QUERY_COUNTRY_FIELD] = STPL_COUNTRY_CODE;
+  // }
+
+  const response = await axios.post(STPL_API_URL, null, { params, timeout: 20000 });
+  return {
+    status: response.status,
+    data: response.data,
+    params,
+  };
 }
 
 module.exports = {
