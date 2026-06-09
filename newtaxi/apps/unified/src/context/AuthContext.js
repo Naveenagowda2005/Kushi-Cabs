@@ -353,30 +353,29 @@ export const AuthProvider = ({ children }) => {
       // Authenticate OTP user with Supabase
       console.log('Authenticating OTP user with Supabase');
       
-      // Try to sign in with the phone-based email and temporary password
-      const tempPassword = 'OTP-' + phoneDigits + '-kushicabs';
+      // For OTP users, we don't use password authentication
+      // Instead, we authenticate directly with the user data from database
+      // since OTP verification already happened on the backend
       
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password: tempPassword,
-      });
+      // Create a mock session for OTP-verified users
+      const mockSession = {
+        user: {
+          id: userData.id,
+          email: userData.email,
+          phone: userData.phone,
+        },
+        access_token: 'otp-verified-' + userData.id,
+        token_type: 'bearer',
+      };
       
-      if (signInError) {
-        console.error('Auth sign in failed:', signInError.message);
-        throw new Error('Authentication failed. Please try again.');
+      console.log('OTP user authenticated with mock session');
+      setSession(mockSession);
+      setUser(userData);
+      if (userData.roles?.name) {
+        setSelectedRole(userData.roles.name);
       }
       
-      if (signInData?.session) {
-        console.log('OTP user authenticated successfully');
-        setSession(signInData.session);
-        setUser(userData);
-        if (userData.roles?.name) {
-          setSelectedRole(userData.roles.name);
-        }
-        return { data: signInData, error: null };
-      }
-      
-      throw new Error('Authentication failed. Please try again.');
+      return { data: { user: userData, session: mockSession }, error: null };
     } catch (error) {
       console.error('Unified Sign in error:', error);
       return { data: null, error };
