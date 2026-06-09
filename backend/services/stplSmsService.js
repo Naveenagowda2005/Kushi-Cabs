@@ -25,12 +25,15 @@ const {
   STPL_API_QUERY_COUNTRY_FIELD = 'country',
 } = process.env;
 
+// Log missing variables for debugging on Railway - don't crash on startup
 if (!STPL_API_URL) {
-  throw new Error('STPL_API_URL is required in environment configuration');
+  console.error('⚠️  STPL_API_URL is not configured - SMS sending will fail');
 }
-
+if (!STPL_SENDER_ID) {
+  console.error('⚠️  STPL_SENDER_ID is not configured - SMS sending will fail');
+}
 if (!STPL_API_KEY && (!STPL_USERNAME || !STPL_PASSWORD)) {
-  throw new Error('Either STPL_API_KEY or STPL_USERNAME and STPL_PASSWORD must be configured');
+  console.error('⚠️  SMS credentials not configured - SMS sending will fail');
 }
 
 function normalizeRecipients(to) {
@@ -52,9 +55,14 @@ async function sendSms({ to, message, senderId, isOtp = false }) {
     throw new Error('Missing SMS message body');
   }
 
+  // Validate SMS configuration before sending
+  if (!STPL_API_URL) {
+    throw new Error('SMS service not configured: STPL_API_URL is missing');
+  }
+
   const finalSender = senderId || STPL_SENDER_ID;
   if (!finalSender) {
-    throw new Error('STPL_SENDER_ID must be configured for SMS sending');
+    throw new Error('SMS sender ID not configured: STPL_SENDER_ID is required');
   }
 
   const params = {

@@ -14,7 +14,9 @@ const adminRouter = require('./routes/admin');
 console.log('📦 Admin router loaded');
 
 const app = express();
+// Railway uses dynamic PORT - must use it
 const port = process.env.PORT || 4000;
+console.log(`🔧 Configured port: ${port}`);
 
 // Enable CORS for all origins during development
 app.use(cors({
