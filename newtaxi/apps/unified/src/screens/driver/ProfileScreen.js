@@ -9,6 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import * as documentService from '../../services/documentService';
+import { API_CONFIG } from '../../constants';
 
 const STATUS_CONFIG = {
   approved:       { color: '#4caf50', icon: 'checkmark-circle',  label: 'Approved' },
@@ -159,6 +160,48 @@ export default function DriverProfileScreen({ navigation }) {
   const rejectedCount = documents.filter(d => d.status === 'rejected').length;
   const pendingCount  = documents.filter(d => d.status === 'pending_review' || d.status === 'pending').length;
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      '⚠️ Delete Account',
+      'This will permanently delete your account and all associated data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/delete-user`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: user.id,
+                  phone: user.phone,
+                  email: `${user.phone}@kushicabs.phone`
+                })
+              });
+
+              const result = await response.json();
+
+              if (!response.ok) {
+                throw new Error(result.error || result.message || 'Failed to delete account');
+              }
+
+              Alert.alert(
+                '✅ Account Deleted',
+                'Your account has been successfully deleted.',
+                [{ text: 'OK', onPress: () => signOut() }]
+              );
+            } catch (err) {
+              console.error('Delete account error:', err);
+              Alert.alert('Error', err.message || 'Failed to delete account');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
       {/* Avatar */}
@@ -293,6 +336,14 @@ export default function DriverProfileScreen({ navigation }) {
       <TouchableOpacity style={styles.signOut} onPress={signOut}>
         <Ionicons name="log-out-outline" size={20} color="#ef5350" />
         <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={[styles.signOut, { borderColor: '#d32f2f88', marginTop: 12 }]} 
+        onPress={() => handleDeleteAccount()}
+      >
+        <Ionicons name="trash-outline" size={20} color="#d32f2f" />
+        <Text style={[styles.signOutText, { color: '#d32f2f' }]}>Delete Account</Text>
       </TouchableOpacity>
 
       {/* Document Preview Modal */}

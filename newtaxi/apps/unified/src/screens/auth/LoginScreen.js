@@ -554,14 +554,22 @@ export default function LoginScreen({ navigation }) {
     
     try {
       console.log('Verifying OTP for:', form.identifier);
+      console.log('OTP value:', otp);
+      console.log('Using API URL:', API_CONFIG.SMS_API_URL);
       
       // Create abort controller for timeout (30 seconds)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
-      const response = await fetch(`${API_CONFIG.SMS_API_URL}/sms/verify`, {
+      const verifyUrl = `${API_CONFIG.SMS_API_URL}/sms/verify`;
+      console.log('Verify endpoint:', verifyUrl);
+      
+      const response = await fetch(verifyUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           to: form.identifier,
           otp: otp
@@ -571,20 +579,27 @@ export default function LoginScreen({ navigation }) {
       
       clearTimeout(timeoutId);
       
+      console.log('Verify Response status:', response.status);
+      console.log('Verify Response headers:', response.headers);
+      
       const data = await response.json();
-      console.log('OTP Verify Response:', data);
+      console.log('OTP Verify Response data:', data);
+      console.log('OTP Verify Response verified field:', data.verified);
       
       if (!data.verified) {
-        Alert.alert('Error', 'Invalid OTP. Please try again.');
+        Alert.alert('Error', data.message || 'Invalid OTP. Please try again.');
         return;
       }
     } catch (error) {
       console.error('OTP Verify Error:', error);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       
       if (error.name === 'AbortError') {
         Alert.alert('Timeout', 'Verification request timed out. Please try again.');
       } else {
-        Alert.alert('Network Error', 'Unable to verify OTP: ' + error.message);
+        Alert.alert('Unable to verify OTP', 'Network request failed: ' + error.message);
       }
       return;
     }

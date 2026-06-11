@@ -4,6 +4,14 @@ const { createOtp, verifyOtp } = require('../services/otpService');
 
 const router = express.Router();
 
+// Handle CORS preflight for all routes
+router.options('*', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.sendStatus(200);
+});
+
 router.post('/send', async (req, res, next) => {
   try {
     const { to, message, senderId } = req.body;
@@ -18,7 +26,7 @@ router.post('/otp', async (req, res, next) => {
   try {
     const { to, purpose = 'verification' } = req.body;
     if (!to) {
-      return res.status(400).json({ success: false, error: 'Missing destination phone number' });
+      return res.status(400).json({ success: false, otpSent: false, error: 'Missing destination phone number' });
     }
 
     // Create OTP - returns a string
@@ -34,7 +42,19 @@ router.post('/otp', async (req, res, next) => {
     
     const result = await sendSms({ to, message: text, isOtp: true });
 
-    res.json({ success: true, otpSent: true, purpose, otp: otpString, result });
+    // Add CORS headers
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    res.json({ 
+      success: true, 
+      otpSent: true, 
+      purpose, 
+      otp: otpString, 
+      result,
+      message: 'OTP sent successfully'
+    });
   } catch (error) {
     next(error);
   }
@@ -47,13 +67,22 @@ router.post('/verify', async (req, res, next) => {
     
     if (!to || !otp) {
       console.log(`❌ Missing phone or OTP`);
-      return res.status(400).json({ success: false, error: 'Missing phone number or OTP' });
+      return res.status(400).json({ success: false, verified: false, error: 'Missing phone number or OTP' });
     }
 
     const verified = verifyOtp(to, otp);
     console.log(`✅ OTP Verification result: ${verified}`);
     
-    res.json({ success: verified, verified });
+    // Add headers for CORS
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    
+    res.json({ 
+      success: verified, 
+      verified: verified,
+      message: verified ? 'OTP verified successfully' : 'Invalid OTP'
+    });
   } catch (error) {
     console.error(`❌ Verify error:`, error);
     next(error);

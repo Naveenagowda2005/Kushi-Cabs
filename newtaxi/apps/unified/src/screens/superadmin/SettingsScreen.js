@@ -35,9 +35,46 @@ export default function SuperAdminSettingsScreen({ navigation }) {
   const fetchDummyDrivers = useCallback(async () => {
     try {
       setLoadingDummy(true);
-      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/dummy-drivers`);
-      const result = await response.json();
-      if (result.success) setDummyDrivers(result.drivers || []);
+      console.log('Fetching dummy drivers from Supabase');
+      
+      // Get driver role ID
+      const { data: roleData } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'driver')
+        .single();
+
+      if (!roleData) {
+        console.error('Driver role not found');
+        return;
+      }
+
+      // Fetch drivers with DUMMY- license numbers
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          id,
+          full_name,
+          phone,
+          is_active,
+          verification_status,
+          created_at,
+          drivers!inner(license_number)
+        `)
+        .eq('role_id', roleData.id)
+        .ilike('drivers.license_number', 'DUMMY-%')
+        .order('created_at', { ascending: false });
+
+      console.log('Dummy drivers from Supabase:', data);
+      
+      if (error) {
+        console.error('Error fetching from Supabase:', error);
+        return;
+      }
+
+      if (data) {
+        setDummyDrivers(data);
+      }
     } catch (e) {
       console.error('Error fetching dummy drivers:', e);
     } finally {
@@ -45,7 +82,14 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchDummyDrivers(); }, [fetchDummyDrivers]));
+  // Fetch on mount and when screen is focused
+  useEffect(() => {
+    fetchDummyDrivers();
+  }, []);
+
+  useFocusEffect(useCallback(() => { 
+    fetchDummyDrivers(); 
+  }, []));
 
   const handleCreateDummyDriver = async () => {
     const digits = dummyPhone.replace(/[^0-9]/g, '');

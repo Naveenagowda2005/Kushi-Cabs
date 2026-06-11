@@ -460,18 +460,31 @@ router.get('/dummy-drivers', async (req, res) => {
   try {
     if (!supabaseAdmin) return res.status(500).json({ error: 'Admin credentials not configured' });
 
-    const { data: roleData } = await supabaseAdmin
-      .from('roles').select('id').eq('name', 'driver').single();
-
+    // Fetch drivers with license_number starting with 'DUMMY-'
     const { data, error } = await supabaseAdmin
-      .from('users')
-      .select('id, full_name, phone, is_active, verification_status, created_at')
-      .eq('role_id', roleData.id)
-      .ilike('full_name', 'Dummy%')
+      .from('drivers')
+      .select(`
+        user_id,
+        license_number,
+        users!inner(id, full_name, phone, is_active, verification_status, created_at)
+      `)
+      .ilike('license_number', 'DUMMY-%')
       .order('created_at', { ascending: false });
 
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, drivers: data || [] });
+    
+    // Transform data structure - drivers joined with users
+    const drivers = (data || []).map(driver => ({
+      id: driver.users.id,
+      full_name: driver.users.full_name,
+      phone: driver.users.phone,
+      is_active: driver.users.is_active,
+      verification_status: driver.users.verification_status,
+      created_at: driver.users.created_at,
+      license_number: driver.license_number
+    }));
+    
+    res.json({ success: true, drivers });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
