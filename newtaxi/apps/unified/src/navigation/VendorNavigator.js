@@ -110,7 +110,6 @@ export default function VendorNavigator() {
   const { user } = useAuth();
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [lastCheckTime, setLastCheckTime] = useState(0);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -170,9 +169,7 @@ export default function VendorNavigator() {
         // Success - set the status from database
         const newStatus = data?.overall_status || 'not_started';
         console.log('VendorNavigator: ✅ Status from DB:', newStatus);
-        console.log('VendorNavigator: Full record:', JSON.stringify(data));
         
-        // Update state
         setVerificationStatus(newStatus);
       } catch (error) {
         console.error('VendorNavigator: Exception in verification check:', error);
@@ -191,15 +188,21 @@ export default function VendorNavigator() {
 
     // Check on mount
     checkVerificationStatus();
-    setLastCheckTime(Date.now());
 
-    // Subscribe to real-time changes in vendor_verification_status
-    // IMPORTANT: Add callback BEFORE subscribe, not after
+    // Poll every 4 seconds as the primary mechanism — real-time alone is unreliable
+    // when updates come from SECURITY DEFINER RPCs
+    const pollInterval = setInterval(() => {
+      if (isMounted) {
+        checkVerificationStatus();
+      }
+    }, 4000);
+
+    // Also subscribe to real-time as a bonus (may not fire for RPC updates)
     let channel;
     const setupSubscription = () => {
       try {
         channel = supabase
-          .channel(`vendor_verification_status:user_id=eq.${user.id}`)
+          .channel(`vendor_navigator_vvs_${user.id}`)
           .on(
             'postgres_changes',
             {
@@ -212,22 +215,13 @@ export default function VendorNavigator() {
               if (isMounted) {
                 const newStatus = payload.new?.overall_status || 'not_started';
                 console.log('VendorNavigator: 🔔 Real-time update received - status:', newStatus);
-                
-                setVerificationStatus((prevStatus) => {
-                  if (prevStatus !== newStatus) {
-                    console.log('VendorNavigator: ✅ Status UPDATED from', prevStatus, 'to', newStatus);
-                  }
-                  return newStatus;
-                });
+                setVerificationStatus(newStatus);
               }
             }
           )
           .subscribe((status) => {
-            console.log('VendorNavigator: Real-time channel subscription status:', status);
             if (status === 'SUBSCRIBED') {
               console.log('VendorNavigator: ✅ Real-time listener ACTIVE');
-            } else if (status === 'CLOSED') {
-              console.log('VendorNavigator: ⚠️  Real-time listener CLOSED');
             }
           });
       } catch (error) {
@@ -239,6 +233,7 @@ export default function VendorNavigator() {
 
     return () => {
       isMounted = false;
+      clearInterval(pollInterval);
       if (channel) {
         supabase.removeChannel(channel);
       }
