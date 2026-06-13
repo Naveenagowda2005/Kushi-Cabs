@@ -110,20 +110,27 @@ export default function VendorNavigator() {
   const { user } = useAuth();
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lastCheckTime, setLastCheckTime] = useState(0);
 
   useEffect(() => {
     if (!user?.id) return;
 
     let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
 
-    const checkVerificationStatus = async () => {
+    const checkVerificationStatus = async (isRetry = false) => {
       try {
-        // Add cache busting query parameter to force fresh data
-        const timestamp = new Date().getTime();
+        if (!isRetry) {
+          console.log('VendorNavigator: ✅ Starting verification check for user:', user.id);
+        } else {
+          console.log(`VendorNavigator: 🔄 Retry ${retryCount}/${MAX_RETRIES}`);
+        }
         
+        // Force fresh data - no caching
         const { data, error } = await supabase
           .from('vendor_verification_status')
-          .select('overall_status, approved_at, rejected_at')
+          .select('overall_status, approved_at, rejected_at, submitted_at, all_documents_submitted')
           .eq('user_id', user.id)
           .single();
 
@@ -148,7 +155,13 @@ export default function VendorNavigator() {
         // Other errors
         if (error) {
           console.error('VendorNavigator: Error checking vendor verification status:', error);
-          // Default to not_started on error
+          // Retry up to 3 times
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            setTimeout(() => checkVerificationStatus(true), 1000);
+            return;
+          }
+          // Default to not_started on error after retries
           setVerificationStatus('not_started');
           setLoading(false);
           return;
@@ -156,20 +169,19 @@ export default function VendorNavigator() {
 
         // Success - set the status from database
         const newStatus = data?.overall_status || 'not_started';
-        console.log('VendorNavigator: Status from DB:', newStatus, 'Approved:', data?.approved_at, 'Rejected:', data?.rejected_at);
-        console.log('VendorNavigator: FULL RECORD:', JSON.stringify(data, null, 2));
+        console.log('VendorNavigator: ✅ Status from DB:', newStatus);
+        console.log('VendorNavigator: Full record:', JSON.stringify(data));
         
-        // Update state only if status changed
-        setVerificationStatus((prevStatus) => {
-          if (prevStatus !== newStatus) {
-            console.log('VendorNavigator: ✅ Status CHANGED from', prevStatus, 'to', newStatus);
-          }
-          return newStatus;
-        });
+        // Update state
+        setVerificationStatus(newStatus);
       } catch (error) {
-        console.error('VendorNavigator: Error in vendor verification check:', error);
-        // Default to not_started on error
-        setVerificationStatus('not_started');
+        console.error('VendorNavigator: Exception in verification check:', error);
+        if (retryCount < MAX_RETRIES) {
+          retryCount++;
+          setTimeout(() => checkVerificationStatus(true), 1000);
+        } else {
+          setVerificationStatus('not_started');
+        }
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -179,6 +191,7 @@ export default function VendorNavigator() {
 
     // Check on mount
     checkVerificationStatus();
+    setLastCheckTime(Date.now());
 
     // Subscribe to real-time changes in vendor_verification_status using modern API
     const setupSubscription = async () => {
@@ -195,7 +208,7 @@ export default function VendorNavigator() {
           (payload) => {
             if (isMounted) {
               const newStatus = payload.new?.overall_status || 'not_started';
-              console.log('VendorNavigator: 🔔 Real-time update received - status is now:', newStatus, 'Full payload:', JSON.stringify(payload.new));
+              console.log('VendorNavigator: 🔔 Real-time update received - status:', newStatus, 'Full payload:', JSON.stringify(payload.new));
               
               setVerificationStatus((prevStatus) => {
                 if (prevStatus !== newStatus) {
@@ -208,7 +221,7 @@ export default function VendorNavigator() {
         );
       
       const status = await channel.subscribe((status) => {
-        console.log('VendorNavigator: Channel subscription status:', status);
+        console.log('VendorNavigator: Real-time channel subscription status:', status);
         if (status === 'SUBSCRIBED') {
           console.log('VendorNavigator: ✅ Real-time listener ACTIVE');
         }
