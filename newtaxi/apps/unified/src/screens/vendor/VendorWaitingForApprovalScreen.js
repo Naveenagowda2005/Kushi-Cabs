@@ -159,27 +159,37 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
       loadVerificationStatus().finally(() => setLoading(false));
       
       // Set up real-time listener for this screen
+      // IMPORTANT: Add callback BEFORE subscribe, not after
       let isMounted = true;
-      const channel = supabase
-        .channel(`vendor_verification_status:user_id=eq.${user?.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'vendor_verification_status',
-            filter: `user_id=eq.${user?.id}`,
-          },
-          (payload) => {
-            if (isMounted && payload.new) {
-              console.log('🔔 WaitingForApprovalScreen: Real-time update received:', JSON.stringify(payload.new));
-              loadVerificationStatus();
+      let channel;
+      
+      try {
+        channel = supabase
+          .channel(`vendor_verification_status:user_id=eq.${user?.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'vendor_verification_status',
+              filter: `user_id=eq.${user?.id}`,
+            },
+            (payload) => {
+              if (isMounted && payload.new) {
+                console.log('🔔 WaitingForApprovalScreen: Real-time update received:', JSON.stringify(payload.new));
+                loadVerificationStatus();
+              }
             }
-          }
-        )
-        .subscribe((status) => {
-          console.log('WaitingForApprovalScreen: Real-time listener status:', status);
-        });
+          )
+          .subscribe((status) => {
+            console.log('WaitingForApprovalScreen: Real-time listener status:', status);
+            if (status === 'SUBSCRIBED') {
+              console.log('WaitingForApprovalScreen: ✅ Real-time listener ACTIVE');
+            }
+          });
+      } catch (error) {
+        console.error('WaitingForApprovalScreen: Real-time setup error:', error);
+      }
       
       // Poll for status changes every 5 seconds (as backup to real-time)
       const interval = setInterval(() => {
@@ -193,7 +203,9 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
         console.log('⏸️ WaitingForApprovalScreen: Cleaning up listeners');
         isMounted = false;
         clearInterval(interval);
-        supabase.removeChannel(channel);
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
       };
     }, [user?.id, loadVerificationStatus])
   );

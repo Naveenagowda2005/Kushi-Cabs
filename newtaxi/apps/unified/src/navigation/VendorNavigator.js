@@ -193,45 +193,49 @@ export default function VendorNavigator() {
     checkVerificationStatus();
     setLastCheckTime(Date.now());
 
-    // Subscribe to real-time changes in vendor_verification_status using modern API
-    const setupSubscription = async () => {
-      const channel = supabase
-        .channel(`vendor_verification_status:user_id=eq.${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'vendor_verification_status',
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            if (isMounted) {
-              const newStatus = payload.new?.overall_status || 'not_started';
-              console.log('VendorNavigator: 🔔 Real-time update received - status:', newStatus, 'Full payload:', JSON.stringify(payload.new));
-              
-              setVerificationStatus((prevStatus) => {
-                if (prevStatus !== newStatus) {
-                  console.log('VendorNavigator: ✅ Status UPDATED from', prevStatus, 'to', newStatus);
-                }
-                return newStatus;
-              });
+    // Subscribe to real-time changes in vendor_verification_status
+    // IMPORTANT: Add callback BEFORE subscribe, not after
+    let channel;
+    const setupSubscription = () => {
+      try {
+        channel = supabase
+          .channel(`vendor_verification_status:user_id=eq.${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'vendor_verification_status',
+              filter: `user_id=eq.${user.id}`,
+            },
+            (payload) => {
+              if (isMounted) {
+                const newStatus = payload.new?.overall_status || 'not_started';
+                console.log('VendorNavigator: 🔔 Real-time update received - status:', newStatus);
+                
+                setVerificationStatus((prevStatus) => {
+                  if (prevStatus !== newStatus) {
+                    console.log('VendorNavigator: ✅ Status UPDATED from', prevStatus, 'to', newStatus);
+                  }
+                  return newStatus;
+                });
+              }
             }
-          }
-        );
-      
-      const status = await channel.subscribe((status) => {
-        console.log('VendorNavigator: Real-time channel subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('VendorNavigator: ✅ Real-time listener ACTIVE');
-        }
-      });
-      
-      return channel;
+          )
+          .subscribe((status) => {
+            console.log('VendorNavigator: Real-time channel subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+              console.log('VendorNavigator: ✅ Real-time listener ACTIVE');
+            } else if (status === 'CLOSED') {
+              console.log('VendorNavigator: ⚠️  Real-time listener CLOSED');
+            }
+          });
+      } catch (error) {
+        console.error('VendorNavigator: Real-time setup error:', error);
+      }
     };
 
-    let channel;
-    setupSubscription().then(ch => { channel = ch; });
+    setupSubscription();
 
     return () => {
       isMounted = false;
