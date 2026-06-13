@@ -169,7 +169,42 @@ export default function VendorNavigator() {
         // Success - set the status from database
         const newStatus = data?.overall_status || 'not_started';
         console.log('VendorNavigator: ✅ Status from DB:', newStatus);
-        
+
+        // If still pending, check if all documents are already approved and auto-approve
+        if (newStatus === 'pending' && isMounted) {
+          const { data: docsData } = await supabase
+            .from('vendor_documents')
+            .select('documents')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (docsData?.documents) {
+            const REQUIRED = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
+            const allApproved = REQUIRED.every(dt => docsData.documents[dt]?.status === 'approved');
+            if (allApproved) {
+              console.log('VendorNavigator: All docs approved but status is pending — auto-approving');
+              const { data: vendorData } = await supabase
+                .from('vendors')
+                .select('id')
+                .eq('user_id', user.id)
+                .single();
+              if (vendorData?.id) {
+                await supabase.rpc('update_vendor_verification', {
+                  p_vendor_id: vendorData.id,
+                  p_overall_status: 'approved',
+                });
+                await supabase.rpc('update_user_verification_status', {
+                  p_user_id: user.id,
+                  p_status: 'approved',
+                });
+                setVerificationStatus('approved');
+                if (isMounted) setLoading(false);
+                return;
+              }
+            }
+          }
+        }
+
         setVerificationStatus(newStatus);
       } catch (error) {
         console.error('VendorNavigator: Exception in verification check:', error);
