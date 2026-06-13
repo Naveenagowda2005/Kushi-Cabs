@@ -48,31 +48,71 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
     if (!user?.id) return;
 
     try {
+      console.log('loadVerificationStatus: Fetching status for user:', user.id);
+      
       const { data, error } = await supabase
         .from('vendor_verification_status')
         .select('overall_status, submitted_at, rejection_reason, approved_at')
         .eq('user_id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error?.code === 'PGRST116') {
+        console.log('loadVerificationStatus: No status record found (PGRST116)');
+        setVerificationStatus(null);
+        return;
+      }
+
+      if (error) {
+        console.error('loadVerificationStatus: Error fetching status:', error);
         throw error;
       }
 
+      console.log('loadVerificationStatus: Status data:', JSON.stringify(data));
       setVerificationStatus(data);
-      console.log('📋 Verification Status:', data);
+
+      // Check if approved and trigger alert
+      if (data?.overall_status === 'approved' && !previousStateRef.current.approvalShown) {
+        previousStateRef.current.approvalShown = true;
+        console.log('✅ APPROVED DETECTED - Showing approval alert and navigating');
+        
+        Alert.alert(
+          'Approved!',
+          'Your account has been approved by the admin. You can now access all features.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                console.log('loadVerificationStatus: User clicked OK - navigating to VendorHome');
+                // Navigate to vendor dashboard
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'VendorHome' }],
+                });
+              },
+            },
+          ]
+        );
+        return;
+      }
 
       // Fetch documents to check for rejections
+      console.log('loadVerificationStatus: Fetching documents');
       const { data: vendorDocs, error: docsError } = await supabase
         .from('vendor_documents')
         .select('documents')
         .eq('user_id', user.id)
         .single();
 
-      if (docsError) {
-        console.log('📄 Docs Error:', docsError);
+      if (docsError?.code === 'PGRST116') {
+        console.log('loadVerificationStatus: No vendor documents found');
+        return;
       }
 
-      console.log('📄 Vendor Documents:', vendorDocs);
+      if (docsError) {
+        console.log('loadVerificationStatus: Error fetching documents:', docsError);
+      }
+
+      console.log('loadVerificationStatus: Documents retrieved:', vendorDocs ? 'found' : 'none');
 
       if (vendorDocs?.documents) {
         // Check for any rejected documents
@@ -106,48 +146,8 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
           previousStateRef.current.rejectionShown = false;
         }
       }
-
-      // Check if approved (show only once)
-      if (data?.overall_status === 'approved' && !previousStateRef.current.approvalShown) {
-        previousStateRef.current.approvalShown = true;
-        console.log('✅ Showing approval alert');
-        
-        Alert.alert(
-          'Approved!',
-          'Your account has been approved by the admin. You can now access all features.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Refresh user profile and navigate to vendor dashboard
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'VendorHome' }],
-                });
-              },
-            },
-          ]
-        );
-      }
-
-      // Check if rejected (show only once)
-      if (data?.overall_status === 'rejected' && !previousStateRef.current.overallRejectionShown) {
-        previousStateRef.current.overallRejectionShown = true;
-        console.log('✅ Showing overall rejection alert');
-        
-        Alert.alert(
-          'Application Rejected',
-          `Your application was rejected. Reason: ${data.rejection_reason || 'Not specified'}\n\nPlease contact support for more information.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
-      }
     } catch (error) {
-      console.error('Error loading verification status:', error);
+      console.error('loadVerificationStatus: Error:', error);
     }
   }, [user?.id, navigation]);
 
@@ -158,18 +158,44 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
       setLoading(true);
       loadVerificationStatus().finally(() => setLoading(false));
       
-      // Poll for status changes every 5 seconds (reduced from 2 seconds)
-      // only while on this screen
+      // Set up real-time listener for this screen
+      let isMounted = true;
+      const channel = supabase
+        .channel(`vendor_verification_status:user_id=eq.${user?.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'vendor_verification_status',
+            filter: `user_id=eq.${user?.id}`,
+          },
+          (payload) => {
+            if (isMounted && payload.new) {
+              console.log('🔔 WaitingForApprovalScreen: Real-time update received:', JSON.stringify(payload.new));
+              loadVerificationStatus();
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('WaitingForApprovalScreen: Real-time listener status:', status);
+        });
+      
+      // Poll for status changes every 5 seconds (as backup to real-time)
       const interval = setInterval(() => {
-        console.log('📡 VendorWaitingForApprovalScreen: Polling for status changes...');
-        loadVerificationStatus();
+        if (isMounted) {
+          console.log('📡 WaitingForApprovalScreen: Polling for status changes...');
+          loadVerificationStatus();
+        }
       }, 5000);
 
       return () => {
-        console.log('⏸️ VendorWaitingForApprovalScreen: Stopping polling');
+        console.log('⏸️ WaitingForApprovalScreen: Cleaning up listeners');
+        isMounted = false;
         clearInterval(interval);
+        supabase.removeChannel(channel);
       };
-    }, [loadVerificationStatus])
+    }, [user?.id, loadVerificationStatus])
   );
 
   const onRefresh = useCallback(async () => {

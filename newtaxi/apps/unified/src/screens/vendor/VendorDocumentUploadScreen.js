@@ -140,6 +140,7 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       if (user?.id) {
+        console.log('VendorDocumentUploadScreen: Focus effect triggered, reloading documents');
         loadDocuments(user.id);
       }
     }, [user?.id, loadDocuments])

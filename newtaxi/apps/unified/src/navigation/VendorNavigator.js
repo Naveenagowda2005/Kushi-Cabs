@@ -181,35 +181,50 @@ export default function VendorNavigator() {
     checkVerificationStatus();
 
     // Subscribe to real-time changes in vendor_verification_status using modern API
-    const channel = supabase
-      .channel(`vendor_verification_status:user_id=eq.${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'vendor_verification_status',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          if (isMounted) {
-            const newStatus = payload.new?.overall_status || 'not_started';
-            console.log('VendorNavigator: 🔔 Real-time update received - status is now:', newStatus);
-            
-            setVerificationStatus((prevStatus) => {
-              if (prevStatus !== newStatus) {
-                console.log('VendorNavigator: ✅ Status UPDATED from', prevStatus, 'to', newStatus);
-              }
-              return newStatus;
-            });
+    const setupSubscription = async () => {
+      const channel = supabase
+        .channel(`vendor_verification_status:user_id=eq.${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'vendor_verification_status',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            if (isMounted) {
+              const newStatus = payload.new?.overall_status || 'not_started';
+              console.log('VendorNavigator: 🔔 Real-time update received - status is now:', newStatus, 'Full payload:', JSON.stringify(payload.new));
+              
+              setVerificationStatus((prevStatus) => {
+                if (prevStatus !== newStatus) {
+                  console.log('VendorNavigator: ✅ Status UPDATED from', prevStatus, 'to', newStatus);
+                }
+                return newStatus;
+              });
+            }
           }
+        );
+      
+      const status = await channel.subscribe((status) => {
+        console.log('VendorNavigator: Channel subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('VendorNavigator: ✅ Real-time listener ACTIVE');
         }
-      )
-      .subscribe();
+      });
+      
+      return channel;
+    };
+
+    let channel;
+    setupSubscription().then(ch => { channel = ch; });
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [user?.id]);
 
