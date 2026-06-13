@@ -182,6 +182,12 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
       if (!existingDocs && fetchError?.code === 'PGRST116') {
         console.log('handleUploadDocument: No existing record, creating new one with vendor_id:', vendorId);
         
+        // Verify vendor_id is available
+        if (!vendorId) {
+          console.error('handleUploadDocument: ERROR - vendor_id is null/undefined!');
+          throw new Error('Vendor profile not found. Please restart the app.');
+        }
+        
         // Create new record with ALL document types initialized
         const currentDocs = {};
         // Initialize all required documents
@@ -205,7 +211,8 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
           documents: currentDocs,
         };
 
-        console.log('handleUploadDocument: INSERT payload with keys:', Object.keys(currentDocs));
+        console.log('handleUploadDocument: INSERT payload - user_id:', user.id, 'vendor_id:', vendorId);
+        console.log('handleUploadDocument: Document keys:', Object.keys(currentDocs));
         console.log('handleUploadDocument: Payload size:', JSON.stringify(insertPayload).length, 'bytes');
 
         const { error: insertError, data: insertData } = await supabase
@@ -213,18 +220,21 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
           .insert(insertPayload)
           .select();
 
-        console.log('handleUploadDocument: INSERT result - error:', insertError);
+        console.log('handleUploadDocument: INSERT result - error:', insertError, 'data:', insertData);
         if (insertData && insertData.length > 0) {
-          console.log('handleUploadDocument: INSERT SUCCESS - returned documents keys:', Object.keys(insertData[0]?.documents || {}));
+          console.log('handleUploadDocument: ✅ INSERT SUCCESS - returned documents keys:', Object.keys(insertData[0]?.documents || {}));
+          console.log('handleUploadDocument: Returned record - id:', insertData[0]?.id, 'vendor_id:', insertData[0]?.vendor_id);
+        } else if (!insertError) {
+          console.log('handleUploadDocument: ⚠️ INSERT returned no data but no error');
         }
 
         if (insertError) {
-          console.error('handleUploadDocument: INSERT FAILED:', insertError);
+          console.error('handleUploadDocument: ❌ INSERT FAILED:', insertError);
           throw insertError;
         }
       } else if (existingDocs) {
         // Update existing record
-        console.log('handleUploadDocument: Updating existing record for user:', user.id);
+        console.log('handleUploadDocument: Updating existing record for user:', user.id, 'vendor_id:', existingDocs.vendor_id);
         
         const currentDocs = existingDocs.documents || {};
         console.log('handleUploadDocument: Current document keys before update:', Object.keys(currentDocs));
@@ -249,15 +259,17 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
           .eq('user_id', user.id)
           .select();
 
-        console.log('handleUploadDocument: UPDATE result - error:', updateError);
+        console.log('handleUploadDocument: UPDATE result - error:', updateError, 'data:', updateData);
         if (updateData && updateData.length > 0) {
           const returnedDocs = updateData[0]?.documents || {};
-          console.log('handleUploadDocument: UPDATE returned documents with keys:', Object.keys(returnedDocs));
+          console.log('handleUploadDocument: ✅ UPDATE SUCCESS - returned documents with keys:', Object.keys(returnedDocs));
           console.log('handleUploadDocument: Verify', documentType, 'has data:', !!returnedDocs[documentType]?.document_data);
+        } else if (!updateError) {
+          console.log('handleUploadDocument: ⚠️ UPDATE returned no data but no error');
         }
 
         if (updateError) {
-          console.error('handleUploadDocument: UPDATE FAILED:', updateError);
+          console.error('handleUploadDocument: ❌ UPDATE FAILED:', updateError);
           throw updateError;
         }
       } else if (fetchError) {
@@ -269,7 +281,14 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
       Alert.alert('Success', `${getDocumentLabel(documentType)} uploaded successfully!`);
       await loadDocuments(user.id);
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('❌ Upload error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        details: error.details,
+        hint: error.hint,
+      });
       Alert.alert('Upload Failed', error.message || JSON.stringify(error));
     } finally {
       setUploading(prev => ({ ...prev, [documentType]: false }));
