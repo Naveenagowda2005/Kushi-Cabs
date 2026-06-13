@@ -600,4 +600,85 @@ router.get('/user/:userId', async (req, res) => {
   }
 });
 
+/**
+ * GET /admin/vendor-debug/:userId
+ * Debug endpoint to check vendor setup and documents
+ */
+router.get('/vendor-debug/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Admin credentials not configured' });
+
+    console.log(`🔍 Debugging vendor setup for user: ${userId}`);
+
+    const debug = {};
+
+    // Check user
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, email, phone, full_name, verification_status')
+      .eq('id', userId)
+      .single();
+
+    debug.user = user || { error: userError?.message };
+
+    // Check vendor record
+    const { data: vendor, error: vendorError } = await supabaseAdmin
+      .from('vendors')
+      .select('id, company_name, user_id')
+      .eq('user_id', userId)
+      .single();
+
+    debug.vendor = vendor || { error: vendorError?.message, code: vendorError?.code };
+
+    // Check vendor_verification_status
+    const { data: verifyStatus, error: verifyError } = await supabaseAdmin
+      .from('vendor_verification_status')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    debug.vendor_verification_status = verifyStatus || { error: verifyError?.message, code: verifyError?.code };
+
+    // Check vendor_documents
+    const { data: docs, error: docsError } = await supabaseAdmin
+      .from('vendor_documents')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    debug.vendor_documents = docs || { error: docsError?.message, code: docsError?.code };
+
+    // Check RLS policies by attempting insert with admin client
+    const testDoc = {
+      user_id: userId,
+      vendor_id: vendor?.id || 'test-vendor-id',
+      documents: { TEST: { status: 'pending', test: true } }
+    };
+
+    const { error: testInsertError } = await supabaseAdmin
+      .from('vendor_documents')
+      .insert(testDoc)
+      .select();
+
+    debug.rls_test_insert = testInsertError ? { error: testInsertError.message, code: testInsertError.code } : { success: true };
+
+    // Clean up test record if it was created
+    if (!testInsertError) {
+      await supabaseAdmin
+        .from('vendor_documents')
+        .delete()
+        .eq('user_id', userId)
+        .eq('documents', testDoc.documents);
+    }
+
+    console.log('🔍 Debug info:', JSON.stringify(debug, null, 2));
+    res.json({ success: true, userId, debug });
+
+  } catch (error) {
+    console.error('vendor-debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

@@ -66,18 +66,18 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
   const loadDocuments = useCallback(async (userId) => {
     try {
       setLoading(true);
-      console.log('loadDocuments: Loading documents for vendor:', userId);
+      console.log('loadDocuments: Starting load for user:', userId);
       
       // Get vendor documents
       const { data: docs, error } = await supabase
         .from('vendor_documents')
-        .select('documents')
+        .select('documents, created_at, updated_at')
         .eq('user_id', userId)
         .single();
 
       // Handle table doesn't exist (PGRST205)
       if (error?.code === 'PGRST205') {
-        console.log('vendor_documents table not created yet - showing empty docs');
+        console.log('loadDocuments: Table not created yet - showing empty template');
         const allDocs = REQUIRED_DOCUMENTS.map(type => ({
           document_type: type,
           status: 'pending',
@@ -91,13 +91,33 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
       }
 
       if (error && error.code !== 'PGRST116') {
+        console.error('loadDocuments: Query error:', error);
         throw error;
+      }
+
+      if (error?.code === 'PGRST116') {
+        console.log('loadDocuments: No record found (PGRST116) - showing empty template');
+        const allDocs = REQUIRED_DOCUMENTS.map(type => ({
+          document_type: type,
+          status: 'pending',
+          document_data: null,
+          document_url: null,
+          rejection_reason: null,
+        }));
+        setDocuments(allDocs);
+        setLoading(false);
+        return;
       }
 
       // Create documents list
       const docMap = docs?.documents || {};
+      console.log('loadDocuments: Retrieved document types:', Object.keys(docMap));
+      
       const allDocs = REQUIRED_DOCUMENTS.map(type => {
         const doc = docMap[type];
+        const hasData = !!doc?.document_data;
+        console.log(`loadDocuments: ${type} - status: ${doc?.status || 'pending'}, has data: ${hasData}`);
+        
         return {
           document_type: type,
           status: doc?.status || 'pending',
@@ -107,10 +127,10 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
         };
       });
 
-      console.log('loadDocuments: Final documents list:', allDocs);
+      console.log('loadDocuments: Final list:', allDocs.map(d => ({ type: d.document_type, status: d.status, hasData: !!d.document_data })));
       setDocuments(allDocs);
     } catch (error) {
-      console.error('Error loading documents:', error);
+      console.error('loadDocuments: Error:', error);
       Alert.alert('Error', 'Failed to load documents');
     } finally {
       setLoading(false);
@@ -147,6 +167,7 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
       }
 
       console.log('handleUploadDocument: Image picked successfully, size:', imageData.base64?.length || 0);
+      console.log('handleUploadDocument: User ID:', user.id, 'Vendor ID:', vendorId);
 
       // Get existing vendor_documents record or create new one
       const { data: existingDocs, error: fetchError } = await supabase
@@ -155,48 +176,92 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
         .eq('user_id', user.id)
         .single();
 
+      console.log('handleUploadDocument: Fetch result - existingDocs:', !!existingDocs, 'fetchError:', fetchError?.code);
+
       // If no record exists, create new one
       if (!existingDocs && fetchError?.code === 'PGRST116') {
-        console.log('handleUploadDocument: No existing record, creating new one');
+        console.log('handleUploadDocument: No existing record, creating new one with vendor_id:', vendorId);
         
-        // Create new record
+        // Create new record with ALL document types initialized
         const currentDocs = {};
+        // Initialize all required documents
+        REQUIRED_DOCUMENTS.forEach(docType => {
+          currentDocs[docType] = {
+            status: 'pending',
+            document_data: null,
+            uploaded_at: null,
+          };
+        });
+        // Then update the current one being uploaded
         currentDocs[documentType] = {
           status: 'pending',
           document_data: imageData.base64,
           uploaded_at: new Date().toISOString(),
         };
 
-        const { error: insertError } = await supabase
-          .from('vendor_documents')
-          .insert({
-            user_id: user.id,
-            vendor_id: vendorId,
-            documents: currentDocs,
-          });
+        const insertPayload = {
+          user_id: user.id,
+          vendor_id: vendorId,
+          documents: currentDocs,
+        };
 
-        if (insertError) throw insertError;
+        console.log('handleUploadDocument: INSERT payload with keys:', Object.keys(currentDocs));
+        console.log('handleUploadDocument: Payload size:', JSON.stringify(insertPayload).length, 'bytes');
+
+        const { error: insertError, data: insertData } = await supabase
+          .from('vendor_documents')
+          .insert(insertPayload)
+          .select();
+
+        console.log('handleUploadDocument: INSERT result - error:', insertError);
+        if (insertData && insertData.length > 0) {
+          console.log('handleUploadDocument: INSERT SUCCESS - returned documents keys:', Object.keys(insertData[0]?.documents || {}));
+        }
+
+        if (insertError) {
+          console.error('handleUploadDocument: INSERT FAILED:', insertError);
+          throw insertError;
+        }
       } else if (existingDocs) {
         // Update existing record
-        console.log('handleUploadDocument: Updating existing record');
+        console.log('handleUploadDocument: Updating existing record for user:', user.id);
         
         const currentDocs = existingDocs.documents || {};
+        console.log('handleUploadDocument: Current document keys before update:', Object.keys(currentDocs));
+        
         currentDocs[documentType] = {
           status: 'pending',
           document_data: imageData.base64,
           uploaded_at: new Date().toISOString(),
         };
 
-        const { error: updateError } = await supabase
-          .from('vendor_documents')
-          .update({
-            documents: currentDocs,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', user.id);
+        console.log('handleUploadDocument: Updated', documentType, 'status: pending, data length:', imageData.base64?.length || 0);
+        console.log('handleUploadDocument: Document keys after update:', Object.keys(currentDocs));
 
-        if (updateError) throw updateError;
+        const updatePayload = {
+          documents: currentDocs,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: updateError, data: updateData } = await supabase
+          .from('vendor_documents')
+          .update(updatePayload)
+          .eq('user_id', user.id)
+          .select();
+
+        console.log('handleUploadDocument: UPDATE result - error:', updateError);
+        if (updateData && updateData.length > 0) {
+          const returnedDocs = updateData[0]?.documents || {};
+          console.log('handleUploadDocument: UPDATE returned documents with keys:', Object.keys(returnedDocs));
+          console.log('handleUploadDocument: Verify', documentType, 'has data:', !!returnedDocs[documentType]?.document_data);
+        }
+
+        if (updateError) {
+          console.error('handleUploadDocument: UPDATE FAILED:', updateError);
+          throw updateError;
+        }
       } else if (fetchError) {
+        console.error('handleUploadDocument: FETCH FAILED:', fetchError);
         throw fetchError;
       }
 
@@ -205,7 +270,7 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
       await loadDocuments(user.id);
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Upload Failed', error.message);
+      Alert.alert('Upload Failed', error.message || JSON.stringify(error));
     } finally {
       setUploading(prev => ({ ...prev, [documentType]: false }));
     }
