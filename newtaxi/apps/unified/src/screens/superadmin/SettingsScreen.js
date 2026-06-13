@@ -134,30 +134,63 @@ export default function SuperAdminSettingsScreen({ navigation }) {
       return;
     }
 
+    const phoneChanged = user.phone !== phoneDigits;
+
     setSaving(true);
     try {
-      // Update users table
+      if (phoneChanged) {
+        // Check if the new phone is already taken by another user
+        const { data: existingUser, error: checkError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('phone', phoneDigits)
+          .neq('id', user.id)
+          .maybeSingle();
+
+        if (checkError) throw checkError;
+
+        if (existingUser) {
+          Alert.alert(
+            'Phone Already Registered',
+            'This phone number is already linked to another account. Please use a different number.'
+          );
+          return;
+        }
+      }
+
+      // Build update payload — only include phone/email if changed
+      const updatePayload = { full_name: fullName.trim() };
+      if (phoneChanged) {
+        updatePayload.phone = phoneDigits;
+        updatePayload.email = `${phoneDigits}@kushicabs.phone`;
+      }
+
       const { error: updateError } = await supabase
         .from('users')
-        .update({
-          full_name: fullName.trim(),
-          phone: phoneDigits,
-          email: `${phoneDigits}@kushicabs.phone`, // Update email to match new phone
-        })
+        .update(updatePayload)
         .eq('id', user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        // Handle unique constraint violation gracefully
+        if (updateError.code === '23505') {
+          Alert.alert(
+            'Phone Already Registered',
+            'This phone number is already linked to another account. Please use a different number.'
+          );
+          return;
+        }
+        throw updateError;
+      }
 
-      // If phone number changed, also update auth.users email
-      if (user.phone !== phoneDigits) {
+      // If phone changed, update auth.users email via backend
+      if (phoneChanged) {
         console.log('Phone number changed, updating auth email');
         const newEmail = `${phoneDigits}@kushicabs.phone`;
-        
-        // Call backend to update auth account with new phone
+
         const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/update-admin-phone`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             userId: user.id,
             oldPhone: user.phone,
             newPhone: phoneDigits,
@@ -168,9 +201,9 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         const result = await response.json();
         if (!response.ok) {
           console.warn('Could not update auth account:', result.error);
+          // Non-fatal — users table already updated
         }
 
-        // Phone changed — sign out and ask to re-login with new number
         await refreshUserProfile();
         setIsEditing(false);
         Alert.alert(
@@ -181,6 +214,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         return;
       }
 
+      // Only name changed
       await refreshUserProfile();
       setIsEditing(false);
       Alert.alert('✅ Success', 'Profile updated successfully');
