@@ -165,7 +165,7 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
       
       try {
         channel = supabase
-          .channel(`vendor_verification_status:user_id=eq.${user?.id}`)
+          .channel(`waiting_screen_vvs_${user?.id}`)
           .on(
             'postgres_changes',
             {
