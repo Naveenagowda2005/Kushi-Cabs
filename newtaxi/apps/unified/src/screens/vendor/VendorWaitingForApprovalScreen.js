@@ -73,21 +73,18 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
       // Check if approved and trigger alert
       if (data?.overall_status === 'approved' && !previousStateRef.current.approvalShown) {
         previousStateRef.current.approvalShown = true;
-        console.log('✅ APPROVED DETECTED - Showing approval alert and navigating');
-        
+        console.log('✅ APPROVED DETECTED - Showing approval alert');
+
         Alert.alert(
-          'Approved!',
+          'Approved! 🎉',
           'Your account has been approved by the admin. You can now access all features.',
           [
             {
-              text: 'OK',
+              text: 'Continue',
               onPress: () => {
-                console.log('loadVerificationStatus: User clicked OK - navigating to VendorHome');
-                // Navigate to vendor dashboard
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'VendorHome' }],
-                });
+                console.log('loadVerificationStatus: User clicked Continue - VendorNavigator will re-render');
+                // VendorNavigator polls every 4s and will detect the approved status,
+                // re-rendering the tab navigator automatically. No explicit navigation needed.
               },
             },
           ]

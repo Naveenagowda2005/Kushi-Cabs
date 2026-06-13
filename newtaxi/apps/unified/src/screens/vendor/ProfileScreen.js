@@ -141,10 +141,12 @@ export default function VendorProfileScreen({ navigation }) {
       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
       const currentDocs = existingDocs?.documents || {};
+      // Reset this document to pending — requires admin re-review
       currentDocs[docType] = {
         status: 'pending',
         document_data: imageData.base64,
         uploaded_at: new Date().toISOString(),
+        rejection_reason: null, // clear any old rejection reason
       };
 
       if (existingDocs) {
@@ -167,8 +169,37 @@ export default function VendorProfileScreen({ navigation }) {
         if (insertError) throw insertError;
       }
 
+      // ── Reset overall verification status to 'pending' so admin re-reviews ──
+      // This makes the vendor appear in admin's Pending tab again
+      const { error: resetError } = await supabase
+        .rpc('reset_vendor_to_pending', { p_user_id: user.id });
+
+      if (resetError) {
+        // RPC might not exist yet — fallback to direct update (RLS is disabled)
+        console.warn('reset_vendor_to_pending RPC failed, trying direct update:', resetError.message);
+        await supabase
+          .from('vendor_verification_status')
+          .update({
+            overall_status: 'pending',
+            all_documents_submitted: true,
+            submitted_at: new Date().toISOString(),
+            approved_at: null,
+            rejected_at: null,
+            rejection_reason: null,
+            is_re_verification: true,   // vendor keeps dashboard access
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id);
+      } else {
+        console.log('reset_vendor_to_pending: VVS reset to pending ✅');
+      }
+
       await loadDocuments();
-      Alert.alert('Updated', `${DOC_CONFIG[docType].label} updated successfully`);
+
+      Alert.alert(
+        'Document Updated',
+        `${DOC_CONFIG[docType].label} has been re-uploaded and sent for admin review.\n\nYour account will remain active while the document is being reviewed.`
+      );
     } catch (err) {
       console.error('Re-upload error:', err);
       Alert.alert('Error', err.message || 'Failed to update document');
@@ -310,6 +341,8 @@ export default function VendorProfileScreen({ navigation }) {
                       <Text style={styles.docName}>{doc.label}</Text>
                       {doc.status === 'rejected' && doc.rejection_reason ? (
                         <Text style={styles.docRejection} numberOfLines={1}>⚠️ {doc.rejection_reason}</Text>
+                      ) : doc.status === 'pending' && doc.document_data ? (
+                        <Text style={styles.docPending}>⏳ Awaiting admin review</Text>
                       ) : (
                         <Text style={styles.docDate}>
                           {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : 'Not uploaded'}
@@ -451,6 +484,7 @@ const styles = StyleSheet.create({
   docName: { color: '#fff', fontSize: 13, fontWeight: '500', marginBottom: 2 },
   docDate: { color: '#666', fontSize: 11 },
   docRejection: { color: '#ef5350', fontSize: 11 },
+  docPending: { color: '#ff9800', fontSize: 11 },
   docStatus: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   docStatusText: { fontSize: 11, fontWeight: '600' },
   updateBtn: {

@@ -47,15 +47,21 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error fetching vendor:', error);
+          // Still load documents even if vendor lookup fails
+          loadDocuments(user.id);
           return;
         }
 
         if (vendor?.id) {
           setVendorId(vendor.id);
-          loadDocuments(user.id);
+        } else {
+          console.warn('VendorDocumentUploadScreen: No vendor record found for user:', user.id);
         }
+        // Always load documents regardless of whether vendor record exists
+        loadDocuments(user.id);
       } catch (error) {
         console.error('Error in fetchVendorId:', error);
+        loadDocuments(user.id);
       }
     };
 
@@ -297,9 +303,11 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
   };
 
   const handleViewDocument = (document) => {
-    if (document.document_url) {
+    if (document.document_data) {
       setSelectedDocument(document);
       setViewerVisible(true);
+    } else {
+      Alert.alert('No Document', 'No document uploaded yet for this type.');
     }
   };
 
@@ -421,6 +429,7 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
               status={doc.status}
               rejectionReason={doc.rejection_reason}
               onUpload={handleUploadDocument}
+              onView={() => handleViewDocument(doc)}
               isUploading={uploading[doc.document_type]}
               hasData={!!doc.document_data}
             />
@@ -460,8 +469,12 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
       {/* Document Viewer Modal */}
       <DocumentViewer
         visible={viewerVisible}
-        document={selectedDocument}
-        onClose={() => setViewerVisible(false)}
+        documentData={selectedDocument?.document_data}
+        documentType={selectedDocument?.document_type}
+        onClose={() => {
+          setViewerVisible(false);
+          setSelectedDocument(null);
+        }}
       />
     </View>
   );

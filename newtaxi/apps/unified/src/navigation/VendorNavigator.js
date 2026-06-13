@@ -129,7 +129,7 @@ export default function VendorNavigator() {
         // Force fresh data - no caching
         const { data, error } = await supabase
           .from('vendor_verification_status')
-          .select('overall_status, approved_at, rejected_at, submitted_at, all_documents_submitted')
+          .select('overall_status, approved_at, rejected_at, submitted_at, all_documents_submitted, is_re_verification')
           .eq('user_id', user.id)
           .single();
 
@@ -168,40 +168,56 @@ export default function VendorNavigator() {
 
         // Success - set the status from database
         const newStatus = data?.overall_status || 'not_started';
-        console.log('VendorNavigator: ✅ Status from DB:', newStatus);
+        const isReVerification = data?.is_re_verification === true;
+        console.log('VendorNavigator: ✅ Status from DB:', newStatus, '| re-verification:', isReVerification);
+
+        // If pending but is_re_verification = true, vendor was already approved
+        // and just re-uploaded a doc — keep them on dashboard, don't show waiting screen
+        if (newStatus === 'pending' && isReVerification) {
+          console.log('VendorNavigator: Re-verification pending — keeping dashboard access');
+          setVerificationStatus('approved'); // treat as approved for navigation
+          if (isMounted) setLoading(false);
+          return;
+        }
 
         // If still pending, check if all documents are already approved and auto-approve
         if (newStatus === 'pending' && isMounted) {
-          const { data: docsData } = await supabase
-            .from('vendor_documents')
-            .select('documents')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (docsData?.documents) {
-            const REQUIRED = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
-            const allApproved = REQUIRED.every(dt => docsData.documents[dt]?.status === 'approved');
-            if (allApproved) {
-              console.log('VendorNavigator: All docs approved but status is pending — auto-approving');
-              const { data: vendorData } = await supabase
-                .from('vendors')
-                .select('id')
-                .eq('user_id', user.id)
-                .single();
-              if (vendorData?.id) {
-                await supabase.rpc('update_vendor_verification', {
-                  p_vendor_id: vendorData.id,
-                  p_overall_status: 'approved',
-                });
-                await supabase.rpc('update_user_verification_status', {
-                  p_user_id: user.id,
-                  p_status: 'approved',
-                });
-                setVerificationStatus('approved');
-                if (isMounted) setLoading(false);
-                return;
+          try {
+            const { data: docsData, error: docsError } = await supabase
+              .from('vendor_documents')
+              .select('documents')
+              .eq('user_id', user.id)
+              .single();
+
+            if (!docsError && docsData?.documents) {
+              const REQUIRED = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
+              const allApproved = REQUIRED.every(dt => docsData.documents[dt]?.status === 'approved');
+              if (allApproved) {
+                console.log('VendorNavigator: All docs approved but status is pending — auto-approving');
+                const { data: vendorData } = await supabase
+                  .from('vendors')
+                  .select('id')
+                  .eq('user_id', user.id)
+                  .single();
+                if (vendorData?.id) {
+                  await supabase.rpc('update_vendor_verification', {
+                    p_vendor_id: vendorData.id,
+                    p_overall_status: 'approved',
+                  });
+                  await supabase.rpc('update_user_verification_status', {
+                    p_user_id: user.id,
+                    p_status: 'approved',
+                  });
+                  if (isMounted) {
+                    setVerificationStatus('approved');
+                    setLoading(false);
+                  }
+                  return;
+                }
               }
             }
+          } catch (autoApproveError) {
+            console.warn('VendorNavigator: Auto-approve check failed (non-fatal):', autoApproveError.message);
           }
         }
 
@@ -224,13 +240,12 @@ export default function VendorNavigator() {
     // Check on mount
     checkVerificationStatus();
 
-    // Poll every 4 seconds as the primary mechanism — real-time alone is unreliable
-    // when updates come from SECURITY DEFINER RPCs
+    // Poll every 3 seconds — fast enough to feel instant after admin approves
     const pollInterval = setInterval(() => {
       if (isMounted) {
         checkVerificationStatus();
       }
-    }, 4000);
+    }, 3000);
 
     // Also subscribe to real-time as a bonus (may not fire for RPC updates)
     let channel;

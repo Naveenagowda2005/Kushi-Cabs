@@ -257,6 +257,13 @@ const AdminVendorVerificationDashboard = () => {
   const renderVendorCard = ({ item: vendor }) => {
     if (!vendor.users) return null;
 
+    // is_re_verification = TRUE  → vendor was already approved, just re-uploaded
+    // Fallback check: if any document is 'approved', this is a re-verification
+    const hasAnyApprovedDoc = Object.values(vendor.documents || {}).some(
+      doc => doc?.status === 'approved'
+    );
+    const isReVerification = vendor.is_re_verification === true || hasAnyApprovedDoc;
+
     return (
       <TouchableOpacity
         style={styles.vendorCard}
@@ -270,6 +277,20 @@ const AdminVendorVerificationDashboard = () => {
               <Ionicons name="person-circle-outline" size={32} color={COLORS.vendor.primary} />
             </View>
             <View style={styles.vendorDetailInfo}>
+              {/* NEW / RE-UPLOAD badge */}
+              <View style={isReVerification ? styles.reUploadBadge : styles.newBadge}>
+                <Ionicons
+                  name={isReVerification ? 'refresh-circle-outline' : 'sparkles-outline'}
+                  size={11}
+                  color={isReVerification ? '#ff9800' : '#4caf50'}
+                />
+                <Text style={[
+                  styles.badgeText,
+                  { color: isReVerification ? '#ff9800' : '#4caf50' }
+                ]}>
+                  {isReVerification ? 'RE-UPLOAD' : 'NEW'}
+                </Text>
+              </View>
               <Text style={styles.vendorName}>{vendor.users?.full_name}</Text>
               <Text style={styles.vendorBusiness}>{vendor.vendors?.company_name}</Text>
               <Text style={styles.vendorPhone}>{vendor.users?.phone}</Text>
@@ -285,6 +306,15 @@ const AdminVendorVerificationDashboard = () => {
         {/* Expanded Documents Section */}
         {selectedVendor?.user_id === vendor.user_id && (
           <View style={styles.documentsSection}>
+            {/* Context banner for re-upload requests */}
+            {isReVerification && (
+              <View style={styles.reVerifyBanner}>
+                <Ionicons name="information-circle-outline" size={16} color="#ff9800" />
+                <Text style={styles.reVerifyBannerText}>
+                  This vendor is already approved. They re-uploaded one or more documents for your review. Their dashboard access continues uninterrupted.
+                </Text>
+              </View>
+            )}
             <Text style={styles.sectionTitle}>Documents</Text>
             {documentTypes && documentTypes.length > 0 ? (
               documentTypes.map((docType) => {
@@ -318,8 +348,9 @@ const AdminVendorVerificationDashboard = () => {
                       </View>
                     </TouchableOpacity>
 
-                    {/* Approve/Reject buttons for each document - only show for pending documents */}
-                    {tabIndex === 0 && doc?.document_data && doc?.status === 'pending' && (
+                    {/* Approve/Reject buttons — show on Pending tab for pending docs,
+                        OR on Approved tab if a doc was re-uploaded and is now pending again */}
+                    {(tabIndex === 0 || tabIndex === 1) && doc?.document_data && doc?.status === 'pending' && (
                       <View style={styles.documentActions}>
                           <TouchableOpacity
                             style={[styles.actionButton, styles.approveButton]}
@@ -445,8 +476,8 @@ const AdminVendorVerificationDashboard = () => {
               </View>
             )}
 
-            {/* Overall Approve Button — only on Pending tab */}
-            {tabIndex === 0 && (() => {
+            {/* Overall Approve Button — show on Pending tab and Approved tab (for re-submitted docs) */}
+            {(tabIndex === 0 || tabIndex === 1) && (() => {
               const REQUIRED_DOCS = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
               const allDocsApproved = REQUIRED_DOCS.every(
                 (dt) => vendor.documents[dt]?.status === 'approved'
@@ -712,6 +743,37 @@ const styles = StyleSheet.create({
   vendorDetailInfo: {
     flex: 1,
   },
+  newBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#4caf5020',
+    borderWidth: 1,
+    borderColor: '#4caf5060',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 4,
+    gap: 3,
+  },
+  reUploadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#ff980020',
+    borderWidth: 1,
+    borderColor: '#ff980060',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 4,
+    gap: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   vendorName: {
     fontSize: 14,
     fontWeight: '600',
@@ -931,6 +993,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  reVerifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#ff980015',
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  reVerifyBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#ffb74d',
+    lineHeight: 17,
   },
 });
 

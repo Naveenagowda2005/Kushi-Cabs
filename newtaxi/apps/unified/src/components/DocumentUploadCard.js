@@ -16,6 +16,7 @@ const DocumentUploadCard = ({
   status = 'pending',
   rejectionReason,
   onUpload,
+  onView,
   isUploading = false,
   hasData = false, // New prop to indicate if document has been uploaded
 }) => {
@@ -163,6 +164,17 @@ const DocumentUploadCard = ({
           </>
         )}
       </TouchableOpacity>
+
+      {/* View button — only shown when document has been uploaded */}
+      {hasData && onView && (
+        <TouchableOpacity
+          style={styles.viewButton}
+          onPress={onView}
+        >
+          <Ionicons name="eye-outline" size={16} color={COLORS.primary} />
+          <Text style={styles.viewButtonText}>View Document</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -256,6 +268,23 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     fontSize: 13,
     fontWeight: '600',
+    color: COLORS.primary,
+    marginLeft: 6,
+  },
+  viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}50`,
+  },
+  viewButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
     color: COLORS.primary,
     marginLeft: 6,
   },

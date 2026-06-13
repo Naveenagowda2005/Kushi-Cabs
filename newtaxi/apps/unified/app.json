@@ -23,7 +23,7 @@
     "android": {
       "versionCode": 18,
       "adaptiveIcon": {
-        "foregroundImage": "./logo.png",
+        "foregroundImage": "./adaptive-icon.png",
         "backgroundColor": "#001a33"
       },
       "config": {
