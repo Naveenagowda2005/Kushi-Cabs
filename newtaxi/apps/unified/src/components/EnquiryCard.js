@@ -334,8 +334,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tripType: {
-    color: '#888',
-    fontSize: Math.max(12, screenWidth * 0.03),
+    color: '#ff9800',
+    fontSize: Math.max(18, screenWidth * 0.045),
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,

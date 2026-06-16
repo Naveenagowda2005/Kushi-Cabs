@@ -110,18 +110,12 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       </View>
 
-      {/* Fare + commission badges */}
+      {/* Fare badge */}
       <View style={styles.badgeRow}>
         <View style={styles.fareBadge}>
           <Ionicons name="cash-outline" size={14} color="#fff" />
-          <Text style={styles.fareText}>₹{trip.fare_amount}</Text>
+          <Text style={styles.fareText}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
         </View>
-        {commissionToPay > 0 && (
-          <View style={styles.commissionBadge}>
-            <Ionicons name="trending-up-outline" size={12} color="#fff" />
-            <Text style={styles.commissionText}>₹{commissionToPay.toFixed(2)}</Text>
-          </View>
-        )}
       </View>
 
       {/* Pickup */}
@@ -135,7 +129,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
 
       {/* Dropoff */}
       <View style={styles.row}>
-        <Ionicons name="flag" size={16} color="#1a1a2e" />
+        <Ionicons name="flag" size={16} color="#e94560" />
         <View style={styles.locationContent}>
           <Text style={styles.locationLabel}>Dropoff</Text>
           <Text style={styles.location} numberOfLines={2}>{trip.dropoff_location}</Text>
@@ -194,7 +188,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             color={trip.toll_included ? "#4caf50" : "#ff9800"}
           />
           <Text style={[styles.inclusionText, trip.toll_included ? styles.includedText : styles.excludedText]}>
-            Toll {trip.toll_included ? "✓" : "✗"}
+            Toll {trip.toll_included ? "Included" : "Excluded"}
           </Text>
         </View>
         <View style={[styles.inclusionBadge, trip.state_tax_included ? styles.includedBadge : styles.excludedBadge]}>
@@ -204,21 +198,19 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             color={trip.state_tax_included ? "#4caf50" : "#ff9800"}
           />
           <Text style={[styles.inclusionText, trip.state_tax_included ? styles.includedText : styles.excludedText]}>
-            Tax {trip.state_tax_included ? "✓" : "✗"}
+            Tax {trip.state_tax_included ? "Included" : "Excluded"}
           </Text>
         </View>
-        {trip.pet_travelling === true && (
-          <View style={[styles.inclusionBadge, styles.petBadge]}>
-            <Ionicons 
-              name="paw-outline" 
-              size={12} 
-              color="#ff6b6b"
-            />
-            <Text style={[styles.inclusionText, styles.petText]}>
-              🐾 Pet
-            </Text>
-          </View>
-        )}
+        <View style={[styles.inclusionBadge, trip.pet_travelling === true ? styles.petAllowedBadge : styles.petNotAllowedBadge]}>
+          <Ionicons 
+            name={trip.pet_travelling === true ? "paw-outline" : "close-circle-outline"} 
+            size={12} 
+            color={trip.pet_travelling === true ? "#ff6b6b" : "#ff9800"}
+          />
+          <Text style={[styles.inclusionText, trip.pet_travelling === true ? styles.petAllowedText : styles.petNotAllowedText]}>
+            {trip.pet_travelling === true ? "🐾 Pet Allowed" : "🚫 Pet Not Allowed"}
+          </Text>
+        </View>
       </View>
 
       {/* Departure Time */}
@@ -275,9 +267,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tripType: {
-    color: '#888',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#ff9800',
+    fontSize: 20,
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -419,6 +411,20 @@ const styles = StyleSheet.create({
   },
   petText: {
     color: '#ff6b6b',
+  },
+  petAllowedBadge: {
+    backgroundColor: '#4a1a1a',
+    borderColor: '#ff6b6b66',
+  },
+  petAllowedText: {
+    color: '#ff6b6b',
+  },
+  petNotAllowedBadge: {
+    backgroundColor: '#2a1a00',
+    borderColor: '#ff980066',
+  },
+  petNotAllowedText: {
+    color: '#ff9800',
   },
   lockRow: {
     flexDirection: 'row',

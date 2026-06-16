@@ -50,7 +50,7 @@ export async function acceptTrip(tripId, userId) {
       p_trip_id:     tripId,
       p_user_id:     userId,
       p_role:        ROLES.DRIVER,
-      p_min_balance: 0, // Set to 0 for testing - allow zero balance
+      p_min_balance: 0, // Balance check already done before this call
     });
 
     if (error) throw error;

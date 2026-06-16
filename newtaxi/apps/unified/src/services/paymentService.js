@@ -95,7 +95,7 @@ async function startPhonePeCheckout({ amount, orderId }) {
 
 /**
  * Initiates a wallet deposit flow.
- * 1. Creates a payment order record in DB
+ * 1. Creates a payment order record in DB via RPC
  * 2. Opens the selected gateway flow (Razorpay or PhonePe)
  * 3. On success, credits wallet via RPC or leaves a pending PhonePe order for confirmation
  */
@@ -104,42 +104,26 @@ export async function initiateDeposit({ userId, amount, userEmail, userName, gat
     throw new Error(`Minimum deposit amount is ₹${minAmount}`);
   }
 
-  // 1. Create order record in DB
-  const orderPayload = {
-    user_id:          userId,
-    type:             'deposit',
-    amount,
-    status:           'pending',
-    gateway,
-    razorpay_order_id: gateway === PAYMENT_GATEWAYS.RAZORPAY ? `order_${Date.now()}` : null,
-    phonepe_order_id: gateway === PAYMENT_GATEWAYS.PHONEPE ? `phonepe_${Date.now()}` : null,
-  };
+  // 1. Create order record in DB via RPC (bypasses RLS)
+  const phonepeOrderId = gateway === PAYMENT_GATEWAYS.PHONEPE ? `phonepe_${Date.now()}` : null;
+  
+  const { data: orderId, error: rpcErr } = await supabase.rpc('insert_payment_order', {
+    p_user_id: userId,
+    p_type: 'deposit',
+    p_amount: amount,
+    p_gateway: gateway,
+    p_phonepe_order_id: phonepeOrderId,
+  });
 
-  let { data: order, error: orderErr } = await supabase
-    .from('payment_orders')
-    .insert(orderPayload)
-    .select()
-    .single();
-
-  if (orderErr && orderErr.code === 'PGRST204' && /gateway|phonepe_order_id|phonepe_payment_id/.test(orderErr.message)) {
-    const fallbackPayload = { ...orderPayload };
-    delete fallbackPayload.gateway;
-    delete fallbackPayload.phonepe_order_id;
-    delete fallbackPayload.phonepe_payment_id;
-
-    ({ data: order, error: orderErr } = await supabase
-      .from('payment_orders')
-      .insert(fallbackPayload)
-      .select()
-      .single());
+  if (rpcErr) {
+    console.error('RPC insert_payment_order error:', rpcErr);
+    throw new Error('Failed to create payment order: ' + rpcErr.message);
   }
-
-  if (orderErr) throw orderErr;
 
   // 2. Handle PhonePe payment
   if (gateway === PAYMENT_GATEWAYS.PHONEPE) {
     try {
-      const result = await startPhonePeCheckout({ amount, orderId: order.id });
+      const result = await startPhonePeCheckout({ amount, orderId: orderId });
       if (result.pending) {
         return {
           success: true,
@@ -149,7 +133,7 @@ export async function initiateDeposit({ userId, amount, userEmail, userName, gat
       }
     } catch (err) {
       // Update order as failed
-      await supabase.from('payment_orders').update({ status: 'failed' }).eq('id', order.id);
+      await supabase.from('payment_orders').update({ status: 'failed' }).eq('id', orderId);
       throw err;  // Re-throw to let caller handle it
     }
   }
@@ -162,7 +146,7 @@ export async function initiateDeposit({ userId, amount, userEmail, userName, gat
     key:          RAZORPAY_KEY_ID,
     amount:       amount * 100,  // Razorpay uses paise
     name:         'Taxi Service',
-    order_id:     order.razorpay_order_id,
+    order_id:     `order_${Date.now()}`,
     prefill: {
       email: userEmail ?? '',
       name:  userName  ?? '',
@@ -180,7 +164,7 @@ export async function initiateDeposit({ userId, amount, userEmail, userName, gat
         // Payment successful — credit wallet
         const { data, error } = await supabase.rpc('verify_and_credit_deposit', {
           p_user_id:    userId,
-          p_order_id:   order.razorpay_order_id,
+          p_order_id:   options.order_id,
           p_payment_id: paymentData.razorpay_payment_id,
           p_amount:     amount,
         });
@@ -194,7 +178,7 @@ export async function initiateDeposit({ userId, amount, userEmail, userName, gat
         // User cancelled or payment failed
         supabase.from('payment_orders')
           .update({ status: 'failed' })
-          .eq('id', order.id);
+          .eq('id', orderId);
 
         reject(new Error(error.description ?? 'Payment cancelled'));
       });

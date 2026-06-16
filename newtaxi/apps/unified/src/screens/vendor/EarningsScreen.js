@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     fontWeight: '600' 
   },
   sectionCount: { 
-    color: '#666', 
+    color: '#aaa', 
     fontSize: Math.max(12, screenWidth * 0.032) 
   },
   transactionsList: {
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     textAlign: 'center' 
   },
   emptySubtext: { 
-    color: '#666', 
+    color: '#aaa', 
     fontSize: Math.max(13, screenWidth * 0.035), 
     marginTop: 4, 
     textAlign: 'center' 

@@ -257,7 +257,7 @@ export default function DriverDashboardScreen({ navigation }) {
                     {item.pickup_location} → {item.dropoff_location}
                   </Text>
                 </View>
-                <Text style={styles.tripFare}>₹{item.fare_amount}</Text>
+                <Text style={styles.tripFare}>₹{(item.fare_amount - (item.commission_amount || 0)).toFixed(2)}</Text>
               </View>
 
               {/* Creator/Vendor Details */}
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   myTripFare: {
-    color: '#1a1a2e',
+    color: '#4caf50',
     fontSize: 18,
     fontWeight: '700',
     marginLeft: 12,
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tripFare: {
-    color: '#1a1a2e',
+    color: '#4caf50',
     fontSize: 18,
     fontWeight: '700',
     marginLeft: 12,

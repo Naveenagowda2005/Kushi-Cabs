@@ -21,7 +21,7 @@ export const TRANSACTION_TYPES = {
 };
 
 // Minimum wallet balance required for a driver to accept a trip
-export const MIN_WALLET_BALANCE = 100;
+export const MIN_WALLET_BALANCE = 500;
 
 // How long vendors have exclusive access to new trips (ms)
 export const VENDOR_WINDOW_MS = 5 * 60 * 1000;

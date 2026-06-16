@@ -269,7 +269,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         )}
 
         <View style={styles.sectionHeader}>
-          <Ionicons name="layers-outline" size={18} color="#1a1a2e" />
+          <Ionicons name="layers-outline" size={18} color="#2196f3" />
           <Text style={styles.sectionTitle}>Trip Type</Text>
         </View>
 
@@ -316,7 +316,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         )}
 
         <View style={styles.sectionHeader}>
-          <Ionicons name="location-outline" size={18} color="#1a1a2e" />
+          <Ionicons name="location-outline" size={18} color="#2196f3" />
           <Text style={styles.sectionTitle}>Trip Details</Text>
         </View>
 
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
   breakdownValue: { color: '#fff', fontSize: 13, fontWeight: '600' },
   breakdownTotal: { borderTopWidth: 1, borderTopColor: '#0f3460', paddingTop: 8, marginTop: 4, marginBottom: 0 },
   breakdownTotalLabel: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  breakdownTotalValue: { color: '#1a1a2e', fontSize: 16, fontWeight: '700' },
+  breakdownTotalValue: { color: '#4caf50', fontSize: 16, fontWeight: '700' },
   infoBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#2a1a00', borderRadius: 10, padding: 12, marginBottom: 20 },
   infoText: { color: '#ff9800', fontSize: 12, flex: 1, lineHeight: 18 },
   createBtn: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 8 },

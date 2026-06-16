@@ -101,7 +101,7 @@ export default function DriverTripHistoryScreen({ navigation }) {
               {item.segment?.name?.toUpperCase() || 'ONE WAY'}
             </Text>
           </View>
-          <Text style={styles.fare}>₹{item.fare_amount}</Text>
+          <Text style={styles.fare}>₹{(item.fare_amount - (item.commission_amount || 0)).toFixed(2)}</Text>
         </View>
 
         <View style={styles.row}>
@@ -211,7 +211,7 @@ export default function DriverTripHistoryScreen({ navigation }) {
         renderItem={({ item }) => <TripCard item={item} />}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchTrips} tintColor="#1a1a2e" colors={['#1a1a2e']} />
+          <RefreshControl refreshing={loading} onRefresh={fetchTrips} tintColor="#4caf50" colors={['#4caf50']} />
         }
         ListEmptyComponent={
           !loading && (
@@ -246,19 +246,19 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 6 },
   fare: { color: '#4caf50', fontWeight: 'bold', fontSize: 16 },
   tripTypeBadge: { backgroundColor: '#0f3460', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, flex: 1 },
-  tripTypeText: { color: '#888', fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  tripTypeText: { color: '#ff9800', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   location: { color: '#ccc', fontSize: 13, flex: 1 },
   meta: { color: '#aaa', fontSize: 12, flex: 1 },
   commission: { color: '#4caf50', fontSize: 12 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8 },
-  date: { color: '#555', fontSize: 11, flex: 1 },
+  date: { color: '#aaa', fontSize: 11, flex: 1 },
   actionButtonsRow: { flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', marginTop: 12, gap: 8, flexWrap: 'wrap' },
   viewDetailsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2196f3', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   viewDetailsBtnText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2a1a00', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   contactBtnText: { color: '#ff9800', fontSize: 11, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 80 },
-  emptyText: { color: '#888', fontSize: 16, marginTop: 12 },
-  emptySubtext: { color: '#555', fontSize: 13, marginTop: 4 },
+  emptyText: { color: '#aaa', fontSize: 16, marginTop: 12 },
+  emptySubtext: { color: '#aaa', fontSize: 13, marginTop: 4 },
 });

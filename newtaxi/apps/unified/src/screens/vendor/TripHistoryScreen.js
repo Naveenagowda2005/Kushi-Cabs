@@ -80,7 +80,7 @@ export default function VendorTripHistoryScreen() {
           <Text style={styles.location} numberOfLines={1}>{item.pickup_location}</Text>
         </View>
         <View style={styles.row}>
-          <Ionicons name="flag" size={14} color="#1a1a2e" />
+          <Ionicons name="flag" size={14} color="#e94560" />
           <Text style={styles.location} numberOfLines={1}>{item.dropoff_location}</Text>
         </View>
 
@@ -143,7 +143,7 @@ export default function VendorTripHistoryScreen() {
         renderItem={({ item }) => <TripCard item={item} />}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchTrips} tintColor="#1a1a2e" colors={['#1a1a2e']} />
+          <RefreshControl refreshing={loading} onRefresh={fetchTrips} tintColor="#e94560" colors={['#e94560']} />
         }
         ListEmptyComponent={
           !loading && (
@@ -175,12 +175,12 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 100 },
   card: { backgroundColor: '#16213e', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#1a1a2e' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  fare: { color: '#1a1a2e', fontWeight: 'bold', fontSize: 16 },
+  fare: { color: '#4caf50', fontWeight: 'bold', fontSize: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   location: { color: '#ccc', fontSize: 13, flex: 1 },
   meta: { color: '#888', fontSize: 12, flex: 1 },
   commission: { color: '#4caf50', fontSize: 12 },
-  date: { color: '#555', fontSize: 11, marginTop: 6 },
+  date: { color: '#aaa', fontSize: 11, marginTop: 6 },
   empty: { alignItems: 'center', paddingTop: 80 },
-  emptyText: { color: '#555', fontSize: 16, marginTop: 12 },
+  emptyText: { color: '#aaa', fontSize: 16, marginTop: 12 },
 });

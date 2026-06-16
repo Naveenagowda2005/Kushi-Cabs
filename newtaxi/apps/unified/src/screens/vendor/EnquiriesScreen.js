@@ -126,7 +126,7 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         <Text style={styles.myTripLocation} numberOfLines={1}>{item.pickup_location}</Text>
       </View>
       <View style={styles.row}>
-        <Ionicons name="flag" size={14} color="#1a1a2e" />
+        <Ionicons name="flag" size={14} color="#e94560" />
         <Text style={styles.myTripLocation} numberOfLines={1}>{item.dropoff_location}</Text>
       </View>
       {item.return_location && (
@@ -632,8 +632,8 @@ export default function VendorEnquiriesScreen({ navigation }) {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={activeTab === 0 ? refetchEnq : refetchTrips}
-            tintColor="#1a1a2e"
-            colors={['#1a1a2e']}
+            tintColor="#e94560"
+            colors={['#e94560']}
           />
         }
       />
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 2,
   },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#1a1a2e' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: '#e94560' },
   tabText: {
     color: '#888',
     fontSize: Math.max(13, screenWidth * 0.035),
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabTextActive: { color: '#fff' },
-  badge: { color: '#1a1a2e' },
+  badge: { color: '#e94560' },
   list: {
     padding: screenWidth * 0.04,
     flexGrow: 1,
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenWidth * 0.1,
   },
   emptyText: {
-    color: '#555',
+    color: '#aaa',
     fontSize: Math.max(15, screenWidth * 0.04),
     marginTop: 12,
     textAlign: 'center',
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenWidth * 0.04,
     paddingVertical: 10,
   },
-  errorText: { color: '#1a1a2e', fontSize: Math.max(12, screenWidth * 0.032), flex: 1, marginRight: 8 },
+  errorText: { color: '#ff9800', fontSize: Math.max(12, screenWidth * 0.032), flex: 1, marginRight: 8 },
   retryText: { color: '#fff', fontSize: Math.max(12, screenWidth * 0.032), fontWeight: '600' },
   myTripCard: {
     backgroundColor: '#16213e',
@@ -720,8 +720,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   tripTypeBadgeText: {
-    color: '#2196f3',
-    fontSize: Math.max(12, screenWidth * 0.032),
+    color: '#ff9800',
+    fontSize: Math.max(16, screenWidth * 0.04),
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
   myTripFare: { color: '#4caf50', fontWeight: 'bold', fontSize: Math.max(15, screenWidth * 0.04) },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, flex: 1 },
   myTripLocation: { color: '#ccc', fontSize: Math.max(12, screenWidth * 0.032), flex: 1 },
-  myTripDate: { color: '#555', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 6 },
+  myTripDate: { color: '#aaa', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 6 },
   myTripReturnDate: { color: '#ff9800', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 4, fontWeight: '600' },
   carDetailsRow: {
     flexDirection: 'row',

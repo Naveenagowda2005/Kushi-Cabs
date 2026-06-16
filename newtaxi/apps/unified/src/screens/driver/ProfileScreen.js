@@ -169,33 +169,47 @@ export default function DriverProfileScreen({ navigation }) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/delete-user`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: user.id,
-                  phone: user.phone,
-                  email: `${user.phone}@kushicabs.phone`
-                })
-              });
+          onPress: () => {
+            // Second confirmation
+            Alert.alert(
+              '⚠️ Confirm Deletion',
+              'Are you absolutely sure? You cannot recover this account.',
+              [
+                { text: 'No, Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete Permanently',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/delete-user`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          userId: user.id,
+                          phone: user.phone,
+                          email: `${user.phone}@kushicabs.phone`
+                        })
+                      });
 
-              const result = await response.json();
+                      const result = await response.json();
 
-              if (!response.ok) {
-                throw new Error(result.error || result.message || 'Failed to delete account');
-              }
+                      if (!response.ok) {
+                        throw new Error(result.error || result.message || 'Failed to delete account');
+                      }
 
-              Alert.alert(
-                '✅ Account Deleted',
-                'Your account has been successfully deleted.',
-                [{ text: 'OK', onPress: () => signOut() }]
-              );
-            } catch (err) {
-              console.error('Delete account error:', err);
-              Alert.alert('Error', err.message || 'Failed to delete account');
-            }
+                      Alert.alert(
+                        '✅ Account Deleted',
+                        'Your account has been successfully deleted.',
+                        [{ text: 'OK', onPress: () => signOut() }]
+                      );
+                    } catch (err) {
+                      console.error('Delete account error:', err);
+                      Alert.alert('Error', err.message || 'Failed to delete account');
+                    }
+                  },
+                },
+              ]
+            );
           },
         },
       ]
@@ -203,7 +217,28 @@ export default function DriverProfileScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+    <View style={styles.screenContainer}>
+      {/* Header with Settings */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <TouchableOpacity 
+          style={styles.settingsBtn}
+          onPress={() => {
+            Alert.alert(
+              'Settings',
+              'What would you like to do?',
+              [
+                { text: 'Delete Account', style: 'destructive', onPress: () => handleDeleteAccount() },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
       {/* Avatar */}
       <View style={styles.avatarWrap}>
         <TouchableOpacity onPress={handlePickPhoto} disabled={uploading} style={styles.avatarContainer}>
@@ -328,7 +363,7 @@ export default function DriverProfileScreen({ navigation }) {
           <TouchableOpacity key={item.label} style={styles.menuItem} onPress={item.onPress}>
             <Ionicons name={item.icon} size={22} color="#aaa" />
             <Text style={styles.menuLabel}>{item.label}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#555" />
+            <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </TouchableOpacity>
         ))}
       </View>
@@ -336,14 +371,6 @@ export default function DriverProfileScreen({ navigation }) {
       <TouchableOpacity style={styles.signOut} onPress={signOut}>
         <Ionicons name="log-out-outline" size={20} color="#ef5350" />
         <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={[styles.signOut, { borderColor: '#d32f2f88', marginTop: 12 }]} 
-        onPress={() => handleDeleteAccount()}
-      >
-        <Ionicons name="trash-outline" size={20} color="#d32f2f" />
-        <Text style={[styles.signOutText, { color: '#d32f2f' }]}>Delete Account</Text>
       </TouchableOpacity>
 
       {/* Document Preview Modal */}
@@ -387,11 +414,27 @@ export default function DriverProfileScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContainer: { flex: 1, backgroundColor: '#0d0f1a' },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 16, 
+    paddingTop: 12, 
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#16213e',
+    backgroundColor: '#0d0f1a',
+  },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  settingsBtn: { padding: 8 },
+  
   container: { flex: 1, backgroundColor: '#0d0f1a' },
   scroll: { padding: 20, paddingTop: 56, paddingBottom: 40 },
 
@@ -402,10 +445,10 @@ const styles = StyleSheet.create({
   avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#16213e', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#4caf50' },
   avatarText: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
   cameraOverlay: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#4caf50', borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
-  photoHint: { color: '#555', fontSize: 11, marginBottom: 8 },
+  photoHint: { color: '#aaa', fontSize: 11, marginBottom: 8 },
   name: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   phone: { color: '#888', fontSize: 14, marginBottom: 8 },
-  userId: { color: '#555', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
+  userId: { color: '#aaa', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
   roleBadge: { backgroundColor: '#4caf5020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#4caf50' },
   roleText: { color: '#4caf50', fontSize: 12, fontWeight: '600' },
 
@@ -424,12 +467,12 @@ const styles = StyleSheet.create({
   sectionBadgeText: { color: '#4caf50', fontSize: 11, fontWeight: '700' },
   sectionCount: { color: '#888', fontSize: 12 },
   emptyDocs: { alignItems: 'center', paddingVertical: 24, gap: 8, paddingTop: 16 },
-  emptyDocsText: { color: '#555', fontSize: 13 },
+  emptyDocsText: { color: '#aaa', fontSize: 13 },
   docRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#1a1a2e', gap: 12, marginTop: 4 },
   docIcon: { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   docInfo: { flex: 1 },
   docName: { color: '#fff', fontSize: 13, fontWeight: '500', marginBottom: 2 },
-  docDate: { color: '#666', fontSize: 11 },
+  docDate: { color: '#aaa', fontSize: 11 },
   docRejectionReason: { color: '#ef5350', fontSize: 11 },
   docStatus: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   docStatusText: { fontSize: 11, fontWeight: '600' },
@@ -463,5 +506,5 @@ const styles = StyleSheet.create({
   rejectionText: { color: '#ddd', fontSize: 12 },
   previewImage: { width: '100%', height: 320, borderRadius: 10, backgroundColor: '#0d0f1a' },
   noPreview: { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  noPreviewText: { color: '#555', fontSize: 13 },
+  noPreviewText: { color: '#aaa', fontSize: 13 },
 });

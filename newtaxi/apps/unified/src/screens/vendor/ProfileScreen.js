@@ -229,33 +229,47 @@ export default function VendorProfileScreen({ navigation }) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/delete-user`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: user.id,
-                  phone: user.phone,
-                  email: `${user.phone}@kushicabs.phone`
-                })
-              });
+          onPress: () => {
+            // Second confirmation
+            Alert.alert(
+              '⚠️ Confirm Deletion',
+              'Are you absolutely sure? You cannot recover this account.',
+              [
+                { text: 'No, Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete Permanently',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/delete-user`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          userId: user.id,
+                          phone: user.phone,
+                          email: `${user.phone}@kushicabs.phone`
+                        })
+                      });
 
-              const result = await response.json();
+                      const result = await response.json();
 
-              if (!response.ok) {
-                throw new Error(result.error || result.message || 'Failed to delete account');
-              }
+                      if (!response.ok) {
+                        throw new Error(result.error || result.message || 'Failed to delete account');
+                      }
 
-              Alert.alert(
-                '✅ Account Deleted',
-                'Your account has been successfully deleted.',
-                [{ text: 'OK', onPress: () => signOut() }]
-              );
-            } catch (err) {
-              console.error('Delete account error:', err);
-              Alert.alert('Error', err.message || 'Failed to delete account');
-            }
+                      Alert.alert(
+                        '✅ Account Deleted',
+                        'Your account has been successfully deleted.',
+                        [{ text: 'OK', onPress: () => signOut() }]
+                      );
+                    } catch (err) {
+                      console.error('Delete account error:', err);
+                      Alert.alert('Error', err.message || 'Failed to delete account');
+                    }
+                  },
+                },
+              ]
+            );
           },
         },
       ]
@@ -263,7 +277,28 @@ export default function VendorProfileScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+    <View style={styles.screenContainer}>
+      {/* Header with Settings */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <TouchableOpacity 
+          style={styles.settingsBtn}
+          onPress={() => {
+            Alert.alert(
+              'Settings',
+              'What would you like to do?',
+              [
+                { text: 'Delete Account', style: 'destructive', onPress: () => handleDeleteAccount() },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
       {/* Avatar — sourced from VENDOR_SELFIE document */}
       <View style={styles.avatarWrap}>
         <View style={styles.avatarContainer}>
@@ -391,14 +426,6 @@ export default function VendorProfileScreen({ navigation }) {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[styles.signOut, { borderColor: '#d32f2f88', marginTop: 12 }]} 
-        onPress={() => handleDeleteAccount()}
-      >
-        <Ionicons name="trash-outline" size={20} color="#d32f2f" />
-        <Text style={[styles.signOutText, { color: '#d32f2f' }]}>Delete Account</Text>
-      </TouchableOpacity>
-
       {/* Document Preview Modal */}
       <Modal visible={!!previewDoc} transparent animationType="fade" onRequestClose={() => setPreviewDoc(null)}>
         <View style={styles.modalOverlay}>
@@ -444,11 +471,27 @@ export default function VendorProfileScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContainer: { flex: 1, backgroundColor: '#0f3460' },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 16, 
+    paddingTop: 12, 
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#16213e',
+    backgroundColor: '#0f3460',
+  },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  settingsBtn: { padding: 8 },
+  
   container: { flex: 1, backgroundColor: '#0f3460' },
   scroll: { padding: 24, paddingTop: 60, paddingBottom: 40 },
 
@@ -460,7 +503,7 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
   name: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   phone: { color: '#888', fontSize: 14, marginBottom: 4 },
-  userId: { color: '#555', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
+  userId: { color: '#aaa', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
   company: { color: '#aaa', fontSize: 13, marginBottom: 8 },
   roleBadge: { backgroundColor: '#e9456020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#e94560', alignItems: 'center' },
   roleText: { color: '#e94560', fontSize: 12, fontWeight: '600' },
@@ -482,7 +525,7 @@ const styles = StyleSheet.create({
   docIcon: { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   docInfo: { flex: 1 },
   docName: { color: '#fff', fontSize: 13, fontWeight: '500', marginBottom: 2 },
-  docDate: { color: '#666', fontSize: 11 },
+  docDate: { color: '#aaa', fontSize: 11 },
   docRejection: { color: '#ef5350', fontSize: 11 },
   docPending: { color: '#ff9800', fontSize: 11 },
   docStatus: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -517,5 +560,5 @@ const styles = StyleSheet.create({
   rejectionText: { color: '#ddd', fontSize: 12 },
   previewImage: { width: '100%', height: 320, borderRadius: 10, backgroundColor: '#0d0f1a' },
   noPreview: { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  noPreviewText: { color: '#555', fontSize: 13 },
+  noPreviewText: { color: '#aaa', fontSize: 13 },
 });

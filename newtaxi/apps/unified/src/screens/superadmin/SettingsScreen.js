@@ -202,13 +202,15 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         if (!response.ok) {
           console.warn('Could not update auth account:', result.error);
           // Non-fatal — users table already updated
+        } else {
+          console.log('✅ Auth account updated, old phone freed:', result.oldPhoneFreed);
         }
 
         await refreshUserProfile();
         setIsEditing(false);
         Alert.alert(
           '✅ Phone Updated',
-          `Your phone number has been changed to ${phoneDigits}.\n\nPlease log in again with the new number.`,
+          `Your phone number has been changed to ${phoneDigits}.\n\nThe old number (${user.phone}) is now free and can be used for other accounts.\n\nPlease log in again with the new number.`,
           [{ text: 'OK', onPress: () => signOut() }]
         );
         return;

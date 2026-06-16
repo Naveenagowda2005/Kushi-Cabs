@@ -380,7 +380,7 @@ export default function SuperAdminTripsScreen() {
             </Text>
           </View>
           <View style={styles.locationRow}>
-            <Ionicons name="flag" size={14} color="#1a1a2e" />
+            <Ionicons name="flag" size={14} color="#e94560" />
             <Text style={styles.locationText} numberOfLines={1}>
               {item.dropoff_location}
             </Text>
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   fare: {
-    color: '#1a1a2e',
+    color: '#4caf50',
     fontWeight: 'bold',
     fontSize: 16,
   },

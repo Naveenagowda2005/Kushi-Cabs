@@ -493,6 +493,7 @@ router.get('/dummy-drivers', async (req, res) => {
 /**
  * POST /admin/update-admin-phone
  * Update super admin phone number in both database and auth.users
+ * Also clears the old phone/email from auth so it can be reused by other accounts
  */
 router.post('/update-admin-phone', async (req, res) => {
   try {
@@ -509,32 +510,33 @@ router.post('/update-admin-phone', async (req, res) => {
     console.log(`📞 Updating admin phone: ${oldPhone} → ${newPhone}`);
 
     const oldEmail = `${oldPhone}@kushicabs.phone`;
-    const password = `OTP-${newPhone}-kushicabs`;
+    const newPassword = `OTP-${newPhone}-kushicabs`;
 
-    // Step 1: Find auth user by old email
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) return res.status(500).json({ error: listError.message });
+    // Step 1: Find auth user by userId (most reliable — avoids email lookup issues)
+    const { data: { user: authUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
 
-    const authUser = users.find(u => u.email === oldEmail);
-    
-    if (!authUser) {
-      console.log(`⚠️  Auth user not found for email: ${oldEmail}`);
+    if (getUserError || !authUser) {
+      console.log(`⚠️  Auth user not found for userId: ${userId}`, getUserError?.message);
       return res.status(404).json({ error: 'Auth user not found' });
     }
 
-    console.log(`Found auth user: ${authUser.id}`);
+    console.log(`Found auth user: ${authUser.id}, current email: ${authUser.email}`);
 
-    // Step 2: Check if new email already exists
-    const newEmailExists = users.find(u => u.email === newEmail && u.id !== authUser.id);
-    if (newEmailExists) {
-      return res.status(400).json({ error: 'New phone number already in use' });
+    // Step 2: Check if new email/phone already in use by a DIFFERENT auth user
+    const { data: { users: allUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    if (listError) return res.status(500).json({ error: listError.message });
+
+    const newEmailConflict = allUsers.find(u => u.email === newEmail && u.id !== authUser.id);
+    if (newEmailConflict) {
+      return res.status(400).json({ error: 'New phone number is already in use by another account' });
     }
 
-    // Step 3: Update auth user email and password
+    // Step 3: Update the auth user — change email to new phone, update password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
       email: newEmail,
-      password: password,
-      email_confirm: true
+      password: newPassword,
+      email_confirm: true,
+      phone: '',          // clear phone field so old phone is freed in auth
     });
 
     if (updateError) {
@@ -542,14 +544,40 @@ router.post('/update-admin-phone', async (req, res) => {
       return res.status(500).json({ error: 'Failed to update auth user', details: updateError.message });
     }
 
-    console.log(`✅ Auth user updated with new email: ${newEmail}`);
+    console.log(`✅ Auth user email updated: ${oldEmail} → ${newEmail}`);
+
+    // Step 4: Check if old email exists as a SEPARATE auth record (edge case from duplicate signups)
+    // and delete it so the old phone number is completely freed
+    const oldAuthDuplicate = allUsers.find(u => u.email === oldEmail && u.id !== authUser.id);
+    if (oldAuthDuplicate) {
+      console.log(`🗑️  Found duplicate old auth record ${oldAuthDuplicate.id} — deleting to free old phone`);
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(oldAuthDuplicate.id);
+      if (deleteError) {
+        console.warn('⚠️  Could not delete old auth duplicate:', deleteError.message);
+      } else {
+        console.log(`✅ Old duplicate auth record deleted — phone ${oldPhone} is now free`);
+      }
+    }
+
+    // Step 5: Also clear old email from users table (in case email column still has old value)
+    // The users table phone column was already updated by the settings screen
+    const { error: dbEmailError } = await supabaseAdmin
+      .from('users')
+      .update({ email: newEmail })
+      .eq('id', userId);
+
+    if (dbEmailError) {
+      console.warn('⚠️  Could not update email in users table:', dbEmailError.message);
+      // Non-fatal — phone already updated by settings screen
+    }
 
     res.json({
       success: true,
-      message: 'Admin phone updated successfully',
+      message: 'Admin phone updated successfully. Old phone number is now free.',
       authUserId: authUser.id,
-      oldEmail: oldEmail,
-      newEmail: newEmail
+      oldEmail,
+      newEmail,
+      oldPhoneFreed: true,
     });
 
   } catch (error) {

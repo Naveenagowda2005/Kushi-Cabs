@@ -16,8 +16,6 @@ export default function VendorMyTripsScreen({ navigation }) {
   const [publishing, setPublishing] = useState(null);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(null);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const fetchMyTrips = useCallback(async () => {
     if (!user?.id) return;
@@ -48,30 +46,15 @@ export default function VendorMyTripsScreen({ navigation }) {
     }, [fetchMyTrips])
   );
 
-  const refreshTrips = async () => {
-    if (!user?.id) return;
-    try {
-      const { data, error } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('created_by', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTrips(data || []);
-    } catch (err) {
-      console.error('Error refreshing trips:', err.message);
-    }
-  };
-
   const handlePublish = async (tripId) => {
     setPublishing(tripId);
     try {
       // Immediately update local state FIRST for instant UI feedback
-      const newTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: true } : trip
+      setTrips(prevTrips =>
+        prevTrips.map(trip =>
+          trip.id === tripId ? { ...trip, is_published: true } : trip
+        )
       );
-      setTrips(newTrips);
 
       // Then update database
       const { error } = await supabase
@@ -81,15 +64,15 @@ export default function VendorMyTripsScreen({ navigation }) {
 
       if (error) throw error;
 
-      setSuccessMessage('✅ Published - Trip is now visible to all drivers');
-      setShowSuccessModal(true);
+      Alert.alert('✅ Published', 'Trip is now visible to all drivers');
     } catch (err) {
       console.error('Error publishing trip:', err.message);
       // Revert if error
-      const revertedTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: false } : trip
+      setTrips(prevTrips =>
+        prevTrips.map(trip =>
+          trip.id === tripId ? { ...trip, is_published: false } : trip
+        )
       );
-      setTrips(revertedTrips);
       Alert.alert('Error', 'Failed to publish trip');
     } finally {
       setPublishing(null);
@@ -100,10 +83,11 @@ export default function VendorMyTripsScreen({ navigation }) {
     setPublishing(tripId);
     try {
       // Immediately update local state FIRST for instant UI feedback
-      const newTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: false } : trip
+      setTrips(prevTrips =>
+        prevTrips.map(trip =>
+          trip.id === tripId ? { ...trip, is_published: false } : trip
+        )
       );
-      setTrips(newTrips);
 
       // Then update database
       const { error } = await supabase
@@ -113,15 +97,15 @@ export default function VendorMyTripsScreen({ navigation }) {
 
       if (error) throw error;
 
-      setSuccessMessage('✅ Unpublished - Trip is no longer visible to drivers');
-      setShowSuccessModal(true);
+      Alert.alert('✅ Unpublished', 'Trip is no longer visible to drivers');
     } catch (err) {
       console.error('Error unpublishing trip:', err.message);
       // Revert if error
-      const revertedTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: true } : trip
+      setTrips(prevTrips =>
+        prevTrips.map(trip =>
+          trip.id === tripId ? { ...trip, is_published: true } : trip
+        )
       );
-      setTrips(revertedTrips);
       Alert.alert('Error', 'Failed to unpublish trip');
     } finally {
       setPublishing(null);
@@ -545,32 +529,6 @@ export default function VendorMyTripsScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-
-      {/* Success Modal with Refresh Button */}
-      <Modal visible={showSuccessModal} transparent animationType="fade">
-        <View style={styles.successOverlay}>
-          <View style={styles.successBox}>
-            <Text style={styles.successText}>{successMessage}</Text>
-            <View style={styles.successButtons}>
-              <TouchableOpacity
-                style={[styles.successBtn, styles.cancelBtn]}
-                onPress={() => setShowSuccessModal(false)}
-              >
-                <Text style={styles.successBtnText}>OK</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.successBtn, styles.refreshBtn]}
-                onPress={() => {
-                  setShowSuccessModal(false);
-                  refreshTrips();
-                }}
-              >
-                <Text style={styles.successBtnText}>Refresh</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -933,47 +891,5 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#0f3460',
-  },
-  successOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successBox: {
-    backgroundColor: '#16213e',
-    borderRadius: 14,
-    padding: 20,
-    minWidth: '70%',
-    borderWidth: 1,
-    borderColor: '#4caf50',
-  },
-  successText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  successButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  successBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelBtn: {
-    backgroundColor: '#555',
-  },
-  refreshBtn: {
-    backgroundColor: '#4caf50',
-  },
-  successBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

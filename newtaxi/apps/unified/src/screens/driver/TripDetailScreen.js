@@ -26,49 +26,19 @@ export default function DriverTripDetailScreen({ route, navigation }) {
   const commissionToPay = Math.max(0, commissionAmount - customerPreAdvance);
   
   const hasEnoughBalance = (wallet?.balance || 0) >= commissionToPay;
+  const MIN_WALLET_BALANCE = 500;
+  const hasMinimumBalance = (wallet?.balance || 0) >= MIN_WALLET_BALANCE;
 
-  // ── Deduct commission & accept trip ──────────────
+  // ── Accept trip after payment ──────────────
   async function acceptTripAfterPayment() {
-    // 1. Deduct commission from wallet (if needed)
-    if (commissionToPay > 0) {
-      const walletBalance = wallet?.balance || 0;
-      
-      if (walletBalance < commissionToPay) {
-        throw new Error(`Insufficient balance. Need ₹${commissionToPay.toFixed(2)}, have ₹${walletBalance.toFixed(2)}`);
-      }
+    // Mark commission as paid (payment happened via gateway, not wallet)
+    const { error: markErr } = await supabase
+      .from('trips')
+      .update({ commission_paid: true })
+      .eq('id', trip.id);
+    if (markErr) throw new Error('Failed to mark commission paid: ' + markErr.message);
 
-      // Deduct commission from driver wallet
-      const { error: updateErr } = await supabase
-        .from('wallets')
-        .update({ balance: walletBalance - commissionToPay })
-        .eq('user_id', user.id);
-
-      if (updateErr) throw new Error('Failed to deduct commission: ' + updateErr.message);
-
-      // Record transaction
-      const { data: walletData } = await supabase
-        .from('wallets').select('id').eq('user_id', user.id).single();
-
-      if (walletData) {
-        const { error: txErr } = await supabase.from('transactions').insert({
-          wallet_id:   walletData.id,
-          trip_id:     trip.id,
-          type:        TRANSACTION_TYPES.DEBIT,
-          amount:      commissionToPay,
-          description: 'Commission paid for trip',
-        });
-        if (txErr) console.error('Transaction insert error:', txErr);
-      }
-
-      // Mark commission as paid
-      const { error: markErr } = await supabase
-        .from('trips')
-        .update({ commission_paid: true })
-        .eq('id', trip.id);
-      if (markErr) console.error('Mark commission paid error:', markErr);
-    }
-
-    // 2. Accept trip using atomic RPC function (min_balance = 0 since commission already deducted)
+    // Accept trip using atomic RPC function
     const result = await acceptTrip(trip.id, user.id);
     
     if (!result.success) {
@@ -80,9 +50,19 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
   async function handlePayCommission() {
     if (commissionToPay <= 0) {
+      // Check minimum balance before accepting
+      if (!hasMinimumBalance) {
+        Alert.alert(
+          '⚠️ Minimum Balance Required',
+          `Your wallet must have at least ₹${MIN_WALLET_BALANCE} balance. Current balance: ₹${(wallet?.balance || 0).toFixed(2)}. Please add funds to your wallet first.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       Alert.alert(
         'Accept Trip',
-        'This trip does not require a gateway payment. Accept and unlock customer details?',
+        'This trip does not require a commission payment. Accept and unlock customer details?',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -122,7 +102,17 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
   async function handlePayWithGateway() {
     if (commissionToPay <= 0) {
-      Alert.alert('Nothing to pay', 'This trip does not require a gateway payment.');
+      Alert.alert('Nothing to pay', 'This trip does not require a commission payment.');
+      return;
+    }
+
+    // Check minimum balance before proceeding with payment
+    if (!hasMinimumBalance) {
+      Alert.alert(
+        '⚠️ Minimum Balance Required',
+        `Your wallet must have at least ₹${MIN_WALLET_BALANCE} balance (for potential cancellation fees). Current: ₹${(wallet?.balance || 0).toFixed(2)}. Please add funds first.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -207,8 +197,8 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
         {/* Fare card */}
         <View style={styles.fareCard}>
-          <Text style={styles.fareLabel}>Trip Fare</Text>
-          <Text style={styles.fareAmount}>₹{trip.fare_amount}</Text>
+          <Text style={styles.fareLabel}>Driver Earning</Text>
+          <Text style={styles.fareAmount}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
           {commissionAmount > 0 && (
             <View style={styles.commissionBadge}>
               <Ionicons name="trending-up-outline" size={14} color="#fff" />
@@ -279,17 +269,17 @@ export default function DriverTripDetailScreen({ route, navigation }) {
         </View>
 
         {/* Wallet balance */}
-        <View style={[styles.walletCard, !hasEnoughBalance && styles.walletCardLow]}>
-          <Ionicons name="wallet-outline" size={20} color={hasEnoughBalance ? '#4caf50' : '#ff9800'} />
+        <View style={[styles.walletCard, !hasMinimumBalance && styles.walletCardLow]}>
+          <Ionicons name="wallet-outline" size={20} color={hasMinimumBalance ? '#4caf50' : '#ff9800'} />
           <View style={{ flex: 1 }}>
             <Text style={styles.walletLabel}>Your Wallet Balance</Text>
-            <Text style={[styles.walletAmount, !hasEnoughBalance && styles.walletAmountLow]}>
+            <Text style={[styles.walletAmount, !hasMinimumBalance && styles.walletAmountLow]}>
               ₹{(wallet?.balance || 0).toFixed(2)}
             </Text>
           </View>
-          {!hasEnoughBalance && commissionAmount > 0 && (
+          {!hasMinimumBalance && (
             <Text style={styles.walletShort}>
-              Need ₹{(commissionAmount - (wallet?.balance || 0)).toFixed(2)} more
+              Need ₹{(MIN_WALLET_BALANCE - (wallet?.balance || 0)).toFixed(2)} more
             </Text>
           )}
         </View>
@@ -355,7 +345,7 @@ const styles = StyleSheet.create({
   lockedContent: { gap: 10 },
   lockedText: { color: '#888', fontSize: 12, lineHeight: 18 },
   lockedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  lockedValue: { color: '#444', fontSize: 16, letterSpacing: 4 },
+  lockedValue: { color: '#aaa', fontSize: 16, letterSpacing: 4 },
 
   infoRow: { flexDirection: 'row', alignItems: 'flex-start' },
   infoIcon: { marginRight: 12, marginTop: 2 },

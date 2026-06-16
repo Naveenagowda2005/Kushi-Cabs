@@ -50,7 +50,7 @@ export default function VendorWalletScreen() {
           <RefreshControl
             refreshing={walletLoading || txLoading}
             onRefresh={() => { refetchWallet(); refetchTx(); }}
-            tintColor="#1a1a2e" colors={['#1a1a2e']}
+            tintColor="#4caf50" colors={['#4caf50']}
           />
         }
         ListEmptyComponent={
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     fontWeight: '600' 
   },
   statLabel: { 
-    color: '#666', 
+    color: '#aaa', 
     fontSize: Math.max(10, screenWidth * 0.028),
     textAlign: 'center',
   },
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     fontWeight: '600' 
   },
   historyCount: { 
-    color: '#666', 
+    color: '#aaa', 
     fontSize: Math.max(12, screenWidth * 0.032) 
   },
   list: { paddingBottom: 24 },
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenWidth * 0.1,
   },
   emptyText: { 
-    color: '#555', 
+    color: '#aaa', 
     fontSize: Math.max(15, screenWidth * 0.04), 
     marginTop: 12,
     textAlign: 'center',
