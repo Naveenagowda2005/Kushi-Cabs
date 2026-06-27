@@ -41,6 +41,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
     tollIncluded:     editingTrip?.toll_included || false,
     stateTaxIncluded: editingTrip?.state_tax_included || false,
     petTravelling:    editingTrip?.pet_travelling || false,
+    hillsIncluded:    editingTrip?.hills_included || false,
     fixedKm:          editingTrip?.fixed_km?.toString() || '',
   });
   const [loading, setLoading] = useState(false);
@@ -193,6 +194,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         toll_included:        form.tollIncluded,
         state_tax_included:   form.stateTaxIncluded,
         pet_travelling:       form.petTravelling,
+        hills_included:       form.hillsIncluded,
       };
 
       let error;
@@ -350,7 +352,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
           value={form.fixedKm} onChangeText={(v) => update('fixedKm', v)}
           keyboardType="decimal-pad" />
 
-        <Field label="Fare Amount (₹) *" icon="cash-outline"
+        <Field label="Trip Amount (₹) *" icon="cash-outline"
           placeholder="e.g. 500"
           value={form.fareAmount} onChangeText={(v) => update('fareAmount', v)}
           keyboardType="decimal-pad" />
@@ -374,7 +376,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         {fare > 0 && commission > 0 && (
           <View style={styles.breakdownCard}>
             <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Fare Amount</Text>
+              <Text style={styles.breakdownLabel}>Trip Amount</Text>
               <Text style={styles.breakdownValue}>₹{fare.toFixed(2)}</Text>
             </View>
             <View style={styles.breakdownRow}>
@@ -511,6 +513,32 @@ export default function VendorCreateTripScreen({ navigation, route }) {
           </View>
         </View>
 
+        {/* Hills Charge Toggle */}
+        <View style={styles.toggleWrapper}>
+          <View style={styles.toggleLabel}>
+            <Ionicons name="logo-designernews" size={16} color="#ff9800" />
+            <Text style={styles.toggleLabelText}>Hills Charge Included in Fare</Text>
+          </View>
+          <View style={styles.toggleButtonGroup}>
+            <TouchableOpacity
+              style={[styles.toggleButton, !form.hillsIncluded && styles.toggleButtonActive]}
+              onPress={() => update('hillsIncluded', false)}
+            >
+              <Text style={[styles.toggleButtonText, !form.hillsIncluded && styles.toggleButtonTextActive]}>
+                No
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, form.hillsIncluded && styles.toggleButtonActive]}
+              onPress={() => update('hillsIncluded', true)}
+            >
+              <Text style={[styles.toggleButtonText, form.hillsIncluded && styles.toggleButtonTextActive]}>
+                Yes
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Extra Charges Summary */}
         <View style={styles.chargesSummaryBox}>
           <Text style={styles.chargesSummaryTitle}>Extra Charges Summary</Text>
@@ -533,6 +561,13 @@ export default function VendorCreateTripScreen({ navigation, route }) {
             <Text style={styles.chargesSummaryLabel}>Pet:</Text>
             <Text style={[styles.chargesSummaryValue, form.petTravelling ? styles.included : styles.excluded]}>
               {form.petTravelling ? 'Allowed' : 'Not Allowed'}
+            </Text>
+          </View>
+          <View style={styles.chargesSummaryRow}>
+            <Ionicons name="logo-designernews" size={14} color="#ff9800" />
+            <Text style={styles.chargesSummaryLabel}>Hills:</Text>
+            <Text style={[styles.chargesSummaryValue, form.hillsIncluded ? styles.included : styles.excluded]}>
+              {form.hillsIncluded ? 'Included' : 'Excluded'}
             </Text>
           </View>
         </View>

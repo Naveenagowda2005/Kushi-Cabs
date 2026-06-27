@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
@@ -9,6 +9,9 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
   const [fuelType, setFuelType] = useState(null);
   const [segmentName, setSegmentName] = useState(null);
   const [packageName, setPackageName] = useState(null);
+  
+  // Glow animation
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   // Fetch car details
   useEffect(() => {
@@ -77,6 +80,27 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
     fetchCarDetails();
   }, [trip.car_type, trip.seater_type, trip.fuel_type, trip.segment_id, trip.package_id]);
 
+  // Glow animation - continuous blink
+  useEffect(() => {
+    const glowAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    glowAnimation.start();
+
+    return () => glowAnimation.stop();
+  }, [glowAnim]);
+
   const scheduledDate = trip.scheduled_at
     ? new Date(trip.scheduled_at).toLocaleString()
     : 'ASAP';
@@ -100,8 +124,19 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
     pet_travelling: trip.pet_travelling,
   });
 
+  const glowStyle = {
+    backgroundColor: glowAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['#16213e', '#1a4d1a'],
+    }),
+    shadowOpacity: glowAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.3, 0.8],
+    }),
+  };
+
   return (
-    <View style={styles.card}>
+    <Animated.View style={[styles.card, glowStyle]}>
       {/* Header: Trip type and Payment method */}
       <View style={styles.header}>
         <Text style={styles.tripType}>{segmentName?.toUpperCase() || 'ONE WAY TRIP'}</Text>
@@ -211,6 +246,16 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             {trip.pet_travelling === true ? "🐾 Pet Allowed" : "🚫 Pet Not Allowed"}
           </Text>
         </View>
+        <View style={[styles.inclusionBadge, trip.hills_included ? styles.includedBadge : styles.excludedBadge]}>
+          <Ionicons 
+            name={trip.hills_included ? "checkmark-circle-outline" : "close-circle-outline"} 
+            size={12} 
+            color={trip.hills_included ? "#4caf50" : "#ff9800"}
+          />
+          <Text style={[styles.inclusionText, trip.hills_included ? styles.includedText : styles.excludedText]}>
+            Hills {trip.hills_included ? "Included" : "Excluded"}
+          </Text>
+        </View>
       </View>
 
       {/* Departure Time */}
@@ -226,6 +271,27 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
       <View style={styles.lockRow}>
         <Ionicons name="lock-closed-outline" size={13} color="#ff9800" />
         <Text style={styles.lockText}>Pay commission to unlock customer details</Text>
+      </View>
+
+      {/* Notes Section */}
+      <View style={styles.notesHeader}>
+        <Text style={styles.notesTitle}>Notes:</Text>
+      </View>
+
+      {/* Carrier Note */}
+      <View style={styles.noteItem}>
+        <Ionicons name="alert-circle-outline" size={12} color="#ff9800" />
+        <Text style={styles.noteText}>
+          Carrier must be CNG vehicles
+        </Text>
+      </View>
+
+      {/* Additional Info Note */}
+      <View style={styles.noteItem}>
+        <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
+        <Text style={styles.noteText}>
+          You must accept all charges conditions before accepting trip
+        </Text>
       </View>
 
       {/* Action Buttons */}
@@ -247,7 +313,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
           <Text style={styles.acceptBtnText}>Accept Trip</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -494,7 +560,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     color: '#ff9800',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '500',
     flex: 1,
   },

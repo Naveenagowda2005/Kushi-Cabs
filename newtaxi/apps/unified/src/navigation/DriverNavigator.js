@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { View, ActivityIndicator, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
 import { COLORS } from '../constants';
 import * as documentService from '../services/documentService';
 import { supabase } from '../lib/supabase';
@@ -20,8 +21,81 @@ import DriverDocumentUploadScreen from '../screens/driver/DriverDocumentUploadSc
 import DriverVerificationStatusScreen from '../screens/driver/DriverVerificationStatusScreen';
 import WaitingForApprovalScreen from '../screens/driver/WaitingForApprovalScreen';
 
-const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+const TABS = [
+  { key: 'Trips', label: 'Trips', icon: 'car-outline' },
+  { key: 'Wallet', label: 'Wallet', icon: 'wallet-outline' },
+  { key: 'History', label: 'History', icon: 'time-outline' },
+  { key: 'Profile', label: 'Profile', icon: 'person-outline' },
+];
+
+// Custom header with tabs (driver uses blue/green color scheme)
+function TabHeader({ activeTab, onTabPress }) {
+  return (
+    <View style={styles.tabBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabBarContent}
+        bounces={false}
+      >
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, isActive && styles.tabActive]}
+              onPress={() => onTabPress(tab.key)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={20}
+                color={isActive ? COLORS.driver.secondary : '#888'}
+              />
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+// Wrapper component to use hooks in the stack screen
+function DashboardWithTabs({ route, navigation }) {
+  const screenNavigation = useNavigation();
+  const [activeTab, setActiveTab] = useState(route?.params?.activeTab || 'Trips');
+
+  const handleTabPress = (tab) => {
+    setActiveTab(tab);
+    screenNavigation.setParams({ activeTab: tab });
+  };
+
+  // Update header when tab changes
+  useEffect(() => {
+    screenNavigation.setOptions({
+      headerRight: () => <TabHeader activeTab={activeTab} onTabPress={handleTabPress} />,
+    });
+  }, [activeTab, screenNavigation]);
+
+  // Pass navigation to child screens
+  const screenProps = { navigation: screenNavigation };
+
+  if (activeTab === 'Trips') {
+    return <DriverDashboardScreen {...screenProps} />;
+  } else if (activeTab === 'Wallet') {
+    return <DriverWalletScreen {...screenProps} />;
+  } else if (activeTab === 'History') {
+    return <DriverTripHistoryScreen {...screenProps} />;
+  } else if (activeTab === 'Profile') {
+    return <DriverProfileScreen {...screenProps} />;
+  }
+  return <DriverDashboardScreen {...screenProps} />;
+}
 
 function TripsStack() {
   return (
@@ -180,7 +254,11 @@ export default function DriverNavigator() {
   }, []);
 
   if (loading) {
-    return null; // Or show a loading screen
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
+        <ActivityIndicator size="large" color={COLORS.driver.primary} />
+      </View>
+    );
   }
 
   // If not approved, show WaitingForApprovalScreen with access to document upload
@@ -215,94 +293,108 @@ export default function DriverNavigator() {
     );
   }
 
-  // If approved, show full dashboard with tabs
+  // If approved, show full dashboard with header tabs
+  console.log('DriverNavigator: Driver approved - showing dashboard with header tabs');
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerStyle: { backgroundColor: '#001a33' },
+        headerTintColor: COLORS.textLight,
       }}
     >
-      <Stack.Group>
-        <Stack.Screen
-          name="MainTabs"
-          component={MainTabNavigator}
-          options={{ headerShown: false }}
-        />
-      </Stack.Group>
-
-      {/* Modal screens - only accessible after approval */}
-      <Stack.Group
-        screenOptions={{
-          presentation: 'card',
-          headerShown: true,
-          headerStyle: { backgroundColor: '#001a33' },
-          headerTintColor: COLORS.textLight,
+      <Stack.Screen
+        name="Dashboard"
+        component={DashboardWithTabs}
+        initialParams={{ activeTab: 'Trips' }}
+        options={{
+          title: 'Dashboard',
         }}
-      >
-        <Stack.Screen
-          name="UploadDocuments"
-          component={DriverDocumentUploadScreen}
-          options={{
-            title: 'Upload Documents',
-          }}
-        />
-        <Stack.Screen
-          name="VerificationStatus"
-          component={DriverVerificationStatusScreen}
-          options={{
-            title: 'Verification Status',
-          }}
-        />
-      </Stack.Group>
+      />
+      <Stack.Screen 
+        name="TripDetail"  
+        component={DriverTripDetailScreen}  
+        options={{ title: 'Trip Details' }} 
+      />
+      <Stack.Screen 
+        name="ActiveTrip"  
+        component={DriverActiveTripScreen}  
+        options={{ title: 'Active Trip' }} 
+      />
+      <Stack.Screen 
+        name="CompletedTripDetail" 
+        component={DriverCompletedTripDetailScreen} 
+        options={{ title: 'Trip Details' }} 
+      />
+      <Stack.Screen
+        name="UploadDocuments"
+        component={DriverDocumentUploadScreen}
+        options={{
+          title: 'Upload Documents',
+        }}
+      />
+      <Stack.Screen
+        name="VerificationStatus"
+        component={DriverVerificationStatusScreen}
+        options={{
+          title: 'Verification Status',
+        }}
+      />
+      <Stack.Screen
+        name="Terms"
+        component={PolicyScreen}
+        options={{ title: 'Terms & Conditions' }}
+      />
+      <Stack.Screen
+        name="CancellationPolicy"
+        component={PolicyScreen}
+        options={{ title: 'Cancellation Policy' }}
+      />
+      <Stack.Screen
+        name="ViewPolicy"
+        component={ViewPolicyScreen}
+        options={({ route }) => ({
+          title: route.params?.policyType === 'privacy_policy' ? 'Privacy Policy'
+            : route.params?.policyType === 'terms_conditions' ? 'Terms & Conditions'
+            : route.params?.policyType === 'cancellation_policy' ? 'Cancellation Policy'
+            : route.params?.policyType === 'refund_policy' ? 'Refund Policy'
+            : route.params?.policyType === 'safety_guidelines' ? 'Safety Guidelines'
+            : 'Policy',
+        })}
+      />
     </Stack.Navigator>
   );
 }
 
-function MainTabNavigator() {
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: { 
-          backgroundColor: '#001a33', 
-          borderTopColor: '#0d0f1a',
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: COLORS.driver.secondary,
-        tabBarInactiveTintColor: '#888',
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
-        },
-        tabBarIconStyle: {
-          marginTop: 2,
-        },
-        tabBarIcon: ({ color, size }) => {
-          const icons = {
-            Trips: 'car-outline',
-            History: 'time-outline',
-            Wallet: 'wallet-outline',
-            Profile: 'person-outline',
-          };
-          return <Ionicons name={icons[route.name]} size={size} color={color} />;
-        },
-      })}
-    >
-      <Tab.Screen name="Trips" component={TripsStack} />
-      <Tab.Screen
-        name="Wallet"
-        component={DriverWalletScreen}
-        options={{ tabBarLabel: 'Transaction History' }}
-      />
-      <Tab.Screen
-        name="History"
-        component={DriverTripHistoryScreen}
-        options={{ tabBarLabel: 'Trips History' }}
-      />
-      <Tab.Screen name="Profile" component={ProfileStack} />
-    </Tab.Navigator>
-  );
-}
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: '#001a33',
+    borderBottomWidth: 1,
+    borderBottomColor: '#0d0f1a',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  tabBarContent: {
+    gap: 8,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  tabActive: {
+    backgroundColor: `${COLORS.driver.secondary}20`,
+  },
+  tabLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#888',
+  },
+  tabLabelActive: {
+    color: COLORS.driver.secondary,
+    fontWeight: '600',
+  },
+});

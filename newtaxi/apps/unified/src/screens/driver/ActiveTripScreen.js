@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator, Modal, Linking, TextInput,
+  TouchableOpacity, Alert, ActivityIndicator, Modal, Linking, TextInput, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useActiveTrip } from '../../hooks/useTrips';
 import { useAppSettings } from '../../hooks/useAppSettings';
@@ -30,6 +31,8 @@ export default function DriverActiveTripScreen({ route, navigation }) {
   const [creatorPhone, setCreatorPhone] = useState(null);
   const [startKm, setStartKm] = useState('');
   const [endKm, setEndKm] = useState('');
+  const [startOdometerImage, setStartOdometerImage] = useState(null);
+  const [endOdometerImage, setEndOdometerImage] = useState(null);
 
   useEffect(() => {
     if (!activeTrip) return;
@@ -74,21 +77,91 @@ export default function DriverActiveTripScreen({ route, navigation }) {
     fetchCreatorDetails();
   }, [activeTrip]);
 
+  const captureOdometerImage = async (type) => {
+    try {
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera permission is required to capture odometer images');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        if (type === 'start') {
+          setStartOdometerImage(result.assets[0]);
+        } else {
+          setEndOdometerImage(result.assets[0]);
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to capture image: ' + error.message);
+    }
+  };
+
+  const uploadOdometerImage = async (imageUri, tripId, type) => {
+    try {
+      // Read image as base64
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      // Convert blob to base64
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          // Extract base64 part (remove data:image/jpeg;base64, prefix)
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error uploading odometer image:', error);
+      throw error;
+    }
+  };
+
   async function handleStartTrip() {
     if (!startKm) {
       Alert.alert('Error', 'Please enter the starting odometer reading');
       return;
     }
 
+    if (!startOdometerImage) {
+      Alert.alert('Error', 'Please capture a photo of the starting odometer');
+      return;
+    }
+
     setUploading(true);
     try {
-      // Start trip with manual KM entry (no image)
+      // Upload odometer image as base64
+      const base64Image = await uploadOdometerImage(startOdometerImage.uri, activeTrip.id, 'start');
+      
+      // Store in documents table
+      await supabase
+        .from('documents')
+        .insert({
+          user_id: user.id,
+          trip_id: activeTrip.id,
+          doc_type: 'start_odometer',
+          storage_url: `data:image/jpeg;base64,${base64Image}`,
+        });
+
+      // Start trip with the base64 stored
       await startTrip({
         tripId: activeTrip.id,
-        startOdometerUrl: null,
+        startOdometerUrl: `data:image/jpeg;base64,${base64Image}`,
         startKm: parseFloat(startKm),
         userId: user.id,
       });
+      
       await refetch();
       setStep(STEPS.IN_PROGRESS);
       setShowNavigationMap(true);
@@ -105,10 +178,37 @@ export default function DriverActiveTripScreen({ route, navigation }) {
       return;
     }
 
+    if (!endOdometerImage) {
+      Alert.alert('Error', 'Please capture a photo of the ending odometer');
+      return;
+    }
+
     setUploading(true);
     try {
-      // End trip with manual KM entry - go to payment step
-      // Store end KM in state for payment screen to use
+      // Upload odometer image as base64
+      const base64Image = await uploadOdometerImage(endOdometerImage.uri, activeTrip.id, 'end');
+      
+      // Store in documents table
+      await supabase
+        .from('documents')
+        .insert({
+          user_id: user.id,
+          trip_id: activeTrip.id,
+          doc_type: 'end_odometer',
+          storage_url: `data:image/jpeg;base64,${base64Image}`,
+        });
+
+      // Update trip with end odometer image
+      const { error: updateError } = await supabase
+        .from('trips')
+        .update({
+          end_odometer_url: `data:image/jpeg;base64,${base64Image}`,
+        })
+        .eq('id', activeTrip.id);
+
+      if (updateError) throw updateError;
+
+      // End trip — go to payment step
       setStep(STEPS.PAYMENT);
     } catch (err) {
       Alert.alert('Error', err.message);
@@ -347,7 +447,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
         {step === STEPS.ACCEPTED && (
           <>
             <View style={styles.infoBox}>
-              <Text style={styles.infoText}>Enter starting odometer reading</Text>
+              <Text style={styles.infoText}>Enter starting odometer reading and capture photo</Text>
             </View>
 
             {/* Start KM Input */}
@@ -365,6 +465,37 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                 keyboardType="decimal-pad"
               />
               <Text style={styles.odometerHint}>Please enter the odometer reading before starting the trip</Text>
+
+              {/* Start Odometer Image Capture */}
+              <TouchableOpacity 
+                style={[styles.cameraCaptureBtn, startOdometerImage && styles.cameraCaptureSuccess]}
+                onPress={() => captureOdometerImage('start')}
+                disabled={uploading}
+              >
+                <Ionicons 
+                  name={startOdometerImage ? 'checkmark-circle' : 'camera'} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.cameraCaptureBtnText}>
+                  {startOdometerImage ? 'Photo Captured ✓' : 'Capture Odometer Photo'}
+                </Text>
+              </TouchableOpacity>
+
+              {startOdometerImage && (
+                <View style={styles.imagePreviewContainer}>
+                  <Image 
+                    source={{ uri: startOdometerImage.uri }}
+                    style={styles.imagePreview}
+                  />
+                  <TouchableOpacity 
+                    style={styles.removeImageBtn}
+                    onPress={() => setStartOdometerImage(null)}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#ff6b6b" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
@@ -410,6 +541,37 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                 keyboardType="decimal-pad"
               />
               <Text style={styles.odometerHint}>Please enter the odometer reading before ending the trip</Text>
+
+              {/* End Odometer Image Capture */}
+              <TouchableOpacity 
+                style={[styles.cameraCaptureBtn, endOdometerImage && styles.cameraCaptureSuccess]}
+                onPress={() => captureOdometerImage('end')}
+                disabled={uploading}
+              >
+                <Ionicons 
+                  name={endOdometerImage ? 'checkmark-circle' : 'camera'} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.cameraCaptureBtnText}>
+                  {endOdometerImage ? 'Photo Captured ✓' : 'Capture Odometer Photo'}
+                </Text>
+              </TouchableOpacity>
+
+              {endOdometerImage && (
+                <View style={styles.imagePreviewContainer}>
+                  <Image 
+                    source={{ uri: endOdometerImage.uri }}
+                    style={styles.imagePreview}
+                  />
+                  <TouchableOpacity 
+                    style={styles.removeImageBtn}
+                    onPress={() => setEndOdometerImage(null)}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#ff6b6b" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
@@ -773,7 +935,45 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
-  odometerHint: { color: '#888', fontSize: 12, fontStyle: 'italic' },
+  odometerHint: { color: '#888', fontSize: 12, fontStyle: 'italic', marginBottom: 12 },
+  cameraCaptureBtn: {
+    backgroundColor: '#2196f3',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  cameraCaptureSuccess: {
+    backgroundColor: '#4caf50',
+  },
+  cameraCaptureBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginTop: 12,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 10,
+    backgroundColor: '#0f3460',
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    padding: 4,
+  },
   infoBox: { backgroundColor: '#0a2a4a', borderRadius: 10, padding: 14, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#2196f3' },
   infoText: { color: '#2196f3', fontSize: 14, fontWeight: '600' },
 });

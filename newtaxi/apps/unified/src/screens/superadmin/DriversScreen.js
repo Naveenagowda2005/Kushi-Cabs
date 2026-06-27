@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert, TextInput, Modal,
+  RefreshControl, Alert, TextInput, Modal, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
+import IDCard from '../../components/IDCard';
 
 export default function SuperAdminDriversScreen({ navigation }) {
   const [drivers, setDrivers] = useState([]);
@@ -15,6 +16,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [showIDCard, setShowIDCard] = useState(false);
 
   useEffect(() => { fetchDrivers(); }, []);
   useEffect(() => { filterDrivers(); }, [searchQuery, drivers]);
@@ -23,14 +25,55 @@ export default function SuperAdminDriversScreen({ navigation }) {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('users').select('*').eq('role_id', 3).order('created_at', { ascending: false });
+        .from('users').select('id, full_name, phone, is_active, avatar_base64, created_at, role_id').eq('role_id', 3).order('created_at', { ascending: false });
       if (error) throw error;
 
       const driversWithDetails = await Promise.all(
         (data || []).map(async (user) => {
-          const { data: driverProfile } = await supabase.from('drivers').select('license_number, vehicle_number, is_available').eq('user_id', user.id).single();
+          const { data: driverProfile } = await supabase.from('drivers').select('*').eq('user_id', user.id).single();
           const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
-          return { ...user, drivers: driverProfile ? [driverProfile] : [], wallets: wallet ? [wallet] : [] };
+          
+          // Fetch driver selfie photo
+          let documentPhoto = null;
+          try {
+            // Query driver documents using user_id (driver_id column references users.id)
+            console.log('🔍 Fetching docs for user_id:', user.id, 'user:', user.full_name);
+            const { data: driverDocs, error: docError } = await supabase
+              .from('driver_documents')
+              .select('*')
+              .eq('driver_id', user.id)
+              .order('document_type', { ascending: true });
+
+            if (docError) {
+              console.log('❌ Query error:', docError);
+            }
+
+            if (driverDocs && driverDocs.length > 0) {
+              console.log('📋 Found', driverDocs.length, 'docs for', user.full_name, '- types:', driverDocs.map(d => d.document_type));
+              // Find DRIVER_SELFIE document
+              const selfie = driverDocs.find(d => d.document_type === 'DRIVER_SELFIE' && d.document_data);
+              if (selfie) {
+                const photoData = selfie.document_data;
+                documentPhoto = photoData.startsWith('data:') 
+                  ? photoData
+                  : `data:${selfie.document_mime_type || 'image/jpeg'};base64,${photoData}`;
+                console.log('✅ Found DRIVER_SELFIE photo for:', user.full_name);
+              } else {
+                console.log('⚠️ No DRIVER_SELFIE with data found for:', user.full_name);
+              }
+            } else {
+              console.log('⚠️ No driver documents found for', user.full_name, '(user_id:', user.id + ')');
+            }
+          } catch (err) {
+            console.log('❌ Exception fetching driver documents:', err.message);
+          }
+          
+          return { 
+            ...user, 
+            drivers: driverProfile ? [driverProfile] : [], 
+            wallets: wallet ? [wallet] : [], 
+            documentPhoto 
+          };
         })
       );
       setDrivers(driversWithDetails);
@@ -77,7 +120,6 @@ export default function SuperAdminDriversScreen({ navigation }) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            // Use backend API to delete user (checks for pending trips)
             const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/delete-user`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -91,14 +133,12 @@ export default function SuperAdminDriversScreen({ navigation }) {
             const result = await response.json();
 
             if (!response.ok) {
-              // Check if error is due to pending trips
               if (result.pendingTripsCount > 0) {
                 Alert.alert(
                   'Cannot Delete Driver',
                   `${result.message}\n\nPending Trips: ${result.pendingTripsCount}\nStatuses: ${result.tripStatuses?.join(', ') || 'N/A'}`
                 );
               } else {
-                // Show the actual error from backend
                 const errorMsg = result.details || result.message || result.error || 'Failed to delete driver';
                 throw new Error(errorMsg);
               }
@@ -143,6 +183,10 @@ export default function SuperAdminDriversScreen({ navigation }) {
           <Ionicons name="trash-outline" size={16} color={COLORS.error} />
           <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#1565c020' }]} onPress={() => { setSelectedDriver(driver); setShowIDCard(true); }}>
+          <Ionicons name="card" size={16} color="#1565c0" />
+          <Text style={[styles.actionButtonText, { color: '#1565c0' }]}>ID Card</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -183,7 +227,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
             <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close" size={24} color={COLORS.text} /></TouchableOpacity>
           </View>
           {selectedDriver && (
-            <View style={styles.modalContent}>
+            <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 40 }}>
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>Personal Information</Text>
                 <Text style={styles.modalText}>Name: {selectedDriver.full_name || 'N/A'}</Text>
@@ -201,8 +245,37 @@ export default function SuperAdminDriversScreen({ navigation }) {
                 <Text style={styles.modalSectionTitle}>Wallet</Text>
                 <Text style={styles.modalText}>Balance: ₹{selectedDriver.wallets?.[0]?.balance || 0}</Text>
               </View>
-            </View>
+            </ScrollView>
           )}
+        </View>
+      </Modal>
+
+      {/* ID Card Modal */}
+      <Modal visible={showIDCard} transparent animationType="fade" onRequestClose={() => setShowIDCard(false)}>
+        <View style={styles.idCardModalOverlay}>
+          <View style={styles.idCardModalBox}>
+            <TouchableOpacity 
+              style={styles.idCardCloseBtn}
+              onPress={() => setShowIDCard(false)}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <ScrollView contentContainerStyle={styles.idCardModalContent} showsVerticalScrollIndicator={false}>
+              {selectedDriver && (
+                <IDCard 
+                  userType="driver"
+                  fullName={selectedDriver.full_name}
+                  phone={selectedDriver.phone}
+                  photo={selectedDriver.avatar_base64 || selectedDriver.documentPhoto}
+                  licenseNumber={selectedDriver.drivers?.[0]?.license_number}
+                  vehicleNumber={selectedDriver.drivers?.[0]?.vehicle_number}
+                  serialNumber={selectedDriver.drivers?.[0]?.id?.charCodeAt(0) || 12345}
+                  isApproved={true}
+                />
+              )}
+            </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -231,16 +304,65 @@ const styles = StyleSheet.create({
   cardDetails: { marginBottom: 12 },
   detailItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   detailText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginLeft: 8 },
-  actionButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  actionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, flex: 0.48, justifyContent: 'center' },
+  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  actionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, flex: 1, justifyContent: 'center' },
   actionButtonText: { fontSize: getResponsiveFontSize(12), fontWeight: '500', marginLeft: 4 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: getResponsiveFontSize(18), fontWeight: '600', color: COLORS.textSecondary, marginTop: 16 },
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: getResponsivePadding(24), paddingTop: hp(6), borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.text },
-  modalContent: { flex: 1, padding: getResponsivePadding(24) },
+  modalContent: { flex: 1, padding: getResponsivePadding(24), overflow: 'hidden' },
   modalSection: { marginBottom: 24 },
   modalSectionTitle: { fontSize: getResponsiveFontSize(16), fontWeight: '600', color: COLORS.text, marginBottom: 12 },
   modalText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginBottom: 8 },
+
+  idCardButton: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1565c0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+
+  idCardButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  idCardModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  idCardModalBox: {
+    width: '95%',
+    maxHeight: '90%',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  idCardCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
+    padding: 8,
+  },
+
+  idCardModalContent: {
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
 });
+

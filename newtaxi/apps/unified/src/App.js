@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './context/AuthContext';
+import { AlertProvider } from './context/AlertContext';
 import RootNavigator from './navigation/RootNavigator';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -48,9 +49,11 @@ function AppContent() {
   console.log('App.js: AppContent rendering...');
   
   return (
-    <AuthProviderWrapper>
-      <NavigationContainerWrapper />
-    </AuthProviderWrapper>
+    <AlertProvider>
+      <AuthProviderWrapper>
+        <NavigationContainerWrapper />
+      </AuthProviderWrapper>
+    </AlertProvider>
   );
 }
 

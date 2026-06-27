@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
 import { COLORS } from '../constants';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -22,94 +22,84 @@ import CompletedTripDetailScreen from '../screens/driver/CompletedTripDetailScre
 import PolicyScreen from '../screens/common/PolicyScreen';
 import ViewPolicyScreen from '../screens/common/ViewPolicyScreen';
 
-const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-function EnquiriesStack() {
+const TABS = [
+  { key: 'Enquiries', label: 'Enquiries', icon: 'list-outline' },
+  { key: 'History', label: 'History', icon: 'time-outline' },
+  { key: 'Profile', label: 'Profile', icon: 'person-outline' },
+];
+
+// Custom header with tabs
+function TabHeader({ activeTab, onTabPress }) {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#001a33' },
-        headerTintColor: COLORS.textLight,
-      }}
-    >
-      <Stack.Screen 
-        name="EnquiriesList" 
-        component={VendorEnquiriesScreen}    
-        options={{ title: 'Trip Enquiries' }} 
-      />
-      <Stack.Screen 
-        name="EnquiryDetail" 
-        component={VendorEnquiryDetailScreen} 
-        options={{ title: 'Enquiry Details' }} 
-      />
-      <Stack.Screen 
-        name="CreateTrip"    
-        component={VendorCreateTripScreen}    
-        options={{ title: 'Create Trip' }} 
-      />
-      <Stack.Screen 
-        name="CompletedTripDetail" 
-        component={CompletedTripDetailScreen} 
-        options={{ title: 'Trip Details' }} 
-      />
-    </Stack.Navigator>
+    <View style={styles.tabBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabBarContent}
+        bounces={false}
+      >
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, isActive && styles.tabActive]}
+              onPress={() => onTabPress(tab.key)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={20}
+                color={isActive ? '#FF9800' : '#888'}
+              />
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
-function ProfileStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#001a33' },
-        headerTintColor: COLORS.textLight,
-      }}
-    >
-      <Stack.Screen 
-        name="ProfileHome" 
-        component={VendorProfileScreen}  
-        options={{ title: 'Profile' }} 
-      />
-      <Stack.Screen 
-        name="Earnings"    
-        component={VendorEarningsScreen} 
-        options={{ title: 'Earnings & Reports' }} 
-      />
-      <Stack.Screen 
-        name="Settings"    
-        component={VendorSettingsScreen} 
-        options={{ title: 'Business Settings' }} 
-      />
-      <Stack.Screen
-        name="Terms"
-        component={PolicyScreen}
-        options={{ title: 'Terms & Conditions' }}
-      />
-      <Stack.Screen
-        name="CancellationPolicy"
-        component={PolicyScreen}
-        options={{ title: 'Cancellation Policy' }}
-      />
-      <Stack.Screen
-        name="ViewPolicy"
-        component={ViewPolicyScreen}
-        options={({ route }) => ({
-          title: route.params?.policyType === 'privacy_policy' ? 'Privacy Policy'
-            : route.params?.policyType === 'terms_conditions' ? 'Terms & Conditions'
-            : route.params?.policyType === 'cancellation_policy' ? 'Cancellation Policy'
-            : route.params?.policyType === 'refund_policy' ? 'Refund Policy'
-            : route.params?.policyType === 'safety_guidelines' ? 'Safety Guidelines'
-            : 'Policy',
-        })}
-      />
-    </Stack.Navigator>
-  );
+// Wrapper component to use hooks in the stack screen
+function DashboardWithTabs({ route, navigation }) {
+  const screenNavigation = useNavigation();
+  const [activeTab, setActiveTab] = useState(route?.params?.activeTab || 'Enquiries');
+
+  const handleTabPress = (tab) => {
+    setActiveTab(tab);
+    screenNavigation.setParams({ activeTab: tab });
+  };
+
+  // Update header when tab changes
+  useEffect(() => {
+    screenNavigation.setOptions({
+      headerRight: () => <TabHeader activeTab={activeTab} onTabPress={handleTabPress} />,
+    });
+  }, [activeTab, screenNavigation]);
+
+  // Pass navigation to child screens
+  const screenProps = { navigation: screenNavigation };
+
+  if (activeTab === 'Enquiries') {
+    return <VendorEnquiriesScreen {...screenProps} />;
+  } else if (activeTab === 'History') {
+    return <VendorTripHistoryScreen {...screenProps} />;
+  } else if (activeTab === 'Profile') {
+    return <VendorProfileScreen {...screenProps} />;
+  }
+  return <VendorEnquiriesScreen {...screenProps} />;
 }
 
 export default function VendorNavigator() {
   const { user } = useAuth();
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('Enquiries');
 
   useEffect(() => {
     if (!user?.id) return;
@@ -126,7 +116,6 @@ export default function VendorNavigator() {
           console.log(`VendorNavigator: 🔄 Retry ${retryCount}/${MAX_RETRIES}`);
         }
         
-        // Force fresh data - no caching
         const { data, error } = await supabase
           .from('vendor_verification_status')
           .select('overall_status, approved_at, rejected_at, submitted_at, all_documents_submitted, is_re_verification')
@@ -135,7 +124,6 @@ export default function VendorNavigator() {
 
         if (!isMounted) return;
 
-        // Handle table doesn't exist error (PGRST205)
         if (error?.code === 'PGRST205') {
           console.log('VendorNavigator: vendor_verification_status table not created yet - setting to not_started');
           setVerificationStatus('not_started');
@@ -143,7 +131,6 @@ export default function VendorNavigator() {
           return;
         }
 
-        // Handle no record found error (PGRST116) - new vendor without documents
         if (error?.code === 'PGRST116') {
           console.log('VendorNavigator: No verification record found - setting to not_started');
           setVerificationStatus('not_started');
@@ -151,36 +138,29 @@ export default function VendorNavigator() {
           return;
         }
 
-        // Other errors
         if (error) {
           console.error('VendorNavigator: Error checking vendor verification status:', error);
-          // Retry up to 3 times
           if (retryCount < MAX_RETRIES) {
             retryCount++;
             setTimeout(() => checkVerificationStatus(true), 1000);
             return;
           }
-          // Default to not_started on error after retries
           setVerificationStatus('not_started');
           setLoading(false);
           return;
         }
 
-        // Success - set the status from database
         const newStatus = data?.overall_status || 'not_started';
         const isReVerification = data?.is_re_verification === true;
         console.log('VendorNavigator: ✅ Status from DB:', newStatus, '| re-verification:', isReVerification);
 
-        // If pending but is_re_verification = true, vendor was already approved
-        // and just re-uploaded a doc — keep them on dashboard, don't show waiting screen
         if (newStatus === 'pending' && isReVerification) {
           console.log('VendorNavigator: Re-verification pending — keeping dashboard access');
-          setVerificationStatus('approved'); // treat as approved for navigation
+          setVerificationStatus('approved');
           if (isMounted) setLoading(false);
           return;
         }
 
-        // If still pending, check if all documents are already approved and auto-approve
         if (newStatus === 'pending' && isMounted) {
           try {
             const { data: docsData, error: docsError } = await supabase
@@ -237,17 +217,14 @@ export default function VendorNavigator() {
       }
     };
 
-    // Check on mount
     checkVerificationStatus();
 
-    // Poll every 3 seconds — fast enough to feel instant after admin approves
     const pollInterval = setInterval(() => {
       if (isMounted) {
         checkVerificationStatus();
       }
     }, 3000);
 
-    // Also subscribe to real-time as a bonus (may not fire for RPC updates)
     let channel;
     const setupSubscription = () => {
       try {
@@ -298,8 +275,6 @@ export default function VendorNavigator() {
     );
   }
 
-  // If vendor is not approved (pending, rejected, or not_started), show waiting screen
-  // They can access document upload from the waiting screen
   if (verificationStatus === 'pending' || verificationStatus === 'rejected' || verificationStatus === 'not_started') {
     console.log('VendorNavigator: Vendor not approved (status:', verificationStatus, ') - showing waiting screen');
     return (
@@ -316,10 +291,9 @@ export default function VendorNavigator() {
           options={{
             title: 'Waiting for Approval',
             headerBackVisible: false,
-            headerLeft: () => null, // Disable back button on main screen
+            headerLeft: () => null,
           }}
         />
-        {/* Allow access to document upload even while waiting */}
         <Stack.Screen
           name="UploadDocuments"
           component={VendorDocumentUploadScreen}
@@ -332,42 +306,103 @@ export default function VendorNavigator() {
     );
   }
 
-  // If vendor is approved, show normal vendor app
-  console.log('VendorNavigator: Vendor approved - showing dashboard');
+  console.log('VendorNavigator: Vendor approved - showing dashboard with header tabs');
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: { 
-          backgroundColor: '#001a33', 
-          borderTopColor: '#0d0f1a',
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: COLORS.vendor.secondary,
-        tabBarInactiveTintColor: '#888',
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
-        },
-        tabBarIconStyle: {
-          marginTop: 2,
-        },
-        tabBarIcon: ({ color, size }) => {
-          const icons = {
-            Enquiries: 'list-outline',
-            History:   'time-outline',
-            Profile:   'person-outline',
-          };
-          return <Ionicons name={icons[route.name]} size={size} color={color} />;
-        },
-      })}
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerStyle: { backgroundColor: '#001a33' },
+        headerTintColor: COLORS.textLight,
+      }}
     >
-      <Tab.Screen name="Enquiries" component={EnquiriesStack} />
-      <Tab.Screen name="History"   component={VendorTripHistoryScreen} />
-      <Tab.Screen name="Profile"   component={ProfileStack} />
-    </Tab.Navigator>
+      <Stack.Screen
+        name="Dashboard"
+        component={DashboardWithTabs}
+        initialParams={{ activeTab: 'Enquiries' }}
+        options={{
+          title: 'Dashboard',
+        }}
+      />
+      <Stack.Screen 
+        name="EnquiryDetail" 
+        component={VendorEnquiryDetailScreen} 
+        options={{ title: 'Enquiry Details' }} 
+      />
+      <Stack.Screen 
+        name="CreateTrip"    
+        component={VendorCreateTripScreen}    
+        options={{ title: 'Create Trip' }} 
+      />
+      <Stack.Screen 
+        name="CompletedTripDetail" 
+        component={CompletedTripDetailScreen} 
+        options={{ title: 'Trip Details' }} 
+      />
+      <Stack.Screen 
+        name="Earnings"    
+        component={VendorEarningsScreen} 
+        options={{ title: 'Earnings & Reports' }} 
+      />
+      <Stack.Screen 
+        name="Settings"    
+        component={VendorSettingsScreen} 
+        options={{ title: 'Business Settings' }} 
+      />
+      <Stack.Screen
+        name="Terms"
+        component={PolicyScreen}
+        options={{ title: 'Terms & Conditions' }}
+      />
+      <Stack.Screen
+        name="CancellationPolicy"
+        component={PolicyScreen}
+        options={{ title: 'Cancellation Policy' }}
+      />
+      <Stack.Screen
+        name="ViewPolicy"
+        component={ViewPolicyScreen}
+        options={({ route }) => ({
+          title: route.params?.policyType === 'privacy_policy' ? 'Privacy Policy'
+            : route.params?.policyType === 'terms_conditions' ? 'Terms & Conditions'
+            : route.params?.policyType === 'cancellation_policy' ? 'Cancellation Policy'
+            : route.params?.policyType === 'refund_policy' ? 'Refund Policy'
+            : route.params?.policyType === 'safety_guidelines' ? 'Safety Guidelines'
+            : 'Policy',
+        })}
+      />
+    </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: '#001a33',
+    borderBottomWidth: 1,
+    borderBottomColor: '#0d0f1a',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  tabBarContent: {
+    gap: 8,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  tabActive: {
+    backgroundColor: '#FF980020',
+  },
+  tabLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#888',
+  },
+  tabLabelActive: {
+    color: '#FF9800',
+    fontWeight: '600',
+  },
+});

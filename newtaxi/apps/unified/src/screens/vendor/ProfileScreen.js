@@ -11,6 +11,7 @@ import { useVendorProfile } from '../../hooks/useVendorProfile';
 import { supabase } from '../../lib/supabase';
 import * as documentService from '../../services/documentService';
 import { API_CONFIG } from '../../constants';
+import IDCard from '../../components/IDCard';
 
 const REQUIRED_DOCS = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
 
@@ -51,6 +52,7 @@ export default function VendorProfileScreen({ navigation }) {
   const [docsExpanded, setDocsExpanded] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [updatingDoc, setUpdatingDoc] = useState(null); // doc type being re-uploaded
+  const [showIDCard, setShowIDCard] = useState(false);
 
   // Fetch commission
   useEffect(() => {
@@ -312,13 +314,19 @@ export default function VendorProfileScreen({ navigation }) {
         </View>
         <Text style={styles.name}>{user?.full_name || 'Vendor'}</Text>
         <Text style={styles.phone}>{user?.phone}</Text>
-        {user?.id && (
-          <Text style={styles.userId}>ID: {user.id}</Text>
-        )}
         {vendor?.company_name && <Text style={styles.company}>{vendor.company_name}</Text>}
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>Vendor</Text>
         </View>
+
+        {/* ID Card Button */}
+        <TouchableOpacity 
+          style={styles.idCardButton}
+          onPress={() => setShowIDCard(true)}
+        >
+          <Ionicons name="card" size={16} color="#fff" />
+          <Text style={styles.idCardButtonText}>View ID Card</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Wallet */}
@@ -426,7 +434,31 @@ export default function VendorProfileScreen({ navigation }) {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      {/* Document Preview Modal */}
+      {/* ID Card Modal */}
+      <Modal visible={showIDCard} transparent animationType="fade" onRequestClose={() => setShowIDCard(false)}>
+        <View style={styles.idCardModalOverlay}>
+          <View style={styles.idCardModalBox}>
+            <TouchableOpacity 
+              style={styles.idCardCloseBtn}
+              onPress={() => setShowIDCard(false)}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <ScrollView contentContainerStyle={styles.idCardModalContent} showsVerticalScrollIndicator={false}>
+              <IDCard 
+                userType="vendor"
+                fullName={user?.full_name}
+                phone={user?.phone}
+                photo={avatarBase64}
+                companyName={vendor?.company_name}
+                serialNumber={vendor?.id?.charCodeAt(0) || 12345}
+                isApproved={documents.some(d => d.status === 'approved')}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={!!previewDoc} transparent animationType="fade" onRequestClose={() => setPreviewDoc(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -508,6 +540,54 @@ const styles = StyleSheet.create({
   roleBadge: { backgroundColor: '#e9456020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#e94560', alignItems: 'center' },
   roleText: { color: '#e94560', fontSize: 12, fontWeight: '600' },
   commissionText: { color: '#e94560', fontSize: 10, marginTop: 3 },
+
+  idCardButton: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#9c27b0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+
+  idCardButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  idCardModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  idCardModalBox: {
+    width: '95%',
+    maxHeight: '90%',
+    backgroundColor: '#0f3460',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  idCardCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
+    padding: 8,
+  },
+
+  idCardModalContent: {
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
 
   // Wallet
   balanceCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 20 },

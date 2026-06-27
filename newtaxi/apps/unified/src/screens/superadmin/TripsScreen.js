@@ -74,18 +74,34 @@ function ZoomableImage({ imageUrl, title }) {
 
 // Component to handle signed URL loading
 function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError, isLoading, onLoad, onError }) {
-  const [signedUrl, setSignedUrl] = useState(null);
+  const [displayUrl, setDisplayUrl] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const getSignedUrl = async () => {
+    const processImageUrl = async () => {
       try {
         if (!imageUrl) {
           setLoading(false);
           return;
         }
 
-        // Extract file path from the URL
+        // Check if it's already a base64 data URL
+        if (imageUrl.startsWith('data:image/')) {
+          console.log('Using base64 data URL directly for:', imageType);
+          setDisplayUrl(imageUrl);
+          setLoading(false);
+          return;
+        }
+
+        // If it's a regular URL, try to use it directly
+        if (imageUrl.startsWith('http')) {
+          console.log('Using HTTP URL directly for:', imageType);
+          setDisplayUrl(imageUrl);
+          setLoading(false);
+          return;
+        }
+
+        // Extract file path from the URL for storage bucket
         const filePath = imageUrl.split('/odometer-images/')[1];
         if (!filePath) {
           console.warn('Could not extract file path from URL:', imageUrl);
@@ -105,30 +121,30 @@ function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError,
           } else {
             console.error('Error creating signed URL:', error);
           }
-          setSignedUrl(null);
+          setDisplayUrl(null);
           onError?.();
           setLoading(false);
           return;
         }
 
-        setSignedUrl(data?.signedUrl);
+        setDisplayUrl(data?.signedUrl);
         setLoading(false);
       } catch (err) {
-        console.error('Error in getSignedUrl:', err);
+        console.error('Error in processImageUrl:', err);
         onError?.();
         setLoading(false);
       }
     };
 
-    getSignedUrl();
+    processImageUrl();
   }, [imageUrl]);
 
   return (
     <TouchableOpacity
       style={styles.odometerImageWrapper}
       onPress={() => {
-        console.log('Thumbnail pressed, opening modal with signed URL:', signedUrl);
-        onPress?.(signedUrl);
+        console.log('Thumbnail pressed, opening modal with URL:', displayUrl);
+        onPress?.(displayUrl);
       }}
       disabled={isError}
     >
@@ -142,9 +158,9 @@ function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError,
           <Ionicons name="hourglass-outline" size={32} color="#888" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
-      ) : signedUrl ? (
+      ) : displayUrl ? (
         <Image
-          source={{ uri: signedUrl }}
+          source={{ uri: displayUrl }}
           style={styles.odometerImage}
           onLoad={onLoad}
           onError={onError}
@@ -220,52 +236,9 @@ export default function SuperAdminTripsScreen() {
 
   const openImageModal = (imageUrl, title) => {
     console.log('Opening image modal:', { imageUrl, title });
-    setModalSignedUrl(null); // Reset signed URL
+    setModalSignedUrl(imageUrl); // For base64, use URL directly; for storage URLs, will be processed
     setSelectedImage({ url: imageUrl, title });
     setImageModalVisible(true);
-    
-    // Generate signed URL for modal
-    generateSignedUrlForModal(imageUrl);
-  };
-
-  const generateSignedUrlForModal = async (imageUrl) => {
-    try {
-      if (!imageUrl) {
-        console.warn('No image URL provided');
-        return;
-      }
-
-      console.log('Generating signed URL for:', imageUrl);
-
-      // Extract file path from the URL
-      const filePath = imageUrl.split('/odometer-images/')[1];
-      if (!filePath) {
-        console.warn('Could not extract file path from URL:', imageUrl);
-        return;
-      }
-
-      console.log('File path extracted:', filePath);
-
-      // Get signed URL from Supabase
-      const { data, error } = await supabase.storage
-        .from('odometer-images')
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-      if (error) {
-        // Silently fail for missing images (404 is expected)
-        if (error.message?.includes('404') || error.message?.includes('not found')) {
-          console.log('Image not found in storage (expected):', filePath);
-        } else {
-          console.error('Error creating signed URL for modal:', error);
-        }
-        return;
-      }
-
-      console.log('Signed URL generated successfully');
-      setModalSignedUrl(data?.signedUrl);
-    } catch (err) {
-      console.error('Error in generateSignedUrlForModal:', err);
-    }
   };
 
   const handleImageLoad = (tripId, imageType) => {

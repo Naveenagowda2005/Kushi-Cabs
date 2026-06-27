@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import * as documentService from '../../services/documentService';
 import { API_CONFIG } from '../../constants';
+import IDCard from '../../components/IDCard';
 
 const STATUS_CONFIG = {
   approved:       { color: '#4caf50', icon: 'checkmark-circle',  label: 'Approved' },
@@ -27,12 +28,32 @@ export default function DriverProfileScreen({ navigation }) {
   const [previewDoc, setPreviewDoc]     = useState(null); // {label, data, mime}
   const [updatingDoc, setUpdatingDoc]   = useState(null); // documentType being updated
   const [docsExpanded, setDocsExpanded] = useState(false);
+  const [driverProfile, setDriverProfile] = useState(null);
+  const [showIDCard, setShowIDCard] = useState(false);
 
   // Load avatar
   useEffect(() => {
     if (!user?.id) return;
     supabase.from('users').select('avatar_base64').eq('id', user.id).maybeSingle()
       .then(({ data }) => { if (data?.avatar_base64) setAvatarBase64(data.avatar_base64); });
+  }, [user?.id]);
+
+  // Load driver profile details
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchDriverProfile = async () => {
+      try {
+        const { data } = await supabase
+          .from('drivers')
+          .select('id, license_number, vehicle_number')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setDriverProfile(data);
+      } catch (e) {
+        console.error('Error loading driver profile:', e);
+      }
+    };
+    fetchDriverProfile();
   }, [user?.id]);
 
   // Load documents on every focus
@@ -256,12 +277,18 @@ export default function DriverProfileScreen({ navigation }) {
         <Text style={styles.photoHint}>Tap to change photo</Text>
         <Text style={styles.name}>{user?.full_name || 'Driver'}</Text>
         <Text style={styles.phone}>{user?.phone}</Text>
-        {user?.id && (
-          <Text style={styles.userId}>ID: {user.id}</Text>
-        )}
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>Driver</Text>
         </View>
+
+        {/* ID Card Button */}
+        <TouchableOpacity 
+          style={styles.idCardButton}
+          onPress={() => setShowIDCard(true)}
+        >
+          <Ionicons name="card" size={16} color="#fff" />
+          <Text style={styles.idCardButtonText}>View ID Card</Text>
+        </TouchableOpacity>
       </View>
 
 
@@ -373,7 +400,32 @@ export default function DriverProfileScreen({ navigation }) {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      {/* Document Preview Modal */}
+      {/* ID Card Modal */}
+      <Modal visible={showIDCard} transparent animationType="fade" onRequestClose={() => setShowIDCard(false)}>
+        <View style={styles.idCardModalOverlay}>
+          <View style={styles.idCardModalBox}>
+            <TouchableOpacity 
+              style={styles.idCardCloseBtn}
+              onPress={() => setShowIDCard(false)}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <ScrollView contentContainerStyle={styles.idCardModalContent} showsVerticalScrollIndicator={false}>
+              <IDCard 
+                userType="driver"
+                fullName={user?.full_name}
+                phone={user?.phone}
+                photo={avatarBase64}
+                licenseNumber={driverProfile?.license_number}
+                vehicleNumber={driverProfile?.vehicle_number}
+                serialNumber={driverProfile?.id?.charCodeAt(0) || 12345}
+                isApproved={documents.some(d => d.status === 'approved')}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={!!previewDoc} transparent animationType="fade" onRequestClose={() => setPreviewDoc(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -448,9 +500,56 @@ const styles = StyleSheet.create({
   photoHint: { color: '#aaa', fontSize: 11, marginBottom: 8 },
   name: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   phone: { color: '#888', fontSize: 14, marginBottom: 8 },
-  userId: { color: '#aaa', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
   roleBadge: { backgroundColor: '#4caf5020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#4caf50' },
   roleText: { color: '#4caf50', fontSize: 12, fontWeight: '600' },
+
+  idCardButton: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1565c0',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+
+  idCardButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  idCardModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  idCardModalBox: {
+    width: '95%',
+    maxHeight: '90%',
+    backgroundColor: '#0d0f1a',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  idCardCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
+    padding: 8,
+  },
+
+  idCardModalContent: {
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
 
   // Stats row
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },

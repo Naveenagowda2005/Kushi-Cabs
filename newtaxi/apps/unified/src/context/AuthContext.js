@@ -62,6 +62,36 @@ export const AuthProvider = ({ children }) => {
           console.log('AuthProvider: Could not restore super admin session:', e.message);
         }
         
+        // Check for OTP user session in AsyncStorage (vendor/driver)
+        try {
+          const otpSessionStr = await AsyncStorage.getItem('otpUserSession');
+          console.log('AuthProvider: Checking AsyncStorage for otpUserSession:', !!otpSessionStr);
+          
+          if (otpSessionStr) {
+            console.log('AuthProvider: Found OTP user session in AsyncStorage');
+            const otpSession = JSON.parse(otpSessionStr);
+            console.log('AuthProvider: Parsed OTP session:', { 
+              hasUserId: !!otpSession?.user?.id,
+              email: otpSession?.user?.email 
+            });
+            
+            // ✅ SET SESSION FIRST
+            console.log('AuthProvider: Setting OTP session from AsyncStorage');
+            setSession(otpSession);
+            console.log('AuthProvider: OTP session set, now fetching profile');
+            
+            if (otpSession?.user?.id) {
+              console.log('AuthProvider: Restoring OTP user profile from session');
+              await fetchUserProfile(otpSession.user.id);
+              console.log('AuthProvider: OTP user profile restored');
+              console.log('AuthProvider: OTP session persisted, hasSession will now return true');
+              return; // Early return if OTP session restored
+            }
+          }
+        } catch (e) {
+          console.log('AuthProvider: Could not restore OTP user session:', e.message);
+        }
+        
         console.log('AuthProvider: No AsyncStorage session found, checking Supabase...');
         
         // Get initial session with timeout
@@ -174,14 +204,17 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setLoading(false);
       } else if (data) {
-        console.log('fetchUserProfile: Setting user:', data.id, data.roles?.name);
+        console.log('fetchUserProfile: Got user data, setting user:', data.id, data.roles?.name);
+        // Set user state
         setUser(data);
         if (data.roles?.name) {
           console.log('fetchUserProfile: Auto-selecting role:', data.roles.name);
           setSelectedRole(data.roles.name);
         }
-        console.log('fetchUserProfile: Setting loading to false');
+        console.log('fetchUserProfile: User and role set, now setting loading to false');
+        // IMPORTANT: Set loading to false AFTER user is set
         setLoading(false);
+        console.log('fetchUserProfile: Loading set to false');
       } else {
         console.log('fetchUserProfile: No user profile found');
         setUser(null);
@@ -283,6 +316,7 @@ export const AuthProvider = ({ children }) => {
         }
         
         console.log('Super Admin: Session and user set - redirecting to dashboard');
+        setLoading(false);
         
         return { data: { user: adminData, session: mockSession }, error: null };
       }
@@ -375,6 +409,15 @@ export const AuthProvider = ({ children }) => {
         setSelectedRole(userData.roles.name);
       }
       
+      // Persist OTP session to AsyncStorage (like super admin)
+      try {
+        await AsyncStorage.setItem('otpUserSession', JSON.stringify(mockSession));
+        console.log('OTP user session persisted to AsyncStorage');
+      } catch (e) {
+        console.warn('Could not persist OTP session to AsyncStorage:', e.message);
+      }
+      
+      setLoading(false);
       return { data: { user: userData, session: mockSession }, error: null };
     } catch (error) {
       console.error('Unified Sign in error:', error);
@@ -462,6 +505,14 @@ export const AuthProvider = ({ children }) => {
         console.log('Super admin session cleared from AsyncStorage');
       } catch (e) {
         console.warn('Could not clear super admin session from AsyncStorage:', e.message);
+      }
+      
+      // Clear OTP user session from AsyncStorage
+      try {
+        await AsyncStorage.removeItem('otpUserSession');
+        console.log('OTP user session cleared from AsyncStorage');
+      } catch (e) {
+        console.warn('Could not clear OTP user session from AsyncStorage:', e.message);
       }
       
       const { error } = await supabase.auth.signOut();

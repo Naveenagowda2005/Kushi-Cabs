@@ -60,17 +60,38 @@ export default function SuperAdminNavigator() {
 
   const fetchPendingCounts = async () => {
     try {
-      // Use RPC to bypass RLS (super admin uses mock session)
-      const { data: drivers } = await supabase
-        .rpc('get_driver_verifications_pending_count');
+      // ALWAYS use direct query for driver count (RPC is broken)
+      // The RPC returns 0 even when records exist with overall_status = 'pending_review'
+      const { data: directDriverData, error: directDriverError } = await supabase
+        .from('driver_verification_status')
+        .select('id')
+        .eq('overall_status', 'pending_review');
 
-      const { data: vendors } = await supabase
+      if (!directDriverError) {
+        const driverCount = directDriverData?.length || 0;
+        console.log('✅ Driver count (direct query):', driverCount);
+        setPendingDriverCount(driverCount);
+      } else {
+        console.error('🔴 Driver count query error:', directDriverError);
+        setPendingDriverCount(0);
+      }
+
+      // Vendor count via RPC (this one works)
+      const { data: vendors, error: vendorError } = await supabase
         .rpc('get_vendor_verifications', { p_status: 'pending' });
 
-      setPendingDriverCount(drivers || 0);
-      setPendingVendorCount(vendors?.length || 0);
+      if (vendorError) {
+        console.error('🔴 Vendor count RPC error:', vendorError);
+        setPendingVendorCount(0);
+      } else {
+        const vendorCount = vendors?.length || 0;
+        console.log('✅ Vendor count from RPC:', vendorCount);
+        setPendingVendorCount(vendorCount);
+      }
     } catch (error) {
-      console.error('Error fetching pending counts:', error);
+      console.error('❌ Error fetching pending counts:', error);
+      setPendingDriverCount(0);
+      setPendingVendorCount(0);
     }
   };
 
@@ -197,7 +218,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     paddingBottom: 10,
-    paddingTop: 20,
+    paddingTop: 50,
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },

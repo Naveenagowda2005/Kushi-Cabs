@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
   RefreshControl, TouchableOpacity, Dimensions, Alert,
@@ -6,6 +6,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import { useAvailableEnquiries, useVendorTrips } from '../../hooks/useEnquiries';
 import { useVendorProfile } from '../../hooks/useVendorProfile';
 import { useAppSettings } from '../../hooks/useAppSettings';
@@ -17,6 +18,7 @@ import {
   notifyNewEnquiry,
   notifyCommissionEarned,
 } from '../../services/notificationService';
+import { initializeAudio, cleanup } from '../../services/soundService';
 import EnquiryCard from '../../components/EnquiryCard';
 import TripStatusBadge from '../../components/TripStatusBadge';
 
@@ -379,11 +381,20 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
 
 export default function VendorEnquiriesScreen({ navigation }) {
   const { user } = useAuth();
+  const { isMuted, setIsMuted, updateAlertData } = useAlert();
   const { vendor } = useVendorProfile(user?.id);
   const { settings } = useAppSettings();
   const { enquiries, loading: loadingEnq, error, refetch: refetchEnq } = useAvailableEnquiries();
   const { trips, loading: loadingTrips, refetch: refetchTrips } = useVendorTrips(user?.id);
   const [activeTab, setActiveTab] = useState(0);
+
+  // Initialize audio on mount
+  useEffect(() => {
+    initializeAudio();
+    return () => {
+      cleanup();
+    };
+  }, []);
 
   // Log settings when they change
   useEffect(() => {
@@ -393,6 +404,14 @@ export default function VendorEnquiriesScreen({ navigation }) {
   // Live-patched enquiry list
   const [liveEnquiries, setLiveEnquiries] = useState([]);
   useEffect(() => { setLiveEnquiries(enquiries); }, [enquiries]);
+
+  // Sync enquiries AND vendor trips to AlertContext
+  useEffect(() => {
+    updateAlertData({
+      enquiries: liveEnquiries.length,
+      vendorTrips: trips.length,
+    });
+  }, [liveEnquiries.length, trips.length, updateAlertData]);
 
   // Register push on mount
   useEffect(() => {
@@ -406,12 +425,14 @@ export default function VendorEnquiriesScreen({ navigation }) {
     }, [refetchEnq, refetchTrips])
   );
 
-  // Realtime: enquiries
+  // Realtime: enquiries with sound alert
   useRealtimeEnquiries({
     userId: user?.id,
     onNewEnquiry: (trip) => {
       setLiveEnquiries((prev) => {
         if (prev.find((t) => t.id === trip.id)) return prev;
+        // Continuous alert will handle sound playing
+        console.log('🔔 New enquiry received');
         notifyNewEnquiry(trip);
         return [trip, ...prev];
       });
@@ -586,8 +607,9 @@ export default function VendorEnquiriesScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Tabs */}
-      <View style={styles.tabs}>
+      {/* Tabs with Mute Control */}
+      <View style={styles.tabsHeader}>
+        <View style={styles.tabs}>
         {TABS.map((tab, i) => (
           <TouchableOpacity
             key={tab}
@@ -602,6 +624,20 @@ export default function VendorEnquiriesScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
         ))}
+        </View>
+        <TouchableOpacity 
+          style={styles.muteButton}
+          onPress={() => {
+            console.log(`🔊 Sound alerts ${isMuted ? 'unmuted' : 'muted'}`);
+            setIsMuted(!isMuted);
+          }}
+        >
+          <Ionicons 
+            name={isMuted ? "volume-mute" : "volume-high-outline"} 
+            size={24} 
+            color={isMuted ? '#ff6b6b' : '#e94560'}
+          />
+        </TouchableOpacity>
       </View>
 
       {error && activeTab === 0 && (
@@ -650,10 +686,22 @@ export default function VendorEnquiriesScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f3460' },
-  tabs: {
+  tabsHeader: {
     flexDirection: 'row',
     backgroundColor: '#16213e',
     paddingHorizontal: screenWidth * 0.02,
+    paddingVertical: 0,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tabs: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  muteButton: {
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tab: {
     flex: 1,

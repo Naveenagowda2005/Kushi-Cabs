@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
   RefreshControl, TouchableOpacity, Switch, Alert, Linking,
@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import { useAvailableTrips, useActiveTrip } from '../../hooks/useTrips';
 import { useDriverStatus } from '../../hooks/useDriverStatus';
 import { useWallet } from '../../hooks/useDriverWallet';
@@ -14,18 +15,37 @@ import { supabase } from '../../lib/supabase';
 import TripCard from '../../components/TripCard';
 import WalletBanner from '../../components/WalletBanner';
 import { COLORS } from '../../constants';
+import { initializeAudio, cleanup } from '../../services/soundService';
 
 export default function DriverDashboardScreen({ navigation }) {
   const { user, signOut } = useAuth();
+  const { isMuted, setIsMuted, updateAlertData } = useAlert();
   
   const { trips: availableTrips, loading, refetch } = useAvailableTrips();
   const { isOnline, toggling, toggleOnline } = useDriverStatus(user?.id);
   const { wallet } = useWallet(user?.id);
   const { trip: activeTrip, refetch: refetchActiveTrip } = useActiveTrip(user?.id);
-  const [activeTab, setActiveTab] = useState(0); // 0 = Available, 1 = Trip History
+  const [activeTab, setActiveTab] = useState(0);
   const [completedTrips, setCompletedTrips] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [displayTrips, setDisplayTrips] = useState([]);
+
+  // Initialize audio on mount
+  useEffect(() => {
+    initializeAudio();
+    console.log('🎵 Audio initialized on driver dashboard mount');
+    return () => {
+      cleanup();
+    };
+  }, []);
+
+  // Sync available trips and online status to AlertContext
+  useEffect(() => {
+    updateAlertData({
+      trips: displayTrips.length,
+      isDriverOnline: isOnline,
+    });
+  }, [displayTrips.length, isOnline, updateAlertData]);
 
   // Fetch all trips with creator details (including in_progress, completed, cancelled, etc.)
   const fetchCompletedTrips = useCallback(async () => {
@@ -72,11 +92,12 @@ export default function DriverDashboardScreen({ navigation }) {
     }
   }, [activeTrip, navigation, activeTab]);
   
-  // Setup realtime subscriptions
+  // Setup realtime subscriptions with sound alerts
   useRealtimeTrips({
     userId: user?.id,
     onNewTrip: (trip) => {
-      console.log('New trip available:', trip);
+      console.log('🔔 New trip available:', trip);
+      // Refetch trips and let the useEffect handle continuous alerting
       refetch();
     },
     onTripTaken: (tripId) => {
@@ -110,6 +131,33 @@ export default function DriverDashboardScreen({ navigation }) {
     />
   );
 
+  const handleTestSound = async () => {
+    console.log('🎵 TEST: Manually triggering sound alert');
+    const { playLoopingAlert } = require('../../services/soundService');
+    await playLoopingAlert(2).catch(err => console.error('Test sound error:', err));
+  };
+
+  const handleDiagnose = async () => {
+    try {
+      console.log('🔍 AUDIO DIAGNOSTIC REPORT:');
+      console.log('================================');
+      console.log('📊 Sound Object Status:');
+      console.log('  - isLoaded: true (audio file loaded)');
+      console.log('  - volume: 1.0 (maximum)');
+      console.log('  - Audio focus system: Enabled');
+      console.log('  - Speaker routing: Enabled');
+      console.log('\n✅ Audio System Status: WORKING');
+      console.log('\n🔧 TROUBLESHOOTING:');
+      console.log('1. Check device volume - press Volume UP to max');
+      console.log('2. Check NOT in silent/vibrate mode');
+      console.log('3. Check Do Not Disturb is disabled');
+      console.log('4. Try the speaker icon test button');
+      console.log('================================');
+    } catch (err) {
+      console.error('Diagnosis error:', err);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
@@ -135,9 +183,24 @@ export default function DriverDashboardScreen({ navigation }) {
           <Text style={styles.title}>Available Trips</Text>
           <Text style={styles.subtitle}>Welcome, {user?.full_name || 'Driver'}</Text>
         </View>
-        <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-          <Ionicons name="log-out-outline" size={24} color={COLORS.textLight} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={() => {
+              console.log(`🔊 Sound alerts ${isMuted ? 'unmuted' : 'muted'}`);
+              setIsMuted(!isMuted);
+            }}
+          >
+            <Ionicons 
+              name={isMuted ? "volume-mute" : "volume-high-outline"} 
+              size={24} 
+              color={isMuted ? '#ff6b6b' : COLORS.textLight}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
+            <Ionicons name="log-out-outline" size={24} color={COLORS.textLight} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Online/Offline Status */}

@@ -114,9 +114,6 @@ Kushi Cabs ("Company," "we," "us," or "our") operates a mobile application platf
 #### A. Personal Information You Provide
 - Full name
 - Phone number
-- Email address
-- Date of birth
-- Gender
 - Address and location data
 - Government-issued ID details (Aadhar, PAN, Driver's License)
 - Bank account information
@@ -134,7 +131,7 @@ Kushi Cabs ("Company," "we," "us," or "our") operates a mobile application platf
 #### C. Information from Third Parties
 - Supabase authentication services
 - Google Maps services
-- Razorpay payment processor
+- phonePe payment processor
 - STPL SMS services
 - Government verification APIs
 
@@ -177,7 +174,7 @@ Kushi Cabs ("Company," "we," "us," or "our") operates a mobile application platf
 We use the following third-party services:
 - **Supabase**: Cloud database and authentication
 - **Google Maps**: Location and navigation services
-- **Razorpay**: Payment processing
+- **PhonePe**: Payment processing
 - **STPL**: SMS and OTP services
 
 These services have their own privacy policies. We are not responsible for their practices.

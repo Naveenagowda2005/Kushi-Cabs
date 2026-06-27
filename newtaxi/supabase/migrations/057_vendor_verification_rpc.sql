@@ -207,7 +207,7 @@ DECLARE
 BEGIN
   SELECT COUNT(*) INTO v_count
   FROM driver_verification_status
-  WHERE overall_status = 'pending';
+  WHERE overall_status = 'pending_review';
   RETURN v_count;
 END;
 $$;

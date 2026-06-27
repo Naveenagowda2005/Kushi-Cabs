@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert, TextInput, Modal,
+  RefreshControl, Alert, TextInput, Modal, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
+import IDCard from '../../components/IDCard';
 
 export default function SuperAdminVendorsScreen({ navigation }) {
   const [vendors, setVendors] = useState([]);
@@ -17,6 +18,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [showIDCard, setShowIDCard] = useState(false);
 
   useEffect(() => { fetchVendors(); }, []);
   useEffect(() => { filterVendors(); }, [searchQuery, vendors]);
@@ -25,14 +27,41 @@ export default function SuperAdminVendorsScreen({ navigation }) {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('users').select('*').eq('role_id', 2).order('created_at', { ascending: false });
+        .from('users').select('id, full_name, phone, is_active, avatar_base64, created_at, role_id').eq('role_id', 2).order('created_at', { ascending: false });
       if (error) throw error;
 
       const vendorsWithDetails = await Promise.all(
         (data || []).map(async (user) => {
-          const { data: vendorProfile } = await supabase.from('vendors').select('company_name, commission_pct').eq('user_id', user.id).single();
+          const { data: vendorProfile } = await supabase.from('vendors').select('*').eq('user_id', user.id).single();
           const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
-          return { ...user, vendors: vendorProfile ? [vendorProfile] : [], wallets: wallet ? [wallet] : [] };
+          
+          // Fetch vendor selfie photo from vendor_documents table
+          let documentPhoto = null;
+          try {
+            // Query vendor_documents with user_id (the foreign key)
+            const { data: vendorDocs } = await supabase
+              .from('vendor_documents')
+              .select('documents')
+              .eq('user_id', user.id)
+              .maybeSingle();
+            
+            if (vendorDocs?.documents?.VENDOR_SELFIE?.document_data) {
+              const photoData = vendorDocs.documents.VENDOR_SELFIE.document_data;
+              documentPhoto = photoData.startsWith('data:') 
+                ? photoData
+                : `data:image/jpeg;base64,${photoData}`;
+              console.log('✅ Found VENDOR_SELFIE photo for:', user.full_name);
+            }
+          } catch (docError) {
+            console.log('⚠️ Error fetching vendor docs:', docError.message);
+          }
+          
+          return { 
+            ...user, 
+            vendors: vendorProfile ? [vendorProfile] : [], 
+            wallets: wallet ? [wallet] : [], 
+            documentPhoto 
+          };
         })
       );
       setVendors(vendorsWithDetails);
@@ -140,6 +169,10 @@ export default function SuperAdminVendorsScreen({ navigation }) {
           <Ionicons name="trash-outline" size={16} color={COLORS.error} />
           <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#9c27b020' }]} onPress={() => { setSelectedVendor(vendor); setShowIDCard(true); }}>
+          <Ionicons name="card" size={16} color="#9c27b0" />
+          <Text style={[styles.actionButtonText, { color: '#9c27b0' }]}>ID Card</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -179,7 +212,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
             <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close" size={24} color={COLORS.text} /></TouchableOpacity>
           </View>
           {selectedVendor && (
-            <View style={styles.modalContent}>
+            <ScrollView style={styles.modalContent} contentContainerStyle={{ paddingBottom: 40 }}>
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>Personal Information</Text>
                 <Text style={styles.modalText}>Name: {selectedVendor.full_name || 'N/A'}</Text>
@@ -208,7 +241,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
                   <Text style={styles.markPaidButtonText}>Mark Payment as Paid</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           )}
         </View>
       </Modal>
@@ -317,6 +350,34 @@ export default function SuperAdminVendorsScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* ID Card Modal */}
+      <Modal visible={showIDCard} transparent animationType="fade" onRequestClose={() => setShowIDCard(false)}>
+        <View style={styles.idCardModalOverlay}>
+          <View style={styles.idCardModalBox}>
+            <TouchableOpacity 
+              style={styles.idCardCloseBtn}
+              onPress={() => setShowIDCard(false)}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <ScrollView contentContainerStyle={styles.idCardModalContent} showsVerticalScrollIndicator={false}>
+              {selectedVendor && (
+                <IDCard 
+                  userType="vendor"
+                  fullName={selectedVendor.full_name}
+                  phone={selectedVendor.phone}
+                  photo={selectedVendor.avatar_base64 || selectedVendor.documentPhoto}
+                  companyName={selectedVendor.vendors?.[0]?.company_name}
+                  serialNumber={selectedVendor.vendors?.[0]?.id?.charCodeAt(0) || 12345}
+                  isApproved={true}
+                />
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -344,15 +405,15 @@ const styles = StyleSheet.create({
   cardDetails: { marginBottom: 12 },
   detailItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   detailText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginLeft: 8, flex: 1 },
-  actionButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-  actionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, flex: 0.48, justifyContent: 'center' },
+  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  actionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, flex: 1, justifyContent: 'center' },
   actionButtonText: { fontSize: getResponsiveFontSize(12), fontWeight: '500', marginLeft: 4 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: getResponsiveFontSize(18), fontWeight: '600', color: COLORS.textSecondary, marginTop: 16 },
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: getResponsivePadding(24), paddingTop: hp(6), borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.text },
-  modalContent: { flex: 1, padding: getResponsivePadding(24) },
+  modalContent: { flex: 1, padding: getResponsivePadding(24), overflow: 'hidden' },
   modalSection: { marginBottom: 24 },
   modalSectionTitle: { fontSize: getResponsiveFontSize(16), fontWeight: '600', color: COLORS.text, marginBottom: 12 },
   modalText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginBottom: 8 },
@@ -420,5 +481,52 @@ const styles = StyleSheet.create({
   paymentButtonText: {
     fontSize: getResponsiveFontSize(14),
     fontWeight: '600',
+  },
+
+  idCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.superAdmin.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 16,
+  },
+
+  idCardButtonText: {
+    fontSize: getResponsiveFontSize(16),
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  idCardModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  idCardModalBox: {
+    width: '95%',
+    maxHeight: '90%',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  idCardCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
+    padding: 8,
+  },
+
+  idCardModalContent: {
+    paddingTop: 12,
+    paddingBottom: 20,
   },
 });
