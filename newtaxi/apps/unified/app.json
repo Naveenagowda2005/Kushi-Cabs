@@ -3,11 +3,11 @@
     "name": "Kushi Cabs",
     "slug": "kushicabs-unified",
     "version": "1.0.0",
-    "icon": "./logo.png",
+    "icon": "./app.icon.jpeg",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./logo.png",
+      "image": "./app.icon.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#001a33"
     },
@@ -22,10 +22,6 @@
     },
     "android": {
       "versionCode": 18,
-      "adaptiveIcon": {
-        "foregroundImage": "./adaptive-icon.png",
-        "backgroundColor": "#001a33"
-      },
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyAGZ5ps5kpMnfbDPox8kuN4IoWMSO0TeAY"
@@ -39,7 +35,7 @@
       "package": "com.Kushi_Cabs"
     },
     "web": {
-      "favicon": "./logo.png"
+      "favicon": "./app.icon.jpeg"
     },
     "plugins": [
       [

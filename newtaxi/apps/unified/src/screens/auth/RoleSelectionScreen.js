@@ -149,7 +149,7 @@ export default function RoleSelectionScreen() {
             ]}
           >
             <Image
-              source={require('../../../logo.png')}
+              source={require('../../../app.icon.jpeg')}
               style={styles.logo}
               resizeMode="contain"
             />

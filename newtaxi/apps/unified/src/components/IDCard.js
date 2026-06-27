@@ -41,7 +41,7 @@ export default function IDCard({
         <View style={styles.header}>
           <View style={styles.logoSection}>
             <Image 
-              source={require('../../logo.png')}
+              source={require('../../app.icon.jpeg')}
               style={styles.logoImage}
             />
             <Text style={styles.appName}>Kushi Cabs</Text>

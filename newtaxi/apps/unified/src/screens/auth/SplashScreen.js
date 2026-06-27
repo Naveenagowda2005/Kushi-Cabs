@@ -181,7 +181,7 @@ export default function SplashScreen({ navigation }) {
           {/* Logo */}
           <View style={styles.logoContainer}>
             <Image
-              source={require('../../../logo.png')}
+              source={require('../../../app.icon.jpeg')}
               style={styles.logo}
               resizeMode="contain"
             />

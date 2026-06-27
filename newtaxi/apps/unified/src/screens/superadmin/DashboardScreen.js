@@ -197,7 +197,7 @@ export default function SuperAdminDashboardScreen({ navigation }) {
           ]}
         >
           <Image
-            source={require('../../../logo.png')}
+            source={require('../../../app.icon.jpeg')}
             style={styles.headerLogo}
             resizeMode="contain"
           />

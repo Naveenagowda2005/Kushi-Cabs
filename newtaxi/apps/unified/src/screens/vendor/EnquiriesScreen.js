@@ -597,7 +597,7 @@ export default function VendorEnquiriesScreen({ navigation }) {
           refetchTrips();
         }}
         onPublish={() => {
-          // Removed - no need to refetch since we already updated local state
+          refetchTrips();
         }}
       />
     );

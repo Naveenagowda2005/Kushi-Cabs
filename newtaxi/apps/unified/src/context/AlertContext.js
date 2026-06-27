@@ -85,8 +85,10 @@ export const AlertProvider = ({ children }) => {
     // - vendorTrips (vendor's own published trips)
     const hasTripsOrEnquiries = trips > 0 || enquiries > 0 || vendorTrips > 0;
     
-    // For drivers: need to be online. For vendors: always ready
-    const shouldPlayAlert = hasTripsOrEnquiries && !isMuted;
+    // For drivers: need to be online AND have trips
+    // For vendors: just need enquiries/vendorTrips (no online status needed)
+    const isDriver = trips > 0;
+    const shouldPlayAlert = hasTripsOrEnquiries && !isMuted && (!isDriver || isDriverOnline);
 
     if (shouldPlayAlert && !hasPlayedInitialRef.current) {
       console.log('🔔 Alert available - starting continuous ring');
@@ -126,7 +128,7 @@ export const AlertProvider = ({ children }) => {
         clearInterval(continuousAlertRef.current);
       }
     };
-  }, [trips, enquiries, isMuted, vendorTrips, startBackgroundCheck, stopBackgroundCheck]);
+  }, [trips, enquiries, isMuted, vendorTrips, isDriverOnline, startBackgroundCheck, stopBackgroundCheck]);
 
   // Memoized update function to prevent re-renders
   const updateAlertData = useCallback((data) => {
@@ -134,6 +136,14 @@ export const AlertProvider = ({ children }) => {
     if (data.enquiries !== undefined) setEnquiries(data.enquiries);
     if (data.isDriverOnline !== undefined) setIsDriverOnline(data.isDriverOnline);
     if (data.vendorTrips !== undefined) setVendorTrips(data.vendorTrips);
+    
+    // Debug log
+    console.log('🔔 AlertContext updated:', {
+      trips: data.trips,
+      enquiries: data.enquiries,
+      vendorTrips: data.vendorTrips,
+      isDriverOnline: data.isDriverOnline
+    });
   }, []);
 
   // Handle mute changes - stop sound when muted
@@ -143,6 +153,14 @@ export const AlertProvider = ({ children }) => {
       stopSound().catch(err => console.warn('Error stopping sound:', err));
     }
   }, [isMuted]);
+
+  // Handle driver going offline - stop sound immediately
+  useEffect(() => {
+    if (!isDriverOnline && trips > 0) {
+      console.log('🔇 Driver went offline - stopping sound');
+      stopSound().catch(err => console.warn('Error stopping sound:', err));
+    }
+  }, [isDriverOnline, trips]);
 
   const value = {
     isMuted,
