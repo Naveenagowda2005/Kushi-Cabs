@@ -3,11 +3,11 @@
     "name": "Kushi Cabs",
     "slug": "kushicabs-unified",
     "version": "1.0.0",
-    "icon": "./app.icon.jpeg",
+    "icon": "./app-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./app.icon.jpeg",
+      "image": "./app-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#001a33"
     },
@@ -35,7 +35,7 @@
       "package": "com.Kushi_Cabs"
     },
     "web": {
-      "favicon": "./app.icon.jpeg"
+      "favicon": "./app-icon.png"
     },
     "plugins": [
       [
