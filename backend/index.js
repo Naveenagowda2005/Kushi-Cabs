@@ -61,9 +61,15 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`📱 API endpoints:`);
   console.log(`   - POST /sms/otp - Send OTP`);
   console.log(`   - POST /sms/verify - Verify OTP`);
+  console.log(`   - POST /admin/create-driver-account - Create driver account`);
+  console.log(`   - POST /admin/create-dummy-driver - Create dummy driver`);
+  console.log(`   - GET /admin/dummy-drivers - List dummy drivers`);
+  console.log(`   - POST /admin/create-dummy-vendor - Create dummy vendor`);
+  console.log(`   - GET /admin/dummy-vendors - List dummy vendors`);
   console.log(`   - POST /admin/delete-user - Delete user`);
   console.log(`   - POST /admin/update-admin-phone - Update admin phone`);
   console.log(`   - GET /admin/user/:userId - Get user info`);
+  console.log(`   - GET /admin/vendor-debug/:userId - Debug vendor setup`);
   console.log(`   - GET /health - Health check`);
 });
 

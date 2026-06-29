@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 
@@ -17,6 +18,14 @@ const POLICY_TYPES = [
 ];
 
 export default function PolicyManagementScreen({ navigation }) {
+  const { forceUpdate } = useTheme();
+  
+  // Force re-render when theme changes
+  const [themeRefresh, setThemeRefresh] = useState(0);
+  useEffect(() => {
+    setThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+  
   const [policies, setPolicies] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

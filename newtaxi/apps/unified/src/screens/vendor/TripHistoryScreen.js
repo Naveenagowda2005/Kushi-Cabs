@@ -76,17 +76,17 @@ export default function VendorTripHistoryScreen() {
         </View>
 
         <View style={styles.row}>
-          <Ionicons name="location" size={14} color="#4caf50" />
+          <Ionicons name="location" size={16} color="#4caf50" />
           <Text style={styles.location} numberOfLines={1}>{item.pickup_location}</Text>
         </View>
         <View style={styles.row}>
-          <Ionicons name="flag" size={14} color="#e94560" />
+          <Ionicons name="flag" size={16} color="#e94560" />
           <Text style={styles.location} numberOfLines={1}>{item.dropoff_location}</Text>
         </View>
 
         {item.passenger_name && (
           <View style={styles.row}>
-            <Ionicons name="person-outline" size={14} color="#888" />
+            <Ionicons name="person-outline" size={16} color="#888" />
             <Text style={styles.meta}>{item.passenger_name}</Text>
           </View>
         )}
@@ -159,28 +159,28 @@ export default function VendorTripHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f3460' },
-  header: { backgroundColor: '#001a33', padding: 20, paddingTop: 60 },
-  title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  subtitle: { color: '#888', fontSize: 13, marginTop: 4 },
-  statsRow: { flexDirection: 'row', backgroundColor: '#16213e', paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#0f3460' },
-  statItem: { flex: 1, alignItems: 'center' },
-  statValue: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  statLabel: { color: '#888', fontSize: 11, marginTop: 2 },
-  tabs: { flexDirection: 'row', backgroundColor: '#16213e', paddingHorizontal: 4, paddingBottom: 4 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  tabActive: { backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#f0f0f0' },
+  header: { backgroundColor: '#ffffff', padding: 6, paddingTop: 12 },
+  title: { color: '#333', fontSize: 28, fontWeight: 'bold' },
+  subtitle: { color: '#888', fontSize: 14, marginTop: 2, fontWeight: '600' },
+  statsRow: { flexDirection: 'row', backgroundColor: '#f5f5f5', paddingVertical: 16, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: '#e0e0e0', gap: 8 },
+  statItem: { flex: 1, alignItems: 'center', borderWidth: 2, borderColor: '#ff9800', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 8, backgroundColor: '#ffffff' },
+  statValue: { color: '#333', fontSize: 22, fontWeight: 'bold' },
+  statLabel: { color: '#888', fontSize: 12, marginTop: 4, fontWeight: '600' },
+  tabs: { flexDirection: 'row', backgroundColor: '#ffffff', paddingHorizontal: 4, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8, borderWidth: 2, borderColor: '#e0e0e0', marginHorizontal: 4 },
+  tabActive: { backgroundColor: '#f0f0f0', borderColor: '#ff9800' },
   tabText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#fff' },
+  tabTextActive: { color: '#e94560' },
   list: { padding: 16, paddingBottom: 100 },
-  card: { backgroundColor: '#16213e', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#1a1a2e' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  fare: { color: '#4caf50', fontWeight: 'bold', fontSize: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  location: { color: '#ccc', fontSize: 13, flex: 1 },
-  meta: { color: '#888', fontSize: 12, flex: 1 },
+  card: { backgroundColor: '#ffffff', borderRadius: 14, padding: 18, marginBottom: 14, borderWidth: 3, borderColor: '#ff9800' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  fare: { color: '#4caf50', fontWeight: 'bold', fontSize: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6, paddingVertical: 4 },
+  location: { color: '#333', fontSize: 15, flex: 1, fontWeight: '500' },
+  meta: { color: '#666', fontSize: 14, flex: 1, fontWeight: '500' },
   commission: { color: '#4caf50', fontSize: 12 },
-  date: { color: '#aaa', fontSize: 11, marginTop: 6 },
+  date: { color: '#888', fontSize: 12, marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
   empty: { alignItems: 'center', paddingTop: 80 },
-  emptyText: { color: '#aaa', fontSize: 16, marginTop: 12 },
+  emptyText: { color: '#888', fontSize: 16, marginTop: 12 },
 });

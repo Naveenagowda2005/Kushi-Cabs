@@ -15,10 +15,19 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS } from '../../constants';
 import DocumentViewer from '../../components/DocumentViewer';
 
 const AdminVendorVerificationDashboard = () => {
+  const { forceUpdate } = useTheme();
+  
+  // Force re-render when theme changes
+  const [themeRefresh, setThemeRefresh] = useState(0);
+  useEffect(() => {
+    setThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+  
   const [pendingVendors, setPendingVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

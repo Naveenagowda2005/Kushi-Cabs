@@ -5,11 +5,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import IDCard from '../../components/IDCard';
 
 export default function SuperAdminVendorsScreen({ navigation }) {
+  const { forceUpdate } = useTheme();
+  
+  // Force re-render when theme changes
+  const [themeRefresh, setThemeRefresh] = useState(0);
+  useEffect(() => {
+    setThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+  
   const [vendors, setVendors] = useState([]);
   const [filteredVendors, setFilteredVendors] = useState([]);
   const [loading, setLoading] = useState(true);

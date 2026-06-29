@@ -33,7 +33,9 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
   const [fuelTypeName, setFuelTypeName] = useState(null);
   const [creatorName, setCreatorName] = useState(null);
   const [creatorPhone, setCreatorPhone] = useState(null);
-  const [segmentName, setSegmentName] = useState('One-way');
+
+  // Get segment name directly from enriched data
+  const segmentName = item.segment_name || 'ONE WAY';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -64,16 +66,6 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
             .eq('id', item.fuel_type)
             .maybeSingle();
           if (fuelData) setFuelTypeName(fuelData.name);
-        }
-
-        // Fetch segment name - EXACT SAME LOGIC AS ENQUIRYCARD
-        if (item.segment_id) {
-          const { data: segmentData } = await supabase
-            .from('trip_segments')
-            .select('name')
-            .eq('id', item.segment_id)
-            .maybeSingle();
-          if (segmentData) setSegmentName(segmentData.name);
         }
 
         // Fetch creator details
@@ -114,8 +106,8 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
       {/* Trip Type Badge */}
       <View style={styles.tripTypeBadgeRow}>
         <View style={styles.tripTypeBadge}>
-          <Ionicons name="tag-outline" size={14} color="#888" />
-          <Text style={styles.tripTypeBadgeText}>{String(segmentName || 'ONE WAY').toUpperCase()}</Text>
+          <Ionicons name="car-outline" size={14} color="#ff9800" />
+          <Text style={styles.tripTypeBadgeText}>{segmentName ? segmentName.toUpperCase() : 'TRIP'}</Text>
         </View>
       </View>
 
@@ -123,23 +115,44 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         <TripStatusBadge status={item.status} />
         <Text style={styles.myTripFare}>₹{item.fare_amount}</Text>
       </View>
-      <View style={styles.row}>
-        <Ionicons name="location" size={14} color="#4caf50" />
-        <Text style={styles.myTripLocation} numberOfLines={1}>{item.pickup_location}</Text>
-      </View>
-      <View style={styles.row}>
-        <Ionicons name="flag" size={14} color="#e94560" />
-        <Text style={styles.myTripLocation} numberOfLines={1}>{item.dropoff_location}</Text>
-      </View>
-      {item.return_location && (
-        <View style={styles.row}>
-          <Ionicons name="location-outline" size={14} color="#2196f3" />
-          <Text style={[styles.myTripLocation, { color: '#2196f3', fontWeight: '600' }]} numberOfLines={1}>Return: {item.return_location}</Text>
+
+      {/* Locations in one row */}
+      <View style={styles.locationsRow}>
+        <View style={styles.locationItem}>
+          <Ionicons name="location" size={12} color="#4caf50" />
+          <Text style={styles.locationItemLabel}>Pickup</Text>
+          <Text style={styles.locationItemText} numberOfLines={1}>{item.pickup_location}</Text>
         </View>
-      )}
-      <Text style={styles.myTripDate}>Departure: {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : 'ASAP'}</Text>
+        <Text style={styles.locationDivider}>→</Text>
+        <View style={styles.locationItem}>
+          <Ionicons name="flag" size={12} color="#e94560" />
+          <Text style={styles.locationItemLabel}>Drop</Text>
+          <Text style={styles.locationItemText} numberOfLines={1}>{item.dropoff_location}</Text>
+        </View>
+        {item.return_location && (
+          <>
+            <Text style={styles.locationDivider}>→</Text>
+            <View style={styles.locationItem}>
+              <Ionicons name="location-outline" size={12} color="#2196f3" />
+              <Text style={styles.locationItemLabel}>Return</Text>
+              <Text style={[styles.locationItemText, { color: '#2196f3' }]} numberOfLines={1}>{item.return_location}</Text>
+            </View>
+          </>
+        )}
+      </View>
+      <View style={styles.row}>
+        <Ionicons name="calendar-outline" size={14} color="#ff9800" />
+        <Text style={[styles.myTripDate, { flexDirection: 'row', flexWrap: 'nowrap' }]} numberOfLines={1}>
+          Departure: {item.scheduled_at ? new Date(item.scheduled_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }) : 'ASAP'}
+        </Text>
+      </View>
       {item.return_date && (
-        <Text style={styles.myTripReturnDate}>Return: {new Date(item.return_date).toLocaleDateString()}</Text>
+        <View style={styles.row}>
+          <Ionicons name="calendar-outline" size={14} color="#ff9800" />
+          <Text style={[styles.myTripReturnDate, { flexDirection: 'row', flexWrap: 'nowrap' }]} numberOfLines={1}>
+            Return: {new Date(item.return_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })}
+          </Text>
+        </View>
       )}
 
       {/* Fare Breakdown */}
@@ -195,86 +208,24 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         </>
       )}
 
-      {/* Extra Charges Display */}
-      <View style={styles.extraChargesContainer}>
-        <View style={styles.extraChargesRow}>
+      {/* Extra Charges Display - Both in one row */}
+      <View style={[styles.extraChargesContainer, { flexDirection: 'row', gap: 8 }]}>
+        <View style={{ flex: 1 }}>
           <View style={styles.chargeBadge}>
-            <Ionicons name="cash-outline" size={12} color="#fff" />
             <Text style={styles.chargeBadgeText}>
-              Toll: {item.toll_included ? 'Included' : 'Excluded'}
+              Toll - Tax - Hills: {item.toll_included ? '✓ Included' : '✗ Excluded'}
             </Text>
           </View>
         </View>
-        <View style={styles.extraChargesRow}>
-          <View style={styles.chargeBadge}>
-            <Ionicons name="document-text-outline" size={12} color="#fff" />
-            <Text style={styles.chargeBadgeText}>
-              Tax: {item.state_tax_included ? 'Included' : 'Excluded'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.extraChargesRow}>
+        <View style={{ flex: 1 }}>
           <View style={styles.chargeBadge}>
             <Ionicons name="paw-outline" size={12} color="#fff" />
             <Text style={styles.chargeBadgeText}>
-              Pet: {item.pet_travelling ? 'Allowed' : 'Not Allowed'}
+              Pet: {item.pet_travelling ? '✓ Allowed' : '✗ Not Allowed'}
             </Text>
           </View>
         </View>
       </View>
-
-      {/* Additional Notes */}
-      <View style={styles.notesHeader}>
-        <Text style={styles.notesTitle}>Notes:</Text>
-      </View>
-
-      {/* Note 1: Carrier */}
-      {(carTypeName || seaterTypeName) && (
-        <View style={styles.noteItem}>
-          <Ionicons name="alert-circle-outline" size={12} color="#ff9800" />
-          <Text style={styles.noteText}>
-            Carrier must have {carTypeName || 'required'} with {seaterTypeName || 'required'} seating
-          </Text>
-        </View>
-      )}
-
-      {/* Note 2: Additional Info */}
-      <View style={styles.noteItem}>
-        <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>
-          Driver must accept all charges conditions before accepting trip
-        </Text>
-      </View>
-
-      {/* Trip Creator Details - if pre-advance exceeds commission */}
-      {customerPreAdvance > commissionAmount && (
-        <View style={styles.creatorDetailsBox}>
-          <View style={styles.creatorDetailsHeader}>
-            <Ionicons name="alert-circle-outline" size={14} color="#ff9800" />
-            <Text style={styles.creatorDetailsTitle}>Collect from Trip Creator</Text>
-          </View>
-          <Text style={styles.creatorDetailsNote}>
-            Customer pre-advance (₹{customerPreAdvance.toFixed(2)}) exceeds commission (₹{commissionAmount.toFixed(2)})
-          </Text>
-          <View style={styles.creatorDetailRow}>
-            <Ionicons name="person-outline" size={12} color="#ff9800" />
-            <Text style={styles.creatorDetailLabel}>Trip Creator:</Text>
-            <Text style={styles.creatorDetailValue}>{creatorName || 'N/A'}</Text>
-          </View>
-          {creatorPhone && (
-            <View style={styles.creatorDetailRow}>
-              <Ionicons name="call-outline" size={12} color="#ff9800" />
-              <Text style={styles.creatorDetailLabel}>Phone:</Text>
-              <Text style={styles.creatorDetailValue}>{creatorPhone}</Text>
-            </View>
-          )}
-          <View style={styles.creatorDetailRow}>
-            <Ionicons name="wallet-outline" size={12} color="#ff9800" />
-            <Text style={styles.creatorDetailLabel}>Collect:</Text>
-            <Text style={styles.creatorDetailValue}>₹{(customerPreAdvance - commissionAmount).toFixed(2)}</Text>
-          </View>
-        </View>
-      )}
 
       {/* Edit button — for trip creator and super admin */}
       {(item.created_by === user?.id || user?.role === 'super_admin') && (
@@ -685,14 +636,16 @@ export default function VendorEnquiriesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f3460' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   tabsHeader: {
     flexDirection: 'row',
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     paddingHorizontal: screenWidth * 0.02,
     paddingVertical: 0,
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   tabs: {
     flexDirection: 'row',
@@ -711,12 +664,12 @@ const styles = StyleSheet.create({
   },
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#e94560' },
   tabText: {
-    color: '#888',
+    color: '#666',
     fontSize: Math.max(13, screenWidth * 0.035),
     fontWeight: '600',
     textAlign: 'center',
   },
-  tabTextActive: { color: '#fff' },
+  tabTextActive: { color: '#e94560' },
   badge: { color: '#e94560' },
   list: {
     padding: screenWidth * 0.04,
@@ -747,15 +700,15 @@ const styles = StyleSheet.create({
   errorText: { color: '#ff9800', fontSize: Math.max(12, screenWidth * 0.032), flex: 1, marginRight: 8 },
   retryText: { color: '#fff', fontSize: Math.max(12, screenWidth * 0.032), fontWeight: '600' },
   myTripCard: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
-    padding: screenWidth * 0.035,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#1a1a2e',
+    padding: screenWidth * 0.02,
+    marginBottom: 6,
+    borderWidth: 2,
+    borderColor: '#ff9800',
   },
   tripTypeBadgeRow: {
-    marginBottom: 10,
+    marginBottom: 6,
   },
   tripTypeBadge: {
     flexDirection: 'row',
@@ -763,13 +716,13 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#2196f333',
     borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     alignSelf: 'flex-start',
   },
   tripTypeBadgeText: {
     color: '#ff9800',
-    fontSize: Math.max(16, screenWidth * 0.04),
+    fontSize: Math.max(14, screenWidth * 0.038),
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -778,19 +731,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
-  myTripFare: { color: '#4caf50', fontWeight: 'bold', fontSize: Math.max(15, screenWidth * 0.04) },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, flex: 1 },
-  myTripLocation: { color: '#ccc', fontSize: Math.max(12, screenWidth * 0.032), flex: 1 },
-  myTripDate: { color: '#aaa', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 6 },
-  myTripReturnDate: { color: '#ff9800', fontSize: Math.max(10, screenWidth * 0.028), marginTop: 4, fontWeight: '600' },
+  myTripFare: { color: '#4caf50', fontWeight: 'bold', fontSize: Math.max(18, screenWidth * 0.048) },
+  locationsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginVertical: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    backgroundColor: '#0f1c2e',
+    borderRadius: 8,
+    flexWrap: 'wrap',
+  },
+  locationItem: {
+    flex: 1,
+    minWidth: 80,
+    alignItems: 'center',
+    gap: 2,
+  },
+  locationItemLabel: {
+    color: '#888',
+    fontSize: Math.max(8, screenWidth * 0.02),
+    fontWeight: '600',
+  },
+  locationItemText: {
+    color: '#fff',
+    fontSize: Math.max(9, screenWidth * 0.024),
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  locationDivider: {
+    color: '#555',
+    fontSize: Math.max(12, screenWidth * 0.03),
+    marginHorizontal: 2,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2, flex: 1 },
+  myTripLocation: { color: '#ccc', fontSize: Math.max(14, screenWidth * 0.038), flex: 1 },
+  myTripDate: { color: '#ff9800', fontSize: Math.max(12, screenWidth * 0.032), marginTop: 3, fontWeight: '700' },
+  myTripReturnDate: { color: '#ff9800', fontSize: Math.max(12, screenWidth * 0.032), marginTop: 2, fontWeight: '700' },
   carDetailsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginVertical: 8,
-    paddingVertical: 6,
+    gap: 6,
+    marginVertical: 4,
+    paddingVertical: 4,
     borderTopWidth: 1,
     borderTopColor: '#1a1a2e',
     borderBottomWidth: 1,
@@ -799,23 +785,23 @@ const styles = StyleSheet.create({
   carDetail: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     backgroundColor: '#1a2744',
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 0.5,
     borderColor: '#2196f3',
   },
   carDetailText: {
     color: '#2196f3',
-    fontSize: Math.max(11, screenWidth * 0.03),
+    fontSize: Math.max(10, screenWidth * 0.027),
     fontWeight: '600',
     textAlign: 'center',
   },
   extraChargesContainer: {
-    gap: 8,
-    marginVertical: 10,
+    gap: 6,
+    marginVertical: 6,
   },
   extraChargesRow: {
     flexDirection: 'row',
@@ -824,63 +810,63 @@ const styles = StyleSheet.create({
   chargeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#ff9800',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   chargeBadgeText: {
     color: '#fff',
-    fontSize: Math.max(10, screenWidth * 0.028),
+    fontSize: Math.max(9, screenWidth * 0.026),
     fontWeight: '600',
   },
   carrierNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#2a1a00',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    marginVertical: 8,
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginVertical: 4,
   },
   carrierNoteText: {
     color: '#ff9800',
-    fontSize: Math.max(10, screenWidth * 0.028),
+    fontSize: Math.max(9, screenWidth * 0.026),
     fontWeight: '500',
     flex: 1,
   },
   taxNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingTop: 10,
+    gap: 4,
+    marginTop: 4,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: '#1a1a2e',
   },
   taxNoteText: {
     color: '#888',
-    fontSize: Math.max(10, screenWidth * 0.028),
+    fontSize: Math.max(9, screenWidth * 0.026),
     fontWeight: '400',
     flex: 1,
   },
   petsNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
+    gap: 4,
+    marginTop: 3,
   },
   petsNoteText: {
     color: '#888',
-    fontSize: Math.max(10, screenWidth * 0.028),
+    fontSize: Math.max(9, screenWidth * 0.026),
     fontWeight: '400',
     flex: 1,
   },
   notesHeader: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: '#1a1a2e',
   },

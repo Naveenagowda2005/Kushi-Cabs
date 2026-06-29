@@ -9,13 +9,12 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
   const [carType, setCarType] = useState(null);
   const [seaterType, setSeaterType] = useState(null);
   const [fuelType, setFuelType] = useState(null);
-  const [segmentName, setSegmentName] = useState(null);
   const [packageName, setPackageName] = useState(null);
   const [creatorName, setCreatorName] = useState(null);
   const [creatorPhone, setCreatorPhone] = useState(null);
 
-  // Glow animation
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  // Get segment name directly from enriched data (already fetched by hook)
+  const segmentName = trip.segment_name || 'ONE WAY';
 
   const commissionAmount = trip.commission_amount || 0;
   const customerPreAdvance = trip.customer_pre_advance || 0;
@@ -53,15 +52,6 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
           if (fuelData) setFuelType(fuelData.name);
         }
 
-        if (trip.segment_id) {
-          const { data: segmentData } = await supabase
-            .from('trip_segments')
-            .select('name')
-            .eq('id', trip.segment_id)
-            .maybeSingle();
-          if (segmentData) setSegmentName(segmentData.name);
-        }
-
         if (trip.package_id) {
           const { data: packageData } = await supabase
             .from('trip_packages')
@@ -95,43 +85,11 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
 
     fetchCarDetails();
     fetchCreatorDetails();
-  }, [trip.car_type, trip.seater_type, trip.fuel_type, trip.segment_id, trip.package_id, trip.created_by]);
-
-  // Glow animation - continuous blink
-  useEffect(() => {
-    const glowAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: false,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    glowAnimation.start();
-
-    return () => glowAnimation.stop();
-  }, [glowAnim]);
-
-  const glowStyle = {
-    backgroundColor: glowAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['#16213e', '#1a4d1a'],
-    }),
-    shadowOpacity: glowAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.3, 0.8],
-    }),
-  };
+  }, [trip.car_type, trip.seater_type, trip.fuel_type, trip.package_id, trip.created_by]);
 
   return (
     <Animated.View
-      style={[styles.card, glowStyle]}
+      style={[styles.card]}
     >
       <TouchableOpacity
         onPress={onPress}
@@ -141,8 +99,8 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
         <View style={{ flex: 1 }}>
           <View style={styles.header}>
             <View style={styles.tripTypeContainer}>
-              <Ionicons name="car-outline" size={16} color="#888" />
-              <Text style={styles.tripType}>{segmentName?.toUpperCase() || 'ONE WAY TRIP'}</Text>
+              <Ionicons name="car-outline" size={16} color="#ff9800" />
+              <Text style={styles.tripType}>{segmentName ? segmentName.toUpperCase() : 'TRIP'}</Text>
             </View>
             <View style={styles.paymentBadge}>
               <Text style={styles.paymentText}>Paid by Cash</Text>
@@ -150,56 +108,44 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
           </View>
 
           <View style={styles.badgeRow}>
-            <View style={styles.fareBadge}>
-              <Ionicons name="cash-outline" size={16} color="#fff" />
-              <Text style={styles.fareText}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <Ionicons name="location" size={16} color="#4caf50" />
-            <View style={styles.locationContent}>
-              <Text style={styles.locationLabel}>Pickup</Text>
-              <Text style={styles.location} numberOfLines={2}>{trip.pickup_location}</Text>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <Ionicons name="flag" size={16} color="#1a1a2e" />
-            <View style={styles.locationContent}>
-              <Text style={styles.locationLabel}>Dropoff</Text>
-              <Text style={styles.location} numberOfLines={2}>{trip.dropoff_location}</Text>
-            </View>
-          </View>
-
-          {/* Return Location - for Round trips */}
-          {trip.return_location && (
-            <View style={styles.row}>
-              <Ionicons name="location" size={16} color="#4caf50" />
-              <View style={styles.locationContent}>
-                <Text style={styles.locationLabel}>Return Location</Text>
-                <Text style={styles.location} numberOfLines={2}>{trip.return_location}</Text>
+            <View style={styles.fareKmBox}>
+              <View style={styles.fareBadge}>
+                <Ionicons name="cash-outline" size={16} color="#333" />
+                <Text style={styles.fareText}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
               </View>
+              {trip.fixed_km && (
+                <View style={styles.kmBadge}>
+                  <Ionicons name="swap-horizontal-outline" size={16} color="#333" />
+                  <Text style={styles.kmText}>{trip.fixed_km} km</Text>
+                </View>
+              )}
             </View>
-          )}
+          </View>
 
-          {/* Return Date - for Round trips */}
-          {trip.return_date && (
-            <View style={styles.row}>
-              <Ionicons name="calendar-outline" size={16} color="#2196f3" />
-              <View style={styles.locationContent}>
-                <Text style={styles.locationLabel}>Return Date</Text>
-                <Text style={styles.location}>
-                  {new Date(trip.return_date).toLocaleDateString('en-IN', {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </Text>
-              </View>
+          {/* Locations in one row */}
+          <View style={styles.enquiryLocationsRow}>
+            <View style={styles.enquiryLocationItem}>
+              <Ionicons name="location" size={12} color="#4caf50" />
+              <Text style={styles.enquiryLocationLabel}>Pickup</Text>
+              <Text style={styles.enquiryLocationText} numberOfLines={1}>{trip.pickup_location}</Text>
             </View>
-          )}
+            <Text style={styles.enquiryLocationDivider}>→</Text>
+            <View style={styles.enquiryLocationItem}>
+              <Ionicons name="flag" size={12} color="#e94560" />
+              <Text style={styles.enquiryLocationLabel}>Drop</Text>
+              <Text style={styles.enquiryLocationText} numberOfLines={1}>{trip.dropoff_location}</Text>
+            </View>
+            {trip.return_location && (
+              <>
+                <Text style={styles.enquiryLocationDivider}>→</Text>
+                <View style={styles.enquiryLocationItem}>
+                  <Ionicons name="location-outline" size={12} color="#2196f3" />
+                  <Text style={styles.enquiryLocationLabel}>Return</Text>
+                  <Text style={[styles.enquiryLocationText, { color: '#2196f3' }]} numberOfLines={1}>{trip.return_location}</Text>
+                </View>
+              </>
+            )}
+          </View>
 
           {/* Package - for Local Packages */}
           {packageName && (
@@ -236,46 +182,37 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
 
           {trip.scheduled_at && (
             <View style={styles.row}>
-              <Ionicons name="calendar-outline" size={14} color="#888" />
-              <Text style={styles.scheduledText}>
-                Departure: {new Date(trip.scheduled_at).toLocaleString()}
+              <Ionicons name="calendar-outline" size={14} color="#ff9800" />
+              <Text style={styles.scheduledText} numberOfLines={1}>
+                Departure: {new Date(trip.scheduled_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
               </Text>
             </View>
           )}
 
-          {/* Extra Charges Display */}
-          <View style={styles.extraChargesContainer}>
-            <View style={styles.extraChargesRow}>
-              <View style={styles.chargeBadge}>
-                <Ionicons name="cash-outline" size={12} color="#fff" />
-                <Text style={styles.chargeBadgeText}>
-                  Toll: {trip.toll_included ? 'Included' : 'Excluded'}
-                </Text>
-              </View>
+          {/* Return Date - for Round trips - directly under departure */}
+          {trip.return_date && (
+            <View style={styles.row}>
+              <Ionicons name="calendar-outline" size={14} color="#ff9800" />
+              <Text style={styles.scheduledText} numberOfLines={1}>
+                Return: {new Date(trip.return_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+              </Text>
             </View>
-            <View style={styles.extraChargesRow}>
-              <View style={styles.chargeBadge}>
-                <Ionicons name="document-text-outline" size={12} color="#fff" />
-                <Text style={styles.chargeBadgeText}>
-                  Tax: {trip.state_tax_included ? 'Included' : 'Excluded'}
-                </Text>
-              </View>
+          )}
+
+          {/* Extra Charges Display - Toll Tax Hills + Pet in Single Row */}
+          <View style={styles.inclusionsRow}>
+            <View style={styles.inclusionBox}>
+              <Text style={styles.inclusionLabel}>Toll - Tax - Hills</Text>
+              <Text style={[styles.inclusionStatus, trip.toll_included ? styles.includedText : styles.excludedText]}>
+                {trip.toll_included ? '✓ Included' : '✗ Excluded'}
+              </Text>
             </View>
-            <View style={styles.extraChargesRow}>
-              <View style={styles.chargeBadge}>
-                <Ionicons name="paw-outline" size={12} color="#fff" />
-                <Text style={styles.chargeBadgeText}>
-                  Pet: {trip.pet_travelling ? 'Allowed' : 'Not Allowed'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.extraChargesRow}>
-              <View style={styles.chargeBadge}>
-                <Ionicons name="logo-designernews" size={12} color="#fff" />
-                <Text style={styles.chargeBadgeText}>
-                  Hills: {trip.hills_included ? 'Included' : 'Excluded'}
-                </Text>
-              </View>
+            <Text style={styles.inclusionDivider}>-</Text>
+            <View style={styles.inclusionBox}>
+              <Text style={styles.inclusionLabel}>Pet</Text>
+              <Text style={[styles.inclusionStatus, trip.pet_travelling ? styles.includedText : styles.excludedText]}>
+                {trip.pet_travelling ? '✓ Allowed' : '✗ Not Allowed'}
+              </Text>
             </View>
           </View>
 
@@ -303,34 +240,7 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
           </View>
 
           {/* Trip Creator Details - if pre-advance exceeds commission */}
-          {customerPreAdvance > commissionAmount && (
-            <View style={styles.creatorDetailsBox}>
-              <View style={styles.creatorDetailsHeader}>
-                <Ionicons name="alert-circle-outline" size={14} color="#ff9800" />
-                <Text style={styles.creatorDetailsTitle}>Collect from Trip Creator</Text>
-              </View>
-              <Text style={styles.creatorDetailsNote}>
-                Customer pre-advance (₹{customerPreAdvance.toFixed(2)}) exceeds commission (₹{commissionAmount.toFixed(2)})
-              </Text>
-              <View style={styles.creatorDetailRow}>
-                <Ionicons name="person-outline" size={12} color="#ff9800" />
-                <Text style={styles.creatorDetailLabel}>Trip Creator:</Text>
-                <Text style={styles.creatorDetailValue}>{creatorName || 'N/A'}</Text>
-              </View>
-              {creatorPhone && (
-                <View style={styles.creatorDetailRow}>
-                  <Ionicons name="call-outline" size={12} color="#ff9800" />
-                  <Text style={styles.creatorDetailLabel}>Phone:</Text>
-                  <Text style={styles.creatorDetailValue}>{creatorPhone}</Text>
-                </View>
-              )}
-              <View style={styles.creatorDetailRow}>
-                <Ionicons name="wallet-outline" size={12} color="#ff9800" />
-                <Text style={styles.creatorDetailLabel}>Collect:</Text>
-                <Text style={styles.creatorDetailValue}>₹{(customerPreAdvance - commissionAmount).toFixed(2)}</Text>
-              </View>
-            </View>
-          )}
+          {/* REMOVED: Collect from Trip Creator box to reduce clutter */}
 
           {/* Action Buttons */}
           <View style={styles.actionButtonsContainer}>
@@ -365,12 +275,12 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: screenWidth * 0.04,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#0f3460',
+    borderWidth: 2,
+    borderColor: '#ff9800',
     minHeight: 180,
   },
   header: {
@@ -392,13 +302,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   paymentBadge: {
-    backgroundColor: '#000',
+    backgroundColor: '#f5f5f5',
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   paymentText: {
-    color: '#fff',
+    color: '#333',
     fontSize: Math.max(11, screenWidth * 0.028),
     fontWeight: '600',
   },
@@ -409,17 +319,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexWrap: 'wrap',
   },
-  fareBadge: {
-    backgroundColor: '#1a1a2e',
+  fareKmBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
+  },
+  fareBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   fareText: {
-    color: '#fff',
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: Math.max(14, screenWidth * 0.038),
+  },
+  kmBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  kmText: {
+    color: '#333',
     fontWeight: 'bold',
     fontSize: Math.max(14, screenWidth * 0.038),
   },
@@ -439,15 +364,15 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   location: {
-    color: '#fff',
-    fontSize: Math.max(13, screenWidth * 0.035),
+    color: '#333',
+    fontSize: Math.max(15, screenWidth * 0.042),
     flex: 1,
   },
   packageBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#0a2a4a',
+    backgroundColor: '#e3f2fd',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -465,9 +390,9 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: '#e0e0e0',
   },
   carDetail: {
     flexDirection: 'row',
@@ -502,6 +427,74 @@ const styles = StyleSheet.create({
     fontSize: Math.max(10, screenWidth * 0.028),
     fontWeight: '600',
   },
+  inclusionsRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginVertical: 10,
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  inclusionBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  inclusionLabel: {
+    fontSize: Math.max(9, screenWidth * 0.022),
+    fontWeight: '600',
+    color: '#333',
+  },
+  inclusionStatus: {
+    fontSize: Math.max(8, screenWidth * 0.02),
+    fontWeight: '600',
+  },
+  inclusionDivider: {
+    fontSize: Math.max(10, screenWidth * 0.025),
+    color: '#555',
+    marginHorizontal: 2,
+  },
+  enquiryLocationsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginVertical: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    flexWrap: 'wrap',
+  },
+  enquiryLocationItem: {
+    flex: 1,
+    minWidth: 70,
+    alignItems: 'center',
+    gap: 2,
+  },
+  enquiryLocationLabel: {
+    color: '#888',
+    fontSize: Math.max(8, screenWidth * 0.02),
+    fontWeight: '600',
+  },
+  enquiryLocationText: {
+    color: '#333',
+    fontSize: Math.max(11, screenWidth * 0.032),
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  enquiryLocationDivider: {
+    color: '#555',
+    fontSize: Math.max(12, screenWidth * 0.03),
+    marginHorizontal: 2,
+  },
+  includedText: {
+    color: '#4caf50',
+  },
+  excludedText: {
+    color: '#ff9800',
+  },
   carrierNote: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -519,14 +512,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scheduledText: {
-    color: '#888',
-    fontSize: Math.max(11, screenWidth * 0.028),
+    color: '#ff9800',
+    fontSize: Math.max(14, screenWidth * 0.038),
+    fontWeight: '700',
   },
   notesHeader: {
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
   },
   notesTitle: {
     color: '#fff',
@@ -553,7 +547,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
   },
   notesText: {
     color: '#888',
@@ -568,7 +562,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
   },
   taxNoteText: {
     color: '#888',
@@ -589,12 +583,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   breakdownBox: {
-    backgroundColor: '#0a1929',
+    backgroundColor: '#f9f9f9',
     borderRadius: 8,
     padding: 10,
     marginVertical: 10,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#e0e0e0',
   },
   breakdownTitle: {
     color: '#fff',
@@ -620,7 +614,7 @@ const styles = StyleSheet.create({
   },
   breakdownTotal: {
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
     marginTop: 8,
     paddingTop: 8,
   },
@@ -685,7 +679,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
   },
   actionButton: {
     flex: 1,

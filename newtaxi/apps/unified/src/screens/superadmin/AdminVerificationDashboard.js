@@ -14,11 +14,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS } from '../../constants';
 import DocumentViewer from '../../components/DocumentViewer';
 import * as documentService from '../../services/documentService';
 
 const AdminVerificationDashboard = () => {
+  const { forceUpdate } = useTheme();
+  
+  // Force re-render when theme changes
+  const [themeRefresh, setThemeRefresh] = useState(0);
+  useEffect(() => {
+    setThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+  
   const [pendingVerifications, setPendingVerifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

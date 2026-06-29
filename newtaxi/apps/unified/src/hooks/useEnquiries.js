@@ -24,7 +24,19 @@ export function useAvailableEnquiries() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setEnquiries(data || []);
+      
+      // Fetch all segment names to enrich trips with segment_name
+      const { data: segments } = await supabase.from('trip_segments').select('id, name');
+      const segmentMap = {};
+      segments?.forEach(seg => { segmentMap[seg.id] = seg.name; });
+      
+      // Enrich enquiries with segment names
+      const enrichedEnquiries = (data || []).map(trip => ({
+        ...trip,
+        segment_name: trip.segment_id ? segmentMap[trip.segment_id] : 'One-way'
+      }));
+      
+      setEnquiries(enrichedEnquiries);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -76,7 +88,19 @@ export function useVendorTrips(userId) {
 
       const { data, error } = await query;
       if (error) throw error;
-      setTrips(data || []);
+      
+      // Fetch all segment names
+      const { data: segments } = await supabase.from('trip_segments').select('id, name');
+      const segmentMap = {};
+      segments?.forEach(seg => { segmentMap[seg.id] = seg.name; });
+      
+      // Enrich trips with segment names
+      const enrichedTrips = (data || []).map(trip => ({
+        ...trip,
+        segment_name: trip.segment_id ? segmentMap[trip.segment_id] : 'One-way'
+      }));
+      
+      setTrips(enrichedTrips);
     } catch (err) {
       console.error('useVendorTrips:', err.message);
     } finally {

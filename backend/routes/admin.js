@@ -629,6 +629,167 @@ router.get('/user/:userId', async (req, res) => {
 });
 
 /**
+ * POST /admin/create-dummy-vendor
+ * Creates a fully approved dummy vendor account for emergency use.
+ * - Creates auth account
+ * - Creates users, vendors, vendor_verification_status (approved) records
+ * - No document upload required — vendor can log in and accept trips immediately
+ */
+router.post('/create-dummy-vendor', async (req, res) => {
+  try {
+    const { phone, companyName } = req.body;
+    if (!phone) return res.status(400).json({ error: 'phone is required' });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Admin credentials not configured' });
+
+    const phoneDigits = phone.replace(/[^0-9]/g, '');
+    if (phoneDigits.length !== 10) {
+      return res.status(400).json({ error: 'Phone must be 10 digits' });
+    }
+
+    const email = `${phoneDigits}@kushicabs.phone`;
+    const password = `OTP-${phoneDigits}-kushicabs`;
+    // Ensure company name always starts with DUMMY for easy identification
+    let name = companyName?.trim() || `DUMMY Vendor ${phoneDigits.slice(-4)}`;
+    // If custom name doesn't start with DUMMY, prepend it
+    if (!name.toUpperCase().startsWith('DUMMY')) {
+      name = `DUMMY - ${name}`;
+    }
+
+    console.log(`🤖 Creating dummy vendor: ${name} (${phoneDigits})`);
+
+    // 1. Get vendor role ID
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from('roles')
+      .select('id')
+      .eq('name', 'vendor')
+      .single();
+
+    if (roleError || !roleData) {
+      return res.status(500).json({ error: 'Vendor role not found' });
+    }
+
+    // 2. Create or reset auth account
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    if (listError) return res.status(500).json({ error: listError.message });
+
+    let authUserId;
+    const existing = users.find(u => u.email === email);
+
+    if (existing) {
+      await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+        password, email_confirm: true
+      });
+      authUserId = existing.id;
+      console.log(`♻️  Reusing existing auth account: ${authUserId}`);
+    } else {
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email, password, email_confirm: true, user_metadata: { phone: phoneDigits }
+      });
+      if (createError) return res.status(500).json({ error: createError.message });
+      authUserId = newUser.user.id;
+      console.log(`✅ Auth account created: ${authUserId}`);
+    }
+
+    // 3. Upsert users table
+    const { error: userError } = await supabaseAdmin
+      .from('users')
+      .upsert({
+        id: authUserId,
+        email,
+        phone: phoneDigits,
+        full_name: name,
+        role_id: roleData.id,
+        is_active: true,
+        verification_status: 'approved',
+      }, { onConflict: 'id' });
+
+    if (userError) return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
+
+    // 4. Upsert vendors table (note: no registration_number column exists)
+    const { error: vendorError } = await supabaseAdmin
+      .from('vendors')
+      .upsert({
+        user_id: authUserId,
+        company_name: name,
+        commission_pct: 10.00,
+      }, { onConflict: 'user_id' });
+
+    if (vendorError) return res.status(500).json({ error: 'Failed to create vendor record: ' + vendorError.message });
+
+    // 5. Upsert vendor_verification_status as approved (skip document check)
+    const { error: vvsError } = await supabaseAdmin
+      .from('vendor_verification_status')
+      .upsert({
+        user_id: authUserId,
+        overall_status: 'approved',
+        all_documents_submitted: true,
+        submitted_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+    if (vvsError) {
+      console.warn('⚠️ Could not create vendor_verification_status:', vvsError.message);
+      // Not fatal — VendorNavigator fallback will handle via users.verification_status
+    } else {
+      console.log('✅ vendor_verification_status set to approved');
+    }
+
+    console.log(`🎉 Dummy vendor ready: ${name} | Phone: ${phoneDigits}`);
+
+    res.json({
+      success: true,
+      message: `Dummy vendor created successfully`,
+      vendor: { name, phone: phoneDigits, userId: authUserId },
+    });
+
+  } catch (error) {
+    console.error('create-dummy-vendor error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /admin/dummy-vendors
+ * List all dummy vendor accounts
+ */
+router.get('/dummy-vendors', async (req, res) => {
+  try {
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Admin credentials not configured' });
+
+    // Fetch vendors with company names starting with 'DUMMY'
+    const { data, error } = await supabaseAdmin
+      .from('vendors')
+      .select(`
+        user_id,
+        company_name,
+        commission_pct,
+        users!inner(id, full_name, phone, is_active, verification_status, created_at)
+      `)
+      .ilike('company_name', 'DUMMY%')
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    
+    // Transform data structure - vendors joined with users
+    const vendors = (data || []).map(vendor => ({
+      id: vendor.users.id,
+      full_name: vendor.users.full_name,
+      phone: vendor.users.phone,
+      is_active: vendor.users.is_active,
+      verification_status: vendor.users.verification_status,
+      created_at: vendor.users.created_at,
+      company_name: vendor.company_name,
+      commission_pct: vendor.commission_pct
+    }));
+    
+    res.json({ success: true, vendors });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+/**
  * GET /admin/vendor-debug/:userId
  * Debug endpoint to check vendor setup and documents
  */

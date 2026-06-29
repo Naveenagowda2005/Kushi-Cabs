@@ -625,39 +625,6 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                       <Text style={styles.paymentSubtitle}>
                         Customer pre-advance exceeds commission. Collect the remaining amount from the trip creator.
                       </Text>
-                      
-                      <View style={styles.creatorDetailsBox}>
-                        <View style={styles.creatorDetailsHeader}>
-                          <Ionicons name="alert-circle-outline" size={14} color="#ff9800" />
-                          <Text style={styles.creatorDetailsTitle}>Collect from Trip Creator</Text>
-                        </View>
-                        <Text style={styles.creatorDetailsNote}>
-                          Customer pre-advance (₹{customerPreAdvance.toFixed(2)}) exceeds commission (₹{commissionAmount.toFixed(2)})
-                        </Text>
-                        <View style={styles.creatorDetailRow}>
-                          <Ionicons name="person-outline" size={12} color="#ff9800" />
-                          <Text style={styles.creatorDetailLabel}>Trip Creator:</Text>
-                          <Text style={styles.creatorDetailValue}>{creatorName || 'N/A'}</Text>
-                        </View>
-                        {creatorPhone && (
-                          <View style={styles.creatorDetailRow}>
-                            <Ionicons name="call-outline" size={12} color="#ff9800" />
-                            <Text style={styles.creatorDetailLabel}>Phone:</Text>
-                            <Text style={styles.creatorDetailValue}>{creatorPhone}</Text>
-                            <TouchableOpacity
-                              style={styles.callBtn}
-                              onPress={() => Linking.openURL(`tel:${creatorPhone}`)}
-                            >
-                              <Ionicons name="call" size={12} color="#fff" />
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                        <View style={styles.creatorDetailRow}>
-                          <Ionicons name="wallet-outline" size={12} color="#ff9800" />
-                          <Text style={styles.creatorDetailLabel}>Collect:</Text>
-                          <Text style={styles.creatorDetailValue}>₹{(customerPreAdvance - commissionAmount).toFixed(2)}</Text>
-                        </View>
-                      </View>
 
                       <View style={styles.paymentDetails}>
                         <View style={styles.detailRow}>

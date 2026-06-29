@@ -177,33 +177,7 @@ export default function DriverDashboardScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Available Trips</Text>
-          <Text style={styles.subtitle}>Welcome, {user?.full_name || 'Driver'}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TouchableOpacity 
-            style={{ padding: 8 }}
-            onPress={() => {
-              console.log(`🔊 Sound alerts ${isMuted ? 'unmuted' : 'muted'}`);
-              setIsMuted(!isMuted);
-            }}
-          >
-            <Ionicons 
-              name={isMuted ? "volume-mute" : "volume-high-outline"} 
-              size={24} 
-              color={isMuted ? '#ff6b6b' : COLORS.textLight}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-            <Ionicons name="log-out-outline" size={24} color={COLORS.textLight} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Online/Offline Status */}
+      {/* Online/Offline Status with Controls */}
       <View style={[styles.statusBar, isOnline ? styles.statusBarOnline : styles.statusBarOffline]}>
         <View style={styles.statusLeft}>
           <View style={[styles.statusDot, isOnline ? styles.dotOnline : styles.dotOffline]} />
@@ -214,13 +188,31 @@ export default function DriverDashboardScreen({ navigation }) {
             </Text>
           </View>
         </View>
-        <Switch
-          value={isOnline}
-          onValueChange={toggleOnline}
-          disabled={toggling}
-          trackColor={{ false: '#333', true: '#4caf5066' }}
-          thumbColor={isOnline ? '#4caf50' : '#666'}
-        />
+        <View style={styles.statusRight}>
+          <Switch
+            value={isOnline}
+            onValueChange={toggleOnline}
+            disabled={toggling}
+            trackColor={{ false: '#333', true: '#4caf5066' }}
+            thumbColor={isOnline ? '#4caf50' : '#666'}
+          />
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={() => {
+              console.log(`🔊 Sound alerts ${isMuted ? 'unmuted' : 'muted'}`);
+              setIsMuted(!isMuted);
+            }}
+          >
+            <Ionicons 
+              name={isMuted ? "volume-mute" : "volume-high-outline"} 
+              size={22} 
+              color={isMuted ? '#ff6b6b' : COLORS.textLight}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={{ padding: 8 }} onPress={signOut}>
+            <Ionicons name="log-out-outline" size={22} color={COLORS.textLight} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Active Trip Banner — shown if redirect hasn't fired yet */}
@@ -404,15 +396,6 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: COLORS.background 
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#001a33',
-    paddingTop: 12,
-  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -426,6 +409,18 @@ const styles = StyleSheet.create({
   },
   signOutBtn: {
     padding: 8,
+  },
+  statusBar: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingHorizontal: 16, 
+    paddingVertical: 12,
+  },
+  statusRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   statusBar: {
     flexDirection: 'row', 

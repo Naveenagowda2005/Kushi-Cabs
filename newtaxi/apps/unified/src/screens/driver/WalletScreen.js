@@ -9,19 +9,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useWallet } from '../../hooks/useDriverWallet';
 import { useTransactions } from '../../hooks/useDriverTransactions';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import TransactionRow from '../../components/TransactionRow';
-import { MIN_WALLET_BALANCE, PAYMENT_GATEWAYS } from '../../constants';
+import { PAYMENT_GATEWAYS } from '../../constants';
 import { initiateDeposit } from '../../services/paymentService';
 
 export default function DriverWalletScreen() {
   const { user } = useAuth();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useWallet(user?.id);
   const { transactions, loading: txLoading, refetch: refetchTx } = useTransactions(user?.id);
+  const { settings } = useSystemSettings();
   const [depositModalVisible, setDepositModalVisible] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [isDepositing, setIsDepositing] = useState(false);
 
-  const isLow = wallet && wallet.balance < MIN_WALLET_BALANCE;
+  const minWalletBalance = settings.minimumWalletBalance || 100;
+  const isLow = wallet && wallet.balance < minWalletBalance;
 
   useFocusEffect(useCallback(() => {
     refetchWallet();
@@ -102,7 +105,7 @@ export default function DriverWalletScreen() {
         {isLow && (
           <View style={styles.warningRow}>
             <Ionicons name="warning-outline" size={16} color="#ff9800" />
-            <Text style={styles.warningText}>Minimum balance required: ₹500</Text>
+            <Text style={styles.warningText}>Minimum balance required: ₹{minWalletBalance}</Text>
           </View>
         )}
         
@@ -253,61 +256,61 @@ export default function DriverWalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#f0f0f0' },
   balanceCard: {
-    backgroundColor: '#16213e', margin: 16, marginTop: 60, borderRadius: 20,
-    padding: 24, borderWidth: 1, borderColor: '#0f3460',
+    backgroundColor: '#ffffff', margin: 16, marginTop: 20, borderRadius: 14,
+    padding: 20, borderWidth: 2, borderColor: '#ff9800',
   },
   balanceCardLow: { borderColor: '#ff9800' },
-  balanceLabel: { color: '#888', fontSize: 14, marginBottom: 6 },
-  balanceAmount: { color: '#fff', fontSize: 42, fontWeight: 'bold' },
+  balanceLabel: { color: '#666', fontSize: 12, marginBottom: 6, fontWeight: '500' },
+  balanceAmount: { color: '#4caf50', fontSize: 36, fontWeight: 'bold' },
   balanceAmountLow: { color: '#ff9800' },
   warningRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  warningText: { color: '#ff9800', fontSize: 12 },
-  actionRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  warningText: { color: '#ff9800', fontSize: 12, fontWeight: '500' },
+  actionRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   actionBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#1a1a2e', borderRadius: 12, padding: 14,
+    gap: 8, backgroundColor: '#ff9800', borderRadius: 10, padding: 12,
   },
-  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#1a1a2e' },
-  actionBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 2, borderColor: '#ff9800' },
+  actionBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   historyHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 8,
+    alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8,
   },
-  historyTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  historyCount: { color: '#aaa', fontSize: 13 },
+  historyTitle: { color: '#333', fontSize: 16, fontWeight: '600' },
+  historyCount: { color: '#888', fontSize: 12 },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   empty: { alignItems: 'center', paddingTop: 60 },
-  emptyText: { color: '#aaa', fontSize: 16, marginTop: 12 },
+  emptyText: { color: '#888', fontSize: 16, marginTop: 12 },
 });
 
 const modal = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   scrollContent: { flexGrow: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#16213e', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  handle: { width: 40, height: 4, backgroundColor: '#444', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  title: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { color: '#888', fontSize: 14, marginBottom: 20 },
+  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: '#ddd', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  title: { color: '#333', fontSize: 20, fontWeight: 'bold', marginBottom: 4 },
+  subtitle: { color: '#666', fontSize: 13, marginBottom: 16 },
   input: {
-    backgroundColor: '#0f3460', color: '#fff', borderRadius: 12,
-    padding: 14, fontSize: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: '#1a1a2e',
+    backgroundColor: '#f5f5f5', color: '#333', borderRadius: 10,
+    padding: 12, fontSize: 15, marginBottom: 12,
+    borderWidth: 2, borderColor: '#ff9800',
   },
-  quickRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  quickBtn: { flex: 1, backgroundColor: '#0f3460', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1a1a2e' },
-  quickBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  methodRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  methodBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center', backgroundColor: '#0f3460', borderWidth: 1, borderColor: '#1a1a2e' },
-  methodBtnActive: { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
-  methodText: { color: '#888', fontWeight: '600' },
+  quickRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  quickBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8, padding: 10, alignItems: 'center', borderWidth: 2, borderColor: '#ff9800' },
+  quickBtnText: { color: '#333', fontSize: 12, fontWeight: '600' },
+  methodRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  methodBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#f5f5f5', borderWidth: 2, borderColor: '#ff9800' },
+  methodBtnActive: { backgroundColor: '#ff9800', borderColor: '#ff9800' },
+  methodText: { color: '#666', fontWeight: '600', fontSize: 12 },
   methodTextActive: { color: '#fff' },
   confirmBtn: {
-    backgroundColor: '#1a1a2e', borderRadius: 14, padding: 16,
-    alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 12,
+    backgroundColor: '#ff9800', borderRadius: 10, padding: 14,
+    alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 10,
   },
   confirmBtnDisabled: { opacity: 0.6 },
-  confirmBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  confirmBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   cancelBtn: { alignItems: 'center', padding: 12 },
-  cancelBtnText: { color: '#888', fontSize: 15 },
+  cancelBtnText: { color: '#888', fontSize: 14, fontWeight: '500' },
 });

@@ -7,6 +7,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS } from '../../constants';
 
 // Zoomable Image Component with simple zoom controls
@@ -184,6 +185,14 @@ const STATUS_COLOR = {
 };
 
 export default function SuperAdminTripsScreen() {
+  const { forceUpdate } = useTheme();
+  
+  // Force re-render when theme changes
+  const [themeRefresh, setThemeRefresh] = useState(0);
+  useEffect(() => {
+    setThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+  
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all'); // all, pending, accepted, in_progress, completed, cancelled

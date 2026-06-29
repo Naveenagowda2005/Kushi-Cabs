@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, FlatList,
@@ -6,16 +6,32 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
 import { supabase } from '../../lib/supabase';
 import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
+import { useSystemSettings, updateMinimumWalletBalance } from '../../hooks/useSystemSettings';
 
 export default function SuperAdminSettingsScreen({ navigation }) {
   const { user, refreshUserProfile, signOut } = useAuth();
+  const { isDarkMode, toggleTheme, forceUpdate } = useTheme();
+  const { settings, loading: settingsLoading, refetch: refetchSettings } = useSystemSettings();
+  
+  // Force re-render when theme changes
+  const [themeRefresh, setThemeRefresh] = useState(0);
+  useEffect(() => {
+    setThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+  
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Wallet balance setting
+  const [minWalletBalance, setMinWalletBalance] = useState('500');
+  const [isEditingWallet, setIsEditingWallet] = useState(false);
+  const [savingWallet, setSavingWallet] = useState(false);
 
   // Dummy driver state
   const [dummyPhone, setDummyPhone] = useState('');
@@ -25,12 +41,32 @@ export default function SuperAdminSettingsScreen({ navigation }) {
   const [loadingDummy, setLoadingDummy] = useState(false);
   const [showDummyForm, setShowDummyForm] = useState(false);
 
+  // Dummy vendor state
+  const [dummyVendorPhone, setDummyVendorPhone] = useState('');
+  const [dummyVendorName, setDummyVendorName] = useState('');
+  const [creatingDummyVendor, setCreatingDummyVendor] = useState(false);
+  const [dummyVendors, setDummyVendors] = useState([]);
+  const [loadingDummyVendor, setLoadingDummyVendor] = useState(false);
+  const [showDummyVendorForm, setShowDummyVendorForm] = useState(false);
+
+  // Refs to manage subscriptions and polling
+  const driversSubscriptionRef = useRef(null);
+  const vendorsSubscriptionRef = useRef(null);
+
   useEffect(() => {
     if (user) {
       setFullName(user.full_name || '');
       setPhone(user.phone || '');
     }
   }, [user]);
+
+  // Initialize wallet balance from settings
+  useEffect(() => {
+    if (settings.minimumWalletBalance !== undefined && settings.minimumWalletBalance !== null) {
+      console.log('✅ Updated minWalletBalance display to:', settings.minimumWalletBalance);
+      setMinWalletBalance(settings.minimumWalletBalance.toString());
+    }
+  }, [settings.minimumWalletBalance]);
 
   const fetchDummyDrivers = useCallback(async () => {
     try {
@@ -82,14 +118,113 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     }
   }, []);
 
+  const fetchDummyVendors = useCallback(async () => {
+    try {
+      setLoadingDummyVendor(true);
+      console.log('🔄 Fetching dummy vendors from Supabase');
+      
+      // Step 1: Get all vendors first (without nested join)
+      const { data: allVendors, error: vendorError } = await supabase
+        .from('vendors')
+        .select('id, user_id, company_name, commission_pct');
+
+      console.log('📊 Raw vendors query result:', allVendors);
+      console.log('❌ Vendors query error:', vendorError);
+      
+      if (vendorError) {
+        console.error('⚠️ Error fetching vendors from Supabase:', vendorError);
+        return;
+      }
+
+      if (!allVendors || allVendors.length === 0) {
+        console.log('⚠️ No vendors found in database');
+        setDummyVendors([]);
+        return;
+      }
+
+      console.log(`✅ Found ${allVendors.length} total vendors in database`);
+      
+      // Filter for dummy vendors (company_name starts with DUMMY or Test)
+      const dummyVendorsList = allVendors.filter(vendor => {
+        const companyName = vendor.company_name || '';
+        const matches = companyName.toUpperCase().startsWith('DUMMY') || 
+                       companyName.toUpperCase().startsWith('TEST');
+        console.log(`  - Vendor: "${companyName}" → ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
+        return matches;
+      });
+      
+      console.log(`📊 Filtered to ${dummyVendorsList.length} dummy vendors`);
+      
+      if (dummyVendorsList.length === 0) {
+        console.log('⚠️ No dummy vendors found (all vendors do not match DUMMY/Test pattern)');
+        setDummyVendors([]);
+        return;
+      }
+
+      // Step 2: Get user data for each vendor
+      const userIds = dummyVendorsList.map(v => v.user_id);
+      console.log(`📊 Fetching user data for ${userIds.length} vendors...`);
+      
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, full_name, phone, is_active, verification_status, created_at')
+        .in('id', userIds);
+
+      if (userError) {
+        console.warn('⚠️ Warning: Could not fetch user data:', userError);
+        // Continue anyway - we have vendor data
+      } else {
+        console.log(`📊 Fetched user data for ${userData?.length || 0} users`);
+      }
+
+      // Step 3: Combine vendor and user data
+      const userMap = {};
+      (userData || []).forEach(user => {
+        userMap[user.id] = user;
+      });
+
+      const transformedData = dummyVendorsList.map(vendor => {
+        const user = userMap[vendor.user_id];
+        return {
+          id: vendor.user_id,
+          full_name: user?.full_name || vendor.company_name || 'Unknown',
+          phone: user?.phone,
+          is_active: user?.is_active,
+          verification_status: user?.verification_status || 'unknown',
+          created_at: user?.created_at,
+          company_name: vendor.company_name,
+          commission_pct: vendor.commission_pct
+        };
+      });
+
+      console.log(`✅ Transformed ${transformedData.length} vendors:`, transformedData);
+      setDummyVendors(transformedData);
+    } catch (e) {
+      console.error('❌ Error fetching dummy vendors:', e);
+    } finally {
+      setLoadingDummyVendor(false);
+    }
+  }, []);
+
   // Fetch on mount and when screen is focused
   useEffect(() => {
     fetchDummyDrivers();
-  }, []);
+    fetchDummyVendors();
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, [fetchDummyDrivers, fetchDummyVendors]);
 
   useFocusEffect(useCallback(() => { 
-    fetchDummyDrivers(); 
-  }, []));
+    console.log('Settings screen focused - refreshing lists once');
+    fetchDummyDrivers();
+    fetchDummyVendors();
+
+    return () => {
+      // No cleanup needed
+    };
+  }, [fetchDummyDrivers, fetchDummyVendors]));
 
   const handleCreateDummyDriver = async () => {
     const digits = dummyPhone.replace(/[^0-9]/g, '');
@@ -119,6 +254,37 @@ export default function SuperAdminSettingsScreen({ navigation }) {
       Alert.alert('Error', err.message);
     } finally {
       setCreatingDummy(false);
+    }
+  };
+
+  const handleCreateDummyVendor = async () => {
+    const digits = dummyVendorPhone.replace(/[^0-9]/g, '');
+    if (digits.length !== 10) {
+      Alert.alert('Invalid Phone', 'Enter a valid 10-digit phone number');
+      return;
+    }
+    try {
+      setCreatingDummyVendor(true);
+      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/create-dummy-vendor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: digits, companyName: dummyVendorName.trim() || undefined }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Failed');
+
+      Alert.alert(
+        '✅ Dummy Vendor Created',
+        `Company: ${result.vendor.name}\nPhone: ${result.vendor.phone}\n\nThis vendor can log in immediately with OTP and accept trips without document verification.`
+      );
+      setDummyVendorPhone('');
+      setDummyVendorName('');
+      setShowDummyVendorForm(false);
+      await fetchDummyVendors();
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setCreatingDummyVendor(false);
     }
   };
 
@@ -228,19 +394,73 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     }
   };
 
+  const handleSaveWalletBalance = async () => {
+    const newBalance = parseFloat(minWalletBalance);
+    
+    if (isNaN(newBalance) || newBalance < 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid minimum balance amount');
+      return;
+    }
+
+    setSavingWallet(true);
+    try {
+      const result = await updateMinimumWalletBalance(newBalance);
+      
+      if (result.success) {
+        Alert.alert(
+          '✅ Success',
+          `Minimum wallet balance updated to ₹${newBalance.toFixed(2)} for all drivers`
+        );
+        // Wait for settings to refetch and update
+        await refetchSettings();
+        // Small delay to ensure state updates
+        await new Promise(r => setTimeout(r, 500));
+        setMinWalletBalance(newBalance.toString());
+        setIsEditingWallet(false);
+      } else {
+        throw new Error(result.error || 'Failed to update');
+      }
+    } catch (err) {
+      console.error('Error saving wallet balance:', err);
+      Alert.alert('Error', err.message || 'Failed to update wallet balance');
+    } finally {
+      setSavingWallet(false);
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
+    <ScrollView style={[styles.container, { backgroundColor: COLORS.background }]} contentContainerStyle={styles.scroll}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Manage your account and app settings</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.title, { color: COLORS.text }]}>Settings</Text>
+          <Text style={[styles.subtitle, { color: COLORS.textSecondary }]}>Manage your account and app settings</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          {/* Refresh Button */}
+          <TouchableOpacity
+            onPress={() => {
+              console.log('🔄 Manual refresh all dummy lists');
+              fetchDummyDrivers();
+              fetchDummyVendors();
+            }}
+            disabled={loadingDummy || loadingDummyVendor}
+            style={{ justifyContent: 'center', alignItems: 'center', width: 40, height: 40 }}
+          >
+            {loadingDummy || loadingDummyVendor ? (
+              <ActivityIndicator color={COLORS.warning} size="small" />
+            ) : (
+              <Ionicons name="refresh" size={24} color={COLORS.warning} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Profile Section */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: COLORS.surface, borderColor: COLORS.border }]}>
         <View style={styles.sectionHeader}>
           <Ionicons name="person-outline" size={24} color={COLORS.warning} />
-          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <Text style={[styles.sectionTitle, { color: COLORS.text }]}>Profile Information</Text>
           {!isEditing && (
             <TouchableOpacity onPress={() => setIsEditing(true)}>
               <Ionicons name="pencil" size={20} color={COLORS.superAdmin.primary} />
@@ -251,9 +471,13 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         {isEditing ? (
           <>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name</Text>
+              <Text style={[styles.label, { color: COLORS.text }]}>Full Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { 
+                  backgroundColor: COLORS.background, 
+                  color: COLORS.text,
+                  borderColor: COLORS.border
+                }]}
                 value={fullName}
                 onChangeText={setFullName}
                 placeholder="Enter your full name"
@@ -263,9 +487,13 @@ export default function SuperAdminSettingsScreen({ navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phone Number</Text>
+              <Text style={[styles.label, { color: COLORS.text }]}>Phone Number</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { 
+                  backgroundColor: COLORS.background, 
+                  color: COLORS.text,
+                  borderColor: COLORS.border
+                }]}
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="Enter your phone number"
@@ -306,17 +534,17 @@ export default function SuperAdminSettingsScreen({ navigation }) {
           </>
         ) : (
           <>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Full Name</Text>
-              <Text style={styles.infoValue}>{user?.full_name || 'Not set'}</Text>
+            <View style={[styles.infoRow, { borderBottomColor: COLORS.border }]}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Full Name</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{user?.full_name || 'Not set'}</Text>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Phone Number</Text>
-              <Text style={styles.infoValue}>{user?.phone || 'Not set'}</Text>
+            <View style={[styles.infoRow, { borderBottomColor: COLORS.border }]}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Phone Number</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{user?.phone || 'Not set'}</Text>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{user?.phone ? `${user.phone}@kushicabs.phone` : 'Not set'}</Text>
+            <View style={[styles.infoRow, { borderBottomColor: COLORS.border }]}>
+              <Text style={[styles.infoLabel, { color: COLORS.textSecondary }]}>Email</Text>
+              <Text style={[styles.infoValue, { color: COLORS.text }]}>{user?.phone ? `${user.phone}@kushicabs.phone` : 'Not set'}</Text>
             </View>
           </>
         )}
@@ -341,7 +569,74 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         </View>
       </TouchableOpacity>
 
-      {/* Dummy Driver Accounts */}
+      {/* Minimum Wallet Balance Setting Card */}
+      <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#4caf50' }]}>
+        <View style={styles.sectionHeader}>
+          <View style={[styles.iconBox, { backgroundColor: '#4caf5020' }]}>
+            <Ionicons name="wallet-outline" size={24} color="#4caf50" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Minimum Wallet Balance</Text>
+            <Text style={styles.cardDesc}>Set minimum wallet balance required for drivers</Text>
+          </View>
+          {!isEditingWallet && (
+            <TouchableOpacity onPress={() => setIsEditingWallet(true)}>
+              <Ionicons name="pencil" size={20} color={COLORS.superAdmin.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {isEditingWallet ? (
+          <>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Minimum Balance (₹)</Text>
+              <TextInput
+                style={styles.input}
+                value={minWalletBalance}
+                onChangeText={setMinWalletBalance}
+                placeholder="Enter amount"
+                placeholderTextColor={COLORS.textTertiary}
+                keyboardType="decimal-pad"
+                editable={!savingWallet}
+              />
+            </View>
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setMinWalletBalance((settings.minimumWalletBalance !== undefined && settings.minimumWalletBalance !== null) ? settings.minimumWalletBalance.toString() : '500');
+                  setIsEditingWallet(false);
+                }}
+                disabled={savingWallet}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.saveButton, savingWallet && styles.buttonDisabled]}
+                onPress={handleSaveWalletBalance}
+                disabled={savingWallet}
+              >
+                {savingWallet ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={18} color="#fff" />
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Current Minimum Balance</Text>
+            <Text style={[styles.infoValue, { color: '#4caf50', fontWeight: 'bold', fontSize: 18 }]}>
+              ₹{(settings.minimumWalletBalance !== undefined && settings.minimumWalletBalance !== null) ? settings.minimumWalletBalance : 500}
+            </Text>
+          </View>
+        )}
+      </View>
       <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#ff9800' }]}>
         <View style={styles.sectionHeader}>
           <View style={[styles.iconBox, { backgroundColor: '#ff980020' }]}>
@@ -422,6 +717,88 @@ export default function SuperAdminSettingsScreen({ navigation }) {
           )}
         </View>
       </View>
+
+      {/* Dummy Vendors Section */}
+      <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#2196F3' }]}>
+        <View style={styles.sectionHeader}>
+          <View style={[styles.iconBox, { backgroundColor: '#2196F320' }]}>
+            <Ionicons name="business-outline" size={24} color="#2196F3" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Emergency Dummy Vendors</Text>
+            <Text style={styles.cardDesc}>Create pre-approved vendor accounts for emergency use. No document verification required.</Text>
+          </View>
+          <TouchableOpacity onPress={() => setShowDummyVendorForm(p => !p)}>
+            <Ionicons name={showDummyVendorForm ? 'chevron-up' : 'add-circle-outline'} size={24} color="#2196F3" />
+          </TouchableOpacity>
+        </View>
+
+        {showDummyVendorForm && (
+          <View style={styles.dummyForm}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Phone Number *</Text>
+              <TextInput
+                style={styles.input}
+                value={dummyVendorPhone}
+                onChangeText={setDummyVendorPhone}
+                placeholder="10-digit phone number"
+                placeholderTextColor={COLORS.textTertiary}
+                keyboardType="phone-pad"
+                maxLength={10}
+                editable={!creatingDummyVendor}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Company Name (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={dummyVendorName}
+                onChangeText={setDummyVendorName}
+                placeholder="e.g. Dummy Vendor Inc"
+                placeholderTextColor={COLORS.textTertiary}
+                editable={!creatingDummyVendor}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.button, styles.vendorCreateBtn, creatingDummyVendor && styles.buttonDisabled]}
+              onPress={handleCreateDummyVendor}
+              disabled={creatingDummyVendor}
+            >
+              {creatingDummyVendor
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <>
+                    <Ionicons name="flash-outline" size={18} color="#fff" />
+                    <Text style={styles.saveButtonText}>Create Dummy Vendor</Text>
+                  </>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* List of existing dummy vendors */}
+        <View style={styles.dummyList}>
+          <Text style={styles.dummyListTitle}>
+            {loadingDummyVendor ? 'Loading...' : `${dummyVendors.length} dummy vendor(s)`}
+          </Text>
+          {dummyVendors.map((v) => (
+            <View key={v.id} style={styles.dummyRow}>
+              <Ionicons name="business-outline" size={18} color="#2196F3" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dummyName}>{v.full_name}</Text>
+                <Text style={styles.dummyPhone}>{v.phone}</Text>
+              </View>
+              <View style={[styles.dummyBadge, { backgroundColor: v.verification_status === 'approved' ? '#4caf5020' : '#2196F320' }]}>
+                <Text style={[styles.dummyBadgeText, { color: v.verification_status === 'approved' ? '#4caf50' : '#2196F3' }]}>
+                  {v.verification_status}
+                </Text>
+              </View>
+            </View>
+          ))}
+          {!loadingDummyVendor && dummyVendors.length === 0 && (
+            <Text style={styles.emptyText}>No dummy vendors yet</Text>
+          )}
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -429,7 +806,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { padding: getResponsivePadding(20), paddingTop: hp(6), paddingBottom: 60 },
-  header: { marginBottom: 24 },
+  header: { marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   title: { fontSize: getResponsiveFontSize(26), fontWeight: 'bold', color: COLORS.text },
   subtitle: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginTop: 4 },
   
@@ -465,8 +842,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  infoLabel: { fontSize: getResponsiveFontSize(13), color: COLORS.textSecondary, fontWeight: '600' },
-  infoValue: { fontSize: getResponsiveFontSize(14), color: COLORS.text, fontWeight: '500' },
+  infoLabel: { fontSize: getResponsiveFontSize(13), fontWeight: '600' },
+  infoValue: { fontSize: getResponsiveFontSize(14), fontWeight: '500' },
 
   // Button styles
   buttonRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
@@ -480,6 +857,7 @@ const styles = StyleSheet.create({
   // Dummy driver styles
   dummyForm: { marginTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 16 },
   dummyCreateBtn: { backgroundColor: '#ff9800', marginTop: 4 },
+  vendorCreateBtn: { backgroundColor: '#2196F3', marginTop: 4 },
   dummyList: { marginTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 12 },
   dummyListTitle: { fontSize: getResponsiveFontSize(12), color: COLORS.textSecondary, marginBottom: 10, fontWeight: '600' },
   dummyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },

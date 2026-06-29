@@ -6,14 +6,22 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
 import { seedSampleData, checkExistingData } from '../../utils/seedData';
 import { COLORS, TRIP_STATUS } from '../../constants';
 import { wp, hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 
 export default function SuperAdminDashboardScreen({ navigation }) {
   const { user, signOut } = useAuth();
+  const { isDarkMode, toggleTheme, forceUpdate } = useTheme();
   const colorAnim = React.useRef(new Animated.Value(0)).current;
   const heartbeat = React.useRef(new Animated.Value(0)).current;
+  
+  // Force re-render when theme changes
+  const [themeRefresh, setThemeRefresh] = useState(0);
+  useEffect(() => {
+    setThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
   
   const [stats, setStats] = useState({
     totalTrips: 0,
@@ -180,7 +188,7 @@ export default function SuperAdminDashboardScreen({ navigation }) {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: COLORS.background }]}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDashboardData} />}
     >
       {/* Header */}
@@ -203,12 +211,25 @@ export default function SuperAdminDashboardScreen({ navigation }) {
           />
         </Animated.View>
           <View>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>{user?.full_name || 'Super Admin'}</Text>
-            <Text style={styles.companyName}>Kushi Cabs Control Panel</Text>
+            <Text style={[styles.welcomeText, { color: COLORS.textSecondary }]}>Welcome back,</Text>
+            <Text style={[styles.userName, { color: COLORS.text }]}>{user?.full_name || 'Super Admin'}</Text>
+            <Text style={[styles.companyName, { color: COLORS.textTertiary }]}>Kushi Cabs Control Panel</Text>
           </View>
         </View>
         <View style={styles.headerActions}>
+          {/* Theme Toggle */}
+          <TouchableOpacity
+            style={styles.themeButton}
+            onPress={toggleTheme}
+          >
+            <Ionicons 
+              name={isDarkMode ? 'sunny' : 'moon'} 
+              size={24} 
+              color={COLORS.warning} 
+            />
+          </TouchableOpacity>
+
+          {/* Logout */}
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={() =>
@@ -218,7 +239,7 @@ export default function SuperAdminDashboardScreen({ navigation }) {
               ])
             }
           >
-            <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
+            <Ionicons name="log-out-outline" size={24} color={COLORS.warning} />
           </TouchableOpacity>
         </View>
       </View>
@@ -294,8 +315,9 @@ const styles = StyleSheet.create({
   welcomeText: { fontSize: getResponsiveFontSize(16), color: COLORS.textSecondary },
   userName: { fontSize: getResponsiveFontSize(24), fontWeight: 'bold', color: COLORS.text, marginTop: 4 },
   companyName: { fontSize: getResponsiveFontSize(14), color: COLORS.superAdmin.primary, marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   profileButton: { padding: 8, marginLeft: 'auto' },
+  themeButton: { padding: 8 },
   logoutButton: { padding: 8 },
   statsContainer: { paddingHorizontal: getResponsivePadding(24) },
   statCard: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 12, borderLeftWidth: 4, elevation: 2 },

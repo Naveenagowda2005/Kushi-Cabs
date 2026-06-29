@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../hooks/useTheme';
 import { COLORS } from '../constants';
 
 import SuperAdminDashboardScreen  from '../screens/superadmin/DashboardScreen';
@@ -52,6 +53,14 @@ function ScreenWrapper({ component: Screen, navigation: parentNav }) {
 }
 
 export default function SuperAdminNavigator() {
+  const { forceUpdate } = useTheme();
+  
+  // Force re-render when theme changes
+  const [navThemeRefresh, setNavThemeRefresh] = useState(0);
+  useEffect(() => {
+    setNavThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+  
   const [activeTab, setActiveTab] = useState(0);
   const [showPolicyManagement, setShowPolicyManagement] = useState(false);
   const tabScrollRef = useRef(null);
@@ -149,7 +158,7 @@ export default function SuperAdminNavigator() {
                   <Ionicons
                     name={tab.icon}
                     size={20}
-                    color={isActive ? '#fff' : COLORS.textSecondary}
+                    color={isActive ? '#fff' : COLORS.warning}
                   />
                   {/* Badge with pending count */}
                   {(tab.key === 'DriverVerif' || tab.key === 'VendorVerif') && (
@@ -245,7 +254,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   tabLineActive: {
-    backgroundColor: COLORS.superAdmin.primary,
+    backgroundColor: COLORS.warning,
   },
   tabIconWrap: {
     width: 40,
@@ -257,7 +266,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   tabIconWrapActive: {
-    backgroundColor: COLORS.superAdmin.primary,
+    backgroundColor: COLORS.warning,
   },
   badge: {
     position: 'absolute',
@@ -295,7 +304,7 @@ const styles = StyleSheet.create({
     lineHeight: 10,
   },
   tabLabelActive: {
-    color: COLORS.superAdmin.primary,
+    color: COLORS.warning,
     fontWeight: '700',
   },
 });

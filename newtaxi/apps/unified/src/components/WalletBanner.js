@@ -28,10 +28,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#16213e',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
+    paddingVertical: 6,
+    gap: 6,
   },
   bannerLow: { backgroundColor: '#2a1a00' },
-  text: { color: '#4caf50', fontSize: 13, flex: 1 },
+  text: { color: '#4caf50', fontSize: 12, flex: 1 },
   textLow: { color: '#ff9800' },
 });

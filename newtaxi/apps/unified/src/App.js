@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './context/AuthContext';
 import { AlertProvider } from './context/AlertContext';
+import { ThemeProvider } from './context/ThemeContext';
 import RootNavigator from './navigation/RootNavigator';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -50,9 +51,11 @@ function AppContent() {
   
   return (
     <AlertProvider>
-      <AuthProviderWrapper>
-        <NavigationContainerWrapper />
-      </AuthProviderWrapper>
+      <ThemeProvider>
+        <AuthProviderWrapper>
+          <NavigationContainerWrapper />
+        </AuthProviderWrapper>
+      </ThemeProvider>
     </AlertProvider>
   );
 }

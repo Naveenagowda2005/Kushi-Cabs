@@ -12,13 +12,34 @@ export function useAvailableTrips() {
       setError(null);
       const { data, error } = await supabase
         .from('trips')
-        .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling')
+        .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km')
         .eq('status', TRIP_STATUS.PENDING)
         .eq('is_published', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTrips(data || []);
+      
+      // Enrich trips with segment names
+      const enrichedTrips = await Promise.all(
+        (data || []).map(async (trip) => {
+          if (trip.segment_id) {
+            try {
+              const { data: segment } = await supabase
+                .from('trip_segments')
+                .select('name')
+                .eq('id', trip.segment_id)
+                .maybeSingle();
+              return { ...trip, segment_name: segment?.name };
+            } catch (err) {
+              console.error('Error fetching segment:', err);
+              return trip;
+            }
+          }
+          return trip;
+        })
+      );
+      
+      setTrips(enrichedTrips);
     } catch (err) {
       setError(err.message);
     } finally {

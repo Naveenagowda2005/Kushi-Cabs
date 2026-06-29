@@ -191,7 +191,7 @@ export const playQuickAlert = async () => {
 };
 
 /**
- * Alternative looping sound for more reliable playback - WITH AUDIO FOCUS
+ * Alternative looping sound for more reliable playback - SKIP AUDIO FOCUS
  */
 export const playLoopingAlert = async (loops = 2) => {
   try {
@@ -203,22 +203,7 @@ export const playLoopingAlert = async (loops = 2) => {
 
     isPlayingAlert = true;
 
-    // STEP 1: Request audio focus by playing silently
-    try {
-      console.log('📢 Acquiring audio focus...');
-      const focusSound = new Audio.Sound();
-      await focusSound.loadAsync(require('../../assets/ring.mp3'));
-      await focusSound.setVolumeAsync(0);
-      await focusSound.playAsync();
-      await new Promise(r => setTimeout(r, 50));
-      await focusSound.stopAsync();
-      await focusSound.unloadAsync();
-      console.log('✅ Audio focus acquired');
-    } catch (e) {
-      console.warn('⚠️ Could not acquire audio focus:', e.message);
-    }
-
-    // STEP 2: Set audio mode for speaker routing
+    // STEP 1: Set audio mode FIRST
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -229,10 +214,12 @@ export const playLoopingAlert = async (loops = 2) => {
       });
       console.log('🔊 Audio mode set for speaker');
     } catch (e) {
-      console.warn('Could not set audio mode:', e.message);
+      console.warn('⚠️ Could not set audio mode:', e.message);
     }
 
-    // STEP 3: Only create new sound if doesn't exist
+    console.log('📢 Skipping audio focus - playing sound directly');
+
+    // STEP 2: Only create new sound if doesn't exist
     if (!soundObject) {
       soundObject = new Audio.Sound();
       const audioSource = require('../../assets/ring.mp3');
@@ -297,6 +284,7 @@ export const playLoopingAlert = async (loops = 2) => {
   } catch (error) {
     console.error('❌ Error in playLoopingAlert:', error);
     isPlayingAlert = false;
+    console.log('⚠️ Falling back to haptic feedback');
     await playHapticFeedback().catch(() => {});
   }
 };

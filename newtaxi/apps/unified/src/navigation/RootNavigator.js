@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../hooks/useTheme';
 import { COLORS, ROLES } from '../constants';
 
 // Navigation components
@@ -13,6 +14,14 @@ import SplashScreen from '../screens/auth/SplashScreen';
 
 export default function RootNavigator() {
   const { loading, hasSession, hasUser, getUserRole, selectedRole } = useAuth();
+  const { forceUpdate } = useTheme();
+  
+  // Force re-render of all child navigators when theme changes
+  const [navThemeRefresh, setNavThemeRefresh] = useState(0);
+  useEffect(() => {
+    setNavThemeRefresh(prev => prev + 1);
+  }, [forceUpdate]);
+
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {

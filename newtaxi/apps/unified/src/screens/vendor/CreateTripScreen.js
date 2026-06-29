@@ -435,16 +435,20 @@ export default function VendorCreateTripScreen({ navigation, route }) {
           <Text style={styles.sectionTitle}>Extra Charges</Text>
         </View>
 
-        {/* Toll Charge Toggle */}
+        {/* Combined Toll - Tax - Hills Toggle Section */}
         <View style={styles.toggleWrapper}>
           <View style={styles.toggleLabel}>
-            <Ionicons name="cash-outline" size={16} color="#ff9800" />
-            <Text style={styles.toggleLabelText}>Toll Charge Included in Fare</Text>
+            <Ionicons name="cash-outline" size={16} color="#888" />
+            <Text style={styles.toggleLabelText}>Toll - Tax - Hills</Text>
           </View>
           <View style={styles.toggleButtonGroup}>
             <TouchableOpacity
               style={[styles.toggleButton, !form.tollIncluded && styles.toggleButtonActive]}
-              onPress={() => update('tollIncluded', false)}
+              onPress={() => {
+                update('tollIncluded', false);
+                update('stateTaxIncluded', false);
+                update('hillsIncluded', false);
+              }}
             >
               <Text style={[styles.toggleButtonText, !form.tollIncluded && styles.toggleButtonTextActive]}>
                 No
@@ -452,35 +456,13 @@ export default function VendorCreateTripScreen({ navigation, route }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleButton, form.tollIncluded && styles.toggleButtonActive]}
-              onPress={() => update('tollIncluded', true)}
+              onPress={() => {
+                update('tollIncluded', true);
+                update('stateTaxIncluded', true);
+                update('hillsIncluded', true);
+              }}
             >
               <Text style={[styles.toggleButtonText, form.tollIncluded && styles.toggleButtonTextActive]}>
-                Yes
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* State Tax Toggle */}
-        <View style={styles.toggleWrapper}>
-          <View style={styles.toggleLabel}>
-            <Ionicons name="document-text-outline" size={16} color="#ff9800" />
-            <Text style={styles.toggleLabelText}>State Tax Included in Fare</Text>
-          </View>
-          <View style={styles.toggleButtonGroup}>
-            <TouchableOpacity
-              style={[styles.toggleButton, !form.stateTaxIncluded && styles.toggleButtonActive]}
-              onPress={() => update('stateTaxIncluded', false)}
-            >
-              <Text style={[styles.toggleButtonText, !form.stateTaxIncluded && styles.toggleButtonTextActive]}>
-                No
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleButton, form.stateTaxIncluded && styles.toggleButtonActive]}
-              onPress={() => update('stateTaxIncluded', true)}
-            >
-              <Text style={[styles.toggleButtonText, form.stateTaxIncluded && styles.toggleButtonTextActive]}>
                 Yes
               </Text>
             </TouchableOpacity>
@@ -490,7 +472,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         {/* Pet Travelling Toggle */}
         <View style={styles.toggleWrapper}>
           <View style={styles.toggleLabel}>
-            <Ionicons name="paw-outline" size={16} color="#ff9800" />
+            <Ionicons name="paw-outline" size={16} color="#888" />
             <Text style={styles.toggleLabelText}>Pet Travelling</Text>
           </View>
           <View style={styles.toggleButtonGroup}>
@@ -513,61 +495,20 @@ export default function VendorCreateTripScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Hills Charge Toggle */}
-        <View style={styles.toggleWrapper}>
-          <View style={styles.toggleLabel}>
-            <Ionicons name="logo-designernews" size={16} color="#ff9800" />
-            <Text style={styles.toggleLabelText}>Hills Charge Included in Fare</Text>
-          </View>
-          <View style={styles.toggleButtonGroup}>
-            <TouchableOpacity
-              style={[styles.toggleButton, !form.hillsIncluded && styles.toggleButtonActive]}
-              onPress={() => update('hillsIncluded', false)}
-            >
-              <Text style={[styles.toggleButtonText, !form.hillsIncluded && styles.toggleButtonTextActive]}>
-                No
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleButton, form.hillsIncluded && styles.toggleButtonActive]}
-              onPress={() => update('hillsIncluded', true)}
-            >
-              <Text style={[styles.toggleButtonText, form.hillsIncluded && styles.toggleButtonTextActive]}>
-                Yes
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Extra Charges Summary */}
         <View style={styles.chargesSummaryBox}>
           <Text style={styles.chargesSummaryTitle}>Extra Charges Summary</Text>
           <View style={styles.chargesSummaryRow}>
-            <Ionicons name="cash-outline" size={14} color="#ff9800" />
-            <Text style={styles.chargesSummaryLabel}>Toll:</Text>
+            <Text style={styles.chargesSummaryLabel}>Toll - Tax - Hills</Text>
             <Text style={[styles.chargesSummaryValue, form.tollIncluded ? styles.included : styles.excluded]}>
-              {form.tollIncluded ? 'Included' : 'Excluded'}
-            </Text>
-          </View>
-          <View style={styles.chargesSummaryRow}>
-            <Ionicons name="document-text-outline" size={14} color="#ff9800" />
-            <Text style={styles.chargesSummaryLabel}>State Tax:</Text>
-            <Text style={[styles.chargesSummaryValue, form.stateTaxIncluded ? styles.included : styles.excluded]}>
-              {form.stateTaxIncluded ? 'Included' : 'Excluded'}
+              {form.tollIncluded ? '✓ Included' : '✗ Excluded'}
             </Text>
           </View>
           <View style={styles.chargesSummaryRow}>
             <Ionicons name="paw-outline" size={14} color="#ff9800" />
-            <Text style={styles.chargesSummaryLabel}>Pet:</Text>
+            <Text style={styles.chargesSummaryLabel}>Pet Travelling</Text>
             <Text style={[styles.chargesSummaryValue, form.petTravelling ? styles.included : styles.excluded]}>
-              {form.petTravelling ? 'Allowed' : 'Not Allowed'}
-            </Text>
-          </View>
-          <View style={styles.chargesSummaryRow}>
-            <Ionicons name="logo-designernews" size={14} color="#ff9800" />
-            <Text style={styles.chargesSummaryLabel}>Hills:</Text>
-            <Text style={[styles.chargesSummaryValue, form.hillsIncluded ? styles.included : styles.excluded]}>
-              {form.hillsIncluded ? 'Included' : 'Excluded'}
+              {form.petTravelling ? '✓ Allowed' : '✗ Not Allowed'}
             </Text>
           </View>
         </View>
@@ -709,18 +650,18 @@ function Field({ label, icon, placeholder, value, onChangeText, keyboardType }) 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f3460' },
-  scroll: { padding: 20, paddingBottom: 60 },
+  container: { flex: 1, backgroundColor: '#f0f0f0' },
+  scroll: { padding: 16, paddingBottom: 60 },
   editModeBanner: { 
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#1e3a8a',
+    backgroundColor: '#e3f2fd',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#2196f3',
   },
   editModeBannerText: {
@@ -729,22 +670,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 12 },
-  sectionTitle: { color: '#ccc', fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  fieldWrapper: { marginBottom: 14 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 12 },
+  sectionTitle: { color: '#333', fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  fieldWrapper: { marginBottom: 12 },
   fieldLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  fieldLabelText: { color: '#aaa', fontSize: 13 },
-  input: { backgroundColor: '#16213e', color: '#fff', borderRadius: 12, padding: 14, fontSize: 15, borderWidth: 1, borderColor: '#1a1a2e' },
+  fieldLabelText: { color: '#666', fontSize: 13, fontWeight: '500' },
+  input: { backgroundColor: '#ffffff', color: '#333', borderRadius: 10, padding: 12, fontSize: 14, borderWidth: 2, borderColor: '#ff9800' },
   toggleWrapper: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    backgroundColor: '#16213e', 
-    borderRadius: 12, 
+    backgroundColor: '#ffffff', 
+    borderRadius: 10, 
     padding: 14, 
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#1a1a2e'
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#ff9800'
   },
   toggleLabel: { 
     flexDirection: 'row', 
@@ -753,7 +694,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   toggleLabelText: { 
-    color: '#aaa', 
+    color: '#666', 
     fontSize: 13,
     fontWeight: '500'
   },
@@ -762,12 +703,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   toggleButton: {
-    backgroundColor: '#0f3460',
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderWidth: 1.5,
-    borderColor: '#555',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
     minWidth: 50,
     alignItems: 'center'
   },
@@ -776,46 +717,46 @@ const styles = StyleSheet.create({
     borderColor: '#ff9800'
   },
   toggleButtonText: {
-    color: '#aaa',
+    color: '#666',
     fontSize: 12,
     fontWeight: '600'
   },
   toggleButtonTextActive: {
     color: '#fff'
   },
-  breakdownCard: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#1a1a2e' },
+  breakdownCard: { backgroundColor: '#ffffff', borderRadius: 10, padding: 14, marginBottom: 16, borderWidth: 2, borderColor: '#ff9800' },
   breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  breakdownLabel: { color: '#888', fontSize: 13 },
-  breakdownValue: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  breakdownTotal: { borderTopWidth: 1, borderTopColor: '#0f3460', paddingTop: 8, marginTop: 4, marginBottom: 0 },
-  breakdownTotalLabel: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  breakdownLabel: { color: '#666', fontSize: 13, fontWeight: '500' },
+  breakdownValue: { color: '#333', fontSize: 13, fontWeight: '600' },
+  breakdownTotal: { borderTopWidth: 1, borderTopColor: '#e0e0e0', paddingTop: 8, marginTop: 4, marginBottom: 0 },
+  breakdownTotalLabel: { color: '#333', fontSize: 14, fontWeight: '700' },
   breakdownTotalValue: { color: '#4caf50', fontSize: 16, fontWeight: '700' },
-  infoBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#2a1a00', borderRadius: 10, padding: 12, marginBottom: 20 },
-  infoText: { color: '#ff9800', fontSize: 12, flex: 1, lineHeight: 18 },
-  createBtn: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 8 },
+  infoBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#fff3e0', borderRadius: 10, padding: 12, marginBottom: 20, borderWidth: 2, borderColor: '#ff9800' },
+  infoText: { color: '#ff9800', fontSize: 12, flex: 1, lineHeight: 18, fontWeight: '500' },
+  createBtn: { backgroundColor: '#ff9800', borderRadius: 10, padding: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 },
   createBtnDisabled: { opacity: 0.6 },
-  createBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  createBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   pickerWrapper: {
-    backgroundColor: '#16213e',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#1a1a2e',
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#ff9800',
     overflow: 'hidden',
   },
   picker: {
-    color: '#fff',
-    backgroundColor: '#16213e',
+    color: '#333',
+    backgroundColor: '#ffffff',
   },
   chargesSummaryBox: {
-    backgroundColor: '#16213e',
-    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
     padding: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#1a1a2e',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#ff9800',
   },
   chargesSummaryTitle: {
-    color: '#aaa',
+    color: '#666',
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -829,12 +770,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: '#e0e0e0',
   },
   chargesSummaryLabel: {
-    color: '#aaa',
+    color: '#666',
     fontSize: 12,
     flex: 1,
+    fontWeight: '500',
   },
   chargesSummaryValue: {
     fontSize: 12,

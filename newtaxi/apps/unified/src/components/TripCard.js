@@ -10,9 +10,6 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
   const [segmentName, setSegmentName] = useState(null);
   const [packageName, setPackageName] = useState(null);
   
-  // Glow animation
-  const glowAnim = useRef(new Animated.Value(0)).current;
-
   // Fetch car details
   useEffect(() => {
     const fetchCarDetails = async () => {
@@ -80,27 +77,8 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
     fetchCarDetails();
   }, [trip.car_type, trip.seater_type, trip.fuel_type, trip.segment_id, trip.package_id]);
 
-  // Glow animation - continuous blink
-  useEffect(() => {
-    const glowAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: false,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    glowAnimation.start();
-
-    return () => glowAnimation.stop();
-  }, [glowAnim]);
-
+  // Glow animation - continuous blink removed for cleaner UI
+  
   const scheduledDate = trip.scheduled_at
     ? new Date(trip.scheduled_at).toLocaleString()
     : 'ASAP';
@@ -124,50 +102,61 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
     pet_travelling: trip.pet_travelling,
   });
 
-  const glowStyle = {
-    backgroundColor: glowAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['#16213e', '#1a4d1a'],
-    }),
-    shadowOpacity: glowAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.3, 0.8],
-    }),
-  };
+  const glowStyle = {};
 
   return (
-    <Animated.View style={[styles.card, glowStyle]}>
+    <Animated.View style={[styles.card]}>
       {/* Header: Trip type and Payment method */}
       <View style={styles.header}>
-        <Text style={styles.tripType}>{segmentName?.toUpperCase() || 'ONE WAY TRIP'}</Text>
+        <Text style={styles.tripType}>{(segmentName || trip.segment_name)?.toUpperCase() || 'ONE WAY TRIP'}</Text>
         <View style={styles.paymentBadge}>
           <Text style={styles.paymentText}>Paid by Cash</Text>
         </View>
       </View>
 
-      {/* Fare badge */}
+      {/* Fare & Fixed KM in one badge box */}
       <View style={styles.badgeRow}>
-        <View style={styles.fareBadge}>
-          <Ionicons name="cash-outline" size={14} color="#fff" />
-          <Text style={styles.fareText}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
+        <View style={styles.fareKmBox}>
+          <View style={styles.fareBadge}>
+            <Ionicons name="cash-outline" size={14} color="#333" />
+            <Text style={styles.fareText}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
+          </View>
+          {trip.fixed_km && (
+            <View style={styles.kmBadge}>
+              <Ionicons name="swap-horizontal-outline" size={14} color="#333" />
+              <Text style={styles.kmText}>{trip.fixed_km} km</Text>
+            </View>
+          )}
         </View>
       </View>
 
-      {/* Pickup */}
-      <View style={styles.row}>
-        <Ionicons name="location" size={16} color="#4caf50" />
-        <View style={styles.locationContent}>
-          <Text style={styles.locationLabel}>Pickup</Text>
-          <Text style={styles.location} numberOfLines={2}>{trip.pickup_location}</Text>
+      {/* Pickup and Dropoff in one row */}
+      <View style={styles.locationsRow}>
+        {/* Pickup */}
+        <View style={styles.locationSide}>
+          <View style={styles.locationRowContent}>
+            <Ionicons name="location" size={16} color="#4caf50" />
+            <View style={styles.locationContent}>
+              <Text style={styles.locationLabel}>Pickup</Text>
+              <Text style={styles.location} numberOfLines={1}>{trip.pickup_location}</Text>
+            </View>
+          </View>
         </View>
-      </View>
-
-      {/* Dropoff */}
-      <View style={styles.row}>
-        <Ionicons name="flag" size={16} color="#e94560" />
-        <View style={styles.locationContent}>
-          <Text style={styles.locationLabel}>Dropoff</Text>
-          <Text style={styles.location} numberOfLines={2}>{trip.dropoff_location}</Text>
+        
+        {/* Arrow Divider */}
+        <View style={styles.arrowDivider}>
+          <Ionicons name="arrow-forward-outline" size={16} color="#333" />
+        </View>
+        
+        {/* Dropoff */}
+        <View style={styles.locationSide}>
+          <View style={styles.locationRowContent}>
+            <Ionicons name="flag" size={16} color="#e94560" />
+            <View style={styles.locationContent}>
+              <Text style={styles.locationLabel}>Dropoff</Text>
+              <Text style={styles.location} numberOfLines={1}>{trip.dropoff_location}</Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -214,46 +203,19 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       )}
 
-      {/* Toll & Tax & Pet Indicators */}
+      {/* Toll & Tax & Hills + Pet Travelling - Single Row */}
       <View style={styles.inclusionsRow}>
-        <View style={[styles.inclusionBadge, trip.toll_included ? styles.includedBadge : styles.excludedBadge]}>
-          <Ionicons 
-            name={trip.toll_included ? "checkmark-circle-outline" : "close-circle-outline"} 
-            size={12} 
-            color={trip.toll_included ? "#4caf50" : "#ff9800"}
-          />
-          <Text style={[styles.inclusionText, trip.toll_included ? styles.includedText : styles.excludedText]}>
-            Toll {trip.toll_included ? "Included" : "Excluded"}
+        <View style={styles.inclusionBox}>
+          <Text style={styles.inclusionLabel}>Toll - Tax - Hills</Text>
+          <Text style={[styles.inclusionStatus, trip.toll_included ? styles.includedText : styles.excludedText]}>
+            {trip.toll_included ? '✓ Included' : '✗ Excluded'}
           </Text>
         </View>
-        <View style={[styles.inclusionBadge, trip.state_tax_included ? styles.includedBadge : styles.excludedBadge]}>
-          <Ionicons 
-            name={trip.state_tax_included ? "checkmark-circle-outline" : "close-circle-outline"} 
-            size={12} 
-            color={trip.state_tax_included ? "#4caf50" : "#ff9800"}
-          />
-          <Text style={[styles.inclusionText, trip.state_tax_included ? styles.includedText : styles.excludedText]}>
-            Tax {trip.state_tax_included ? "Included" : "Excluded"}
-          </Text>
-        </View>
-        <View style={[styles.inclusionBadge, trip.pet_travelling === true ? styles.petAllowedBadge : styles.petNotAllowedBadge]}>
-          <Ionicons 
-            name={trip.pet_travelling === true ? "paw-outline" : "close-circle-outline"} 
-            size={12} 
-            color={trip.pet_travelling === true ? "#ff6b6b" : "#ff9800"}
-          />
-          <Text style={[styles.inclusionText, trip.pet_travelling === true ? styles.petAllowedText : styles.petNotAllowedText]}>
-            {trip.pet_travelling === true ? "🐾 Pet Allowed" : "🚫 Pet Not Allowed"}
-          </Text>
-        </View>
-        <View style={[styles.inclusionBadge, trip.hills_included ? styles.includedBadge : styles.excludedBadge]}>
-          <Ionicons 
-            name={trip.hills_included ? "checkmark-circle-outline" : "close-circle-outline"} 
-            size={12} 
-            color={trip.hills_included ? "#4caf50" : "#ff9800"}
-          />
-          <Text style={[styles.inclusionText, trip.hills_included ? styles.includedText : styles.excludedText]}>
-            Hills {trip.hills_included ? "Included" : "Excluded"}
+        <Text style={styles.inclusionDivider}>-</Text>
+        <View style={styles.inclusionBox}>
+          <Text style={styles.inclusionLabel}>Pet</Text>
+          <Text style={[styles.inclusionStatus, trip.pet_travelling ? styles.includedText : styles.excludedText]}>
+            {trip.pet_travelling ? '✓ Allowed' : '✗ Not Allowed'}
           </Text>
         </View>
       </View>
@@ -266,6 +228,17 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
           {scheduledDate}
         </Text>
       </View>
+
+      {/* Return Date - for Round trips - directly under departure */}
+      {trip.return_date && (
+        <View style={styles.departureRow}>
+          <Ionicons name="calendar-outline" size={14} color="#ff9800" />
+          <Text style={styles.departureLabel}>Return:</Text>
+          <Text style={styles.departureTime}>
+            {new Date(trip.return_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+          </Text>
+        </View>
+      )}
 
       {/* Lock indicator — customer details hidden */}
       <View style={styles.lockRow}>
@@ -319,54 +292,65 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#0f3460',
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#ff9800',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   tripType: {
     color: '#ff9800',
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   paymentBadge: {
-    backgroundColor: '#000',
+    backgroundColor: '#f5f5f5',
     borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   paymentText: {
-    color: '#fff',
-    fontSize: 11,
+    color: '#333',
+    fontSize: 10,
     fontWeight: '600',
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 4,
+    marginBottom: 6,
     flexWrap: 'wrap',
   },
-  fareBadge: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  fareKmBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  fareText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  fareBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  fareText: { color: '#333', fontWeight: 'bold', fontSize: 16 },
+  kmBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  kmText: { color: '#333', fontWeight: 'bold', fontSize: 16 },
   commissionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,72 +369,120 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 10,
   },
+  locationsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'hidden',
+  },
+  locationSide: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  locationRowContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  locationDivider: {
+    width: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 6,
+  },
   locationContent: {
     flex: 1,
   },
   locationLabel: {
-    color: '#888',
-    fontSize: 11,
-    marginBottom: 2,
+    color: '#666',
+    fontSize: 10,
+    marginBottom: 1,
   },
   location: { 
-    color: '#fff', 
-    fontSize: 13,
+    color: '#333', 
+    fontSize: 15,
     flex: 1,
   },
   packageBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#0a2a4a',
+    gap: 4,
+    backgroundColor: '#e3f2fd',
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginVertical: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginVertical: 6,
     alignSelf: 'flex-start',
   },
   packageText: {
     color: '#2196f3',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   carDetailsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginVertical: 10,
-    paddingVertical: 8,
+    gap: 10,
+    marginVertical: 8,
+    paddingVertical: 6,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: '#e0e0e0',
   },
   carDetail: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     flex: 1,
   },
   carDetailText: {
     color: '#2196f3',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
   },
   inclusionsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginVertical: 10,
-    flexWrap: 'wrap',
+    gap: 4,
+    marginVertical: 8,
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  inclusionBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  inclusionLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#333',
+  },
+  inclusionStatus: {
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  inclusionDivider: {
+    fontSize: 10,
+    color: '#333',
+    marginHorizontal: 2,
   },
   inclusionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    gap: 2,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderWidth: 1,
     flex: 1,
-    minWidth: '45%',
+    minWidth: 'auto',
   },
   includedBadge: {
     backgroundColor: '#0a2a0a',
@@ -461,7 +493,7 @@ const styles = StyleSheet.create({
     borderColor: '#ff980066',
   },
   inclusionText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '500',
     flex: 1,
   },
@@ -495,14 +527,14 @@ const styles = StyleSheet.create({
   lockRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#2a1a00',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 10,
+    gap: 4,
+    backgroundColor: '#fff3e0',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 6,
   },
-  lockText: { color: '#ff9800', fontSize: 11, flex: 1 },
+  lockText: { color: '#ff9800', fontSize: 10, flex: 1 },
   carrierNote: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -523,44 +555,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    paddingTop: 4,
+    paddingBottom: 2,
+    marginBottom: 4,
   },
   departureLabel: {
-    color: '#888',
+    color: '#333',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   departureTime: {
-    color: '#4caf50',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#ff9800',
+    fontSize: 14,
+    fontWeight: '700',
     flex: 1,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
   },
   footer: { flexDirection: 'row', alignItems: 'center' },
-  footerText: { color: '#888', fontSize: 12, marginLeft: 4 },
+  footerText: { color: '#888', fontSize: 10, marginLeft: 4 },
   notesHeader: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 4,
+    paddingTop: 4,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
   },
   notesTitle: {
-    color: '#fff',
-    fontSize: 12,
+    color: '#333',
+    fontSize: 11,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   noteItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+    gap: 4,
+    marginBottom: 4,
   },
   noteText: {
     color: '#ff9800',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
     flex: 1,
   },
@@ -655,44 +691,44 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
-    paddingTop: 16,
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e0e0e0',
   },
   acceptBtn: {
     flex: 1,
     backgroundColor: '#4caf50',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   acceptBtnText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   cancelBtn: {
     flex: 1,
     backgroundColor: '#f4433622',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: '#f44336',
   },
   cancelBtnText: {
     color: '#f44336',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

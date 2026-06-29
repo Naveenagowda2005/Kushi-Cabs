@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useWallet } from '../../hooks/useDriverWallet';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
 import { initiateDeposit } from '../../services/paymentService';
 import { acceptTrip } from '../../services/tripService';
 import { supabase } from '../../lib/supabase';
@@ -15,6 +16,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
   const { trip } = route.params;
   const { user } = useAuth();
   const { wallet, refetch: refetchWallet } = useWallet(user?.id);
+  const { settings } = useSystemSettings();
   const [paying, setPaying] = useState(false);
 
   // Has this driver already paid commission for this trip?
@@ -26,8 +28,8 @@ export default function DriverTripDetailScreen({ route, navigation }) {
   const commissionToPay = Math.max(0, commissionAmount - customerPreAdvance);
   
   const hasEnoughBalance = (wallet?.balance || 0) >= commissionToPay;
-  const MIN_WALLET_BALANCE = 500;
-  const hasMinimumBalance = (wallet?.balance || 0) >= MIN_WALLET_BALANCE;
+  const minWalletBalance = settings.minimumWalletBalance || 500;
+  const hasMinimumBalance = (wallet?.balance || 0) >= minWalletBalance;
 
   // ── Accept trip after payment ──────────────
   async function acceptTripAfterPayment() {
@@ -54,7 +56,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
       if (!hasMinimumBalance) {
         Alert.alert(
           '⚠️ Minimum Balance Required',
-          `Your wallet must have at least ₹${MIN_WALLET_BALANCE} balance. Current balance: ₹${(wallet?.balance || 0).toFixed(2)}. Please add funds to your wallet first.`,
+          `Your wallet must have at least ₹${minWalletBalance} balance. Current balance: ₹${(wallet?.balance || 0).toFixed(2)}. Please add funds to your wallet first.`,
           [{ text: 'OK' }]
         );
         return;
@@ -110,7 +112,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
     if (!hasMinimumBalance) {
       Alert.alert(
         '⚠️ Minimum Balance Required',
-        `Your wallet must have at least ₹${MIN_WALLET_BALANCE} balance (for potential cancellation fees). Current: ₹${(wallet?.balance || 0).toFixed(2)}. Please add funds first.`,
+        `Your wallet must have at least ₹${minWalletBalance} balance (for potential cancellation fees). Current: ₹${(wallet?.balance || 0).toFixed(2)}. Please add funds first.`,
         [{ text: 'OK' }]
       );
       return;
@@ -279,7 +281,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
           </View>
           {!hasMinimumBalance && (
             <Text style={styles.walletShort}>
-              Need ₹{(MIN_WALLET_BALANCE - (wallet?.balance || 0)).toFixed(2)} more
+              Need ₹{(minWalletBalance - (wallet?.balance || 0)).toFixed(2)} more
             </Text>
           )}
         </View>
