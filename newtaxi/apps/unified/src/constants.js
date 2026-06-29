@@ -271,22 +271,10 @@ export const COLORS = new Proxy({}, {
 
 // API Configuration
 const getApiUrl = () => {
-  const productionUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
-  
-  if (productionUrl) {
-    console.log('Using production SMS API URL:', productionUrl);
-    return productionUrl;
-  }
-  
-  const MACHINE_IP = '192.168.1.110';
-  
-  if (Platform.OS === 'android') {
-    return `http://${MACHINE_IP}:4000`;
-  } else if (Platform.OS === 'ios') {
-    return 'http://localhost:4000';
-  } else {
-    return 'http://localhost:4000';
-  }
+  // Use production Render URL
+  const productionUrl = 'https://kushi-cabs.onrender.com';
+  console.log('Using production API URL:', productionUrl);
+  return productionUrl;
 };
 
 export const API_CONFIG = {
