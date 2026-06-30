@@ -357,9 +357,8 @@ const AdminVendorVerificationDashboard = () => {
                       </View>
                     </TouchableOpacity>
 
-                    {/* Approve/Reject buttons — show on Pending tab for pending docs,
-                        OR on Approved tab if a doc was re-uploaded and is now pending again */}
-                    {(tabIndex === 0 || tabIndex === 1) && doc?.document_data && doc?.status === 'pending' && (
+                    {/* Approve/Reject buttons — show ONLY on Pending tab for pending docs */}
+                    {tabIndex === 0 && doc?.document_data && doc?.status === 'pending' && (
                       <View style={styles.documentActions}>
                           <TouchableOpacity
                             style={[styles.actionButton, styles.approveButton]}
@@ -485,8 +484,8 @@ const AdminVendorVerificationDashboard = () => {
               </View>
             )}
 
-            {/* Overall Approve Button — show on Pending tab and Approved tab (for re-submitted docs) */}
-            {(tabIndex === 0 || tabIndex === 1) && (() => {
+            {/* Overall Approve Button — show ONLY on Pending tab */}
+            {tabIndex === 0 && (() => {
               const REQUIRED_DOCS = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
               const allDocsApproved = REQUIRED_DOCS.every(
                 (dt) => vendor.documents[dt]?.status === 'approved'
@@ -673,9 +672,9 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#0d0f1a',
+    borderBottomColor: '#e0e0e0',
   },
   tabButton: {
     flex: 1,
@@ -689,11 +688,11 @@ const styles = StyleSheet.create({
   },
   tabButtonText: {
     fontSize: 14,
-    color: '#888',
+    color: '#999999',
     fontWeight: '600',
   },
   tabButtonTextActive: {
-    color: COLORS.vendor.primary,
+    color: '#ff9800',
   },
   scroll: {
     flex: 1,
@@ -722,11 +721,11 @@ const styles = StyleSheet.create({
     numberOfLines: 2,
   },
   vendorCard: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     marginBottom: 0,
     borderWidth: 1,
-    borderColor: '#0d0f1a',
+    borderColor: '#e0e0e0',
     overflow: 'hidden',
   },
   vendorHeader: {
@@ -786,17 +785,17 @@ const styles = StyleSheet.create({
   vendorName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: '#000000',
     marginBottom: 2,
   },
   vendorBusiness: {
     fontSize: 12,
-    color: '#888',
+    color: '#666666',
     marginBottom: 2,
   },
   vendorPhone: {
     fontSize: 11,
-    color: '#bbb',
+    color: '#999999',
   },
   noDocumentsText: {
     fontSize: 12,
@@ -815,9 +814,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#0d0f1a',
+    borderBottomColor: '#e0e0e0',
   },
   documentInfo: {
     flexDirection: 'row',
@@ -831,12 +830,12 @@ const styles = StyleSheet.create({
   documentName: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#fff',
+    color: '#000000',
     marginBottom: 2,
   },
   documentStatus: {
     fontSize: 11,
-    color: '#888',
+    color: '#666666',
   },
   documentActions: {
     flexDirection: 'row',
@@ -861,20 +860,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   rejectionReasonBox: {
-    padding: 16,
-    backgroundColor: '#ff525220',
-    borderTopWidth: 1,
-    borderTopColor: '#0d0f1a',
+    padding: 12,
+    backgroundColor: '#ffe0e0',
+    borderRadius: 8,
+    marginTop: 12,
   },
   rejectionReasonLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#ff5252',
+    color: '#d32f2f',
     marginBottom: 6,
   },
   rejectionReasonText: {
     fontSize: 13,
-    color: '#bbb',
+    color: '#c62828',
     lineHeight: 18,
   },
   modalOverlay: {
@@ -884,7 +883,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 20,
     width: '85%',
@@ -892,22 +891,24 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000000',
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 13,
-    color: '#888',
+    color: '#666666',
     marginBottom: 16,
   },
   reasonInput: {
-    backgroundColor: '#0d0f1a',
+    backgroundColor: '#f5f5f5',
     borderRadius: 10,
     padding: 12,
-    color: '#fff',
+    color: '#000000',
     fontSize: 14,
     marginBottom: 16,
     textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -920,15 +921,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalButtonCancel: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#888',
+    borderColor: '#999999',
   },
   modalButtonReject: {
     backgroundColor: '#f44336',
   },
   modalButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -956,12 +957,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#0d0f1a',
+    borderTopColor: '#e0e0e0',
     gap: 10,
   },
   overallApproveHint: {
     fontSize: 12,
-    color: '#aaa',
+    color: '#666666',
     textAlign: 'center',
     marginBottom: 4,
   },
@@ -976,17 +977,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   overallApproveButtonDisabled: {
-    backgroundColor: '#1e2a1e',
+    backgroundColor: '#e0e0e0',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#999999',
   },
   overallApproveButtonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
   },
   overallApproveButtonTextDisabled: {
-    color: '#666',
+    color: '#999999',
   },
   overallRejectButton: {
     backgroundColor: '#c62828',
@@ -999,7 +1000,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   overallRejectButtonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -1007,7 +1008,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#ff980015',
+    backgroundColor: '#fff3cd',
     borderLeftWidth: 3,
     borderLeftColor: '#ff9800',
     borderRadius: 8,
@@ -1017,7 +1018,7 @@ const styles = StyleSheet.create({
   reVerifyBannerText: {
     flex: 1,
     fontSize: 12,
-    color: '#ffb74d',
+    color: '#856404',
     lineHeight: 17,
   },
 });

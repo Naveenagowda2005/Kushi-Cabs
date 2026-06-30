@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
   },
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#e94560' },
   tabText: {
-    color: '#666',
+    color: '#000',
     fontSize: Math.max(13, screenWidth * 0.035),
     fontWeight: '600',
     textAlign: 'center',

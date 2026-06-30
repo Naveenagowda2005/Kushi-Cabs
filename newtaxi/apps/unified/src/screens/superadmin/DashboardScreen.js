@@ -13,15 +13,8 @@ import { wp, hp, getResponsiveFontSize, getResponsivePadding } from '../../utils
 
 export default function SuperAdminDashboardScreen({ navigation }) {
   const { user, signOut } = useAuth();
-  const { isDarkMode, toggleTheme, forceUpdate } = useTheme();
   const colorAnim = React.useRef(new Animated.Value(0)).current;
   const heartbeat = React.useRef(new Animated.Value(0)).current;
-  
-  // Force re-render when theme changes
-  const [themeRefresh, setThemeRefresh] = useState(0);
-  useEffect(() => {
-    setThemeRefresh(prev => prev + 1);
-  }, [forceUpdate]);
   
   const [stats, setStats] = useState({
     totalTrips: 0,
@@ -217,18 +210,6 @@ export default function SuperAdminDashboardScreen({ navigation }) {
           </View>
         </View>
         <View style={styles.headerActions}>
-          {/* Theme Toggle */}
-          <TouchableOpacity
-            style={styles.themeButton}
-            onPress={toggleTheme}
-          >
-            <Ionicons 
-              name={isDarkMode ? 'sunny' : 'moon'} 
-              size={24} 
-              color={COLORS.warning} 
-            />
-          </TouchableOpacity>
-
           {/* Logout */}
           <TouchableOpacity
             style={styles.logoutButton}

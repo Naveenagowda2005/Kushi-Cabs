@@ -210,7 +210,7 @@ export default function DriverDashboardScreen({ navigation }) {
             />
           </TouchableOpacity>
           <TouchableOpacity style={{ padding: 8 }} onPress={signOut}>
-            <Ionicons name="log-out-outline" size={22} color={COLORS.textLight} />
+            <Ionicons name="log-out-outline" size={22} color={COLORS.warning} />
           </TouchableOpacity>
         </View>
       </View>
@@ -259,7 +259,7 @@ export default function DriverDashboardScreen({ navigation }) {
       {/* Content */}
       {!isOnline ? (
         <View style={styles.offlineWrap}>
-          <Ionicons name="power-outline" size={72} color={COLORS.textSecondary} />
+          <Ionicons name="power-outline" size={72} color={COLORS.warning} />
           <Text style={styles.offlineTitle}>You're Offline</Text>
           <Text style={styles.offlineSubtitle}>
             Go online to start receiving trip requests and notifications
@@ -430,10 +430,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   statusBarOnline: { 
-    backgroundColor: '#0a2a0a' 
+    backgroundColor: '#ffffff' 
   },
   statusBarOffline: { 
-    backgroundColor: '#1e1e1e' 
+    backgroundColor: '#ffffff' 
   },
   statusLeft: { 
     flexDirection: 'row', 
@@ -452,18 +452,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#555' 
   },
   statusText: { 
-    color: COLORS.textLight, 
+    color: COLORS.warning, 
     fontSize: 15, 
     fontWeight: '600' 
   },
   statusSub: { 
-    color: '#888', 
+    color: COLORS.text, 
     fontSize: 11, 
     marginTop: 2 
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#0f3460',
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.driver.secondary,
   },
   tabText: {
-    color: '#888',
+    color: '#000',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -491,15 +491,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center', 
     alignItems: 'center', 
     padding: 32,
+    backgroundColor: COLORS.background,
   },
   offlineTitle: { 
-    color: COLORS.text, 
+    color: COLORS.warning, 
     fontSize: 22, 
     fontWeight: 'bold', 
     marginTop: 20 
   },
   offlineSubtitle: {
-    color: COLORS.textSecondary, 
+    color: COLORS.text, 
     fontSize: 14, 
     textAlign: 'center',
     marginTop: 10, 
@@ -540,7 +541,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   myTripCard: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
@@ -585,7 +586,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tripHistoryCard: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
@@ -676,7 +677,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#2196f3',

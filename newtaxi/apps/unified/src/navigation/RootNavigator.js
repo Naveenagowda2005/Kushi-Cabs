@@ -13,7 +13,7 @@ import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 import SplashScreen from '../screens/auth/SplashScreen';
 
 export default function RootNavigator() {
-  const { loading, hasSession, hasUser, getUserRole, selectedRole } = useAuth();
+  const { loading, hasSession, hasUser, getUserRole, selectedRole, incompleteDriverDocuments } = useAuth();
   const { forceUpdate } = useTheme();
   
   // Force re-render of all child navigators when theme changes
@@ -31,6 +31,7 @@ export default function RootNavigator() {
         loading,
         hasSession: hasSession(),
         hasUser: hasUser(),
+        incompleteDriverDocuments,
       });
       setShowSplash(false);
     }, 2000);
@@ -44,6 +45,7 @@ export default function RootNavigator() {
     hasUser: hasUser(),
     userRole: getUserRole(),
     selectedRole,
+    incompleteDriverDocuments,
     showSplash,
   });
 
@@ -60,6 +62,12 @@ export default function RootNavigator() {
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
+  }
+
+  // If driver has incomplete documents, show document upload (in auth flow)
+  if (hasSession() && hasUser() && incompleteDriverDocuments && getUserRole() === ROLES.DRIVER) {
+    console.log('Driver has incomplete documents, redirecting to auth navigator');
+    return <AuthNavigator />;
   }
 
   // If user has completed profile, route to their role's app

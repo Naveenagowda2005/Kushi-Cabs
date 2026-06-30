@@ -221,7 +221,7 @@ export default function SuperAdminCommissionScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: getResponsivePadding(24), paddingTop: hp(6), backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  headerTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.text },
+  headerTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.warning },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: getResponsivePadding(24), marginTop: 16, marginBottom: 4 },
   statCard: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, flex: 0.48, alignItems: 'center', elevation: 2 },
   statValue: { fontSize: getResponsiveFontSize(18), fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },

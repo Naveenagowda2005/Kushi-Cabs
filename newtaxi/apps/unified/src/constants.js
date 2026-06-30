@@ -254,7 +254,7 @@ const LIGHT_THEME = {
 };
 
 // Global current theme (will be updated by ThemeContext)
-let currentTheme = DARK_THEME;
+let currentTheme = LIGHT_THEME; // DEFAULT TO LIGHT THEME FOR SUPER ADMIN
 
 export const setCurrentTheme = (isDarkMode) => {
   currentTheme = isDarkMode ? DARK_THEME : LIGHT_THEME;

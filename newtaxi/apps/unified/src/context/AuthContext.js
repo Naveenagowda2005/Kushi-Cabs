@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }) => {
   const [selectedRole, setSelectedRole] = useState(null);
   const [incompleteSignupPhone, setIncompleteSignupPhone] = useState(null);
   const [incompleteSignupUserId, setIncompleteSignupUserId] = useState(null); // Store auth user ID
+  const [incompleteDriverDocuments, setIncompleteDriverDocuments] = useState(false); // Driver with incomplete documents
   const fetchingRef = React.useRef(false);
 
   console.log('AuthProvider: Initializing...');
@@ -202,11 +203,52 @@ export const AuthProvider = ({ children }) => {
       if (error) {
         console.error('fetchUserProfile: Error fetching user profile:', error);
         setUser(null);
+        setIncompleteDriverDocuments(false);
         setLoading(false);
       } else if (data) {
         console.log('fetchUserProfile: Got user data, setting user:', data.id, data.roles?.name);
         // Set user state
         setUser(data);
+        
+        // Check if this is a driver with incomplete documents
+        if (data.roles?.name === 'driver') {
+          try {
+            const { data: verificationStatus, error: verifyError } = await supabase
+              .from('driver_verification_status')
+              .select('overall_status, all_documents_submitted')
+              .eq('driver_id', data.id)
+              .maybeSingle();
+            
+            if (verifyError && verifyError.code !== 'PGRST116') {
+              console.error('fetchUserProfile: Error checking driver verification:', verifyError);
+            }
+            
+            console.log('fetchUserProfile: Driver verification status:', verificationStatus?.overall_status);
+            
+            // Mark as incomplete ONLY if:
+            // 1. Documents are rejected, OR
+            // 2. Documents are not all submitted AND status is NOT approved
+            if (verificationStatus?.overall_status === 'rejected') {
+              console.log('fetchUserProfile: Driver has rejected documents, setting flag');
+              setIncompleteDriverDocuments(true);
+            } else if (!verificationStatus?.all_documents_submitted && verificationStatus?.overall_status !== 'approved') {
+              console.log('fetchUserProfile: Driver has incomplete documents, setting flag');
+              setIncompleteDriverDocuments(true);
+            } else if (verificationStatus?.overall_status === 'approved') {
+              console.log('fetchUserProfile: Driver is approved, clearing incomplete flag');
+              setIncompleteDriverDocuments(false);
+            } else {
+              console.log('fetchUserProfile: Driver status is pending, clearing incomplete flag');
+              setIncompleteDriverDocuments(false);
+            }
+          } catch (err) {
+            console.log('fetchUserProfile: Could not check driver verification:', err.message);
+            setIncompleteDriverDocuments(false);
+          }
+        } else {
+          setIncompleteDriverDocuments(false);
+        }
+        
         if (data.roles?.name) {
           console.log('fetchUserProfile: Auto-selecting role:', data.roles.name);
           setSelectedRole(data.roles.name);
@@ -218,6 +260,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         console.log('fetchUserProfile: No user profile found');
         setUser(null);
+        setIncompleteDriverDocuments(false);
         setLoading(false);
       }
     } catch (err) {
@@ -353,7 +396,7 @@ export const AuthProvider = ({ children }) => {
             .from('driver_verification_status')
             .select('overall_status, all_documents_submitted')
             .eq('driver_id', userData.id)
-            .single();
+            .maybeSingle();
           
           if (verifyError && verifyError.code !== 'PGRST116') {
             throw verifyError;
@@ -361,26 +404,33 @@ export const AuthProvider = ({ children }) => {
           
           // Check document verification status
           if (verificationStatus) {
-            console.log('Driver verification status:', verificationStatus?.overall_status);
+            console.log('Driver verification status:', verificationStatus?.overall_status, 'documents_submitted:', verificationStatus?.all_documents_submitted);
             
             // If already approved, allow login immediately (handles dummy drivers)
             if (verificationStatus.overall_status === 'approved') {
               console.log('Driver is approved - allowing login');
+            } else if (verificationStatus.overall_status === 'rejected') {
+              // Documents rejected, mark as incomplete so they can re-upload
+              console.log('Driver has rejected documents - marking as incomplete');
+              setIncompleteDriverDocuments(true);
             } else if (!verificationStatus.all_documents_submitted) {
-              // Documents not yet submitted, block login
-              throw new Error('Please upload your documents first.');
+              // Documents not yet submitted OR incomplete, allow login but mark as incomplete
+              console.log('Driver has incomplete documents - setting flag');
+              setIncompleteDriverDocuments(true);
+            } else {
+              // Documents submitted but pending review
+              setIncompleteDriverDocuments(false);
             }
             // ALL other statuses (pending_review, pending, rejected) → allow login
             // DriverNavigator will show the correct screen based on status
           } else {
             // No verification status record - new driver, must upload documents
-            throw new Error('Please upload your documents first.');
+            console.log('Driver has no verification record - marking as incomplete');
+            setIncompleteDriverDocuments(true);
           }
         } catch (err) {
-          if (err.message.includes('Please upload') || err.message.includes('rejected')) {
-            throw err;
-          }
           console.log('Could not verify document status:', err.message);
+          setIncompleteDriverDocuments(false);
         }
       }
 
@@ -650,6 +700,8 @@ export const AuthProvider = ({ children }) => {
     setIncompleteSignupPhone,
     incompleteSignupUserId,
     setIncompleteSignupUserId,
+    incompleteDriverDocuments,
+    setIncompleteDriverDocuments,
     signIn,
     signUp,
     signOut,

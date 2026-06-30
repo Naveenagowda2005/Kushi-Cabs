@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
-import { COLORS } from '../constants';
+import { COLORS, setCurrentTheme } from '../constants';
 
 import SuperAdminDashboardScreen  from '../screens/superadmin/DashboardScreen';
 import SuperAdminDriversScreen    from '../screens/superadmin/DriversScreen';
@@ -54,6 +54,12 @@ function ScreenWrapper({ component: Screen, navigation: parentNav }) {
 
 export default function SuperAdminNavigator() {
   const { forceUpdate } = useTheme();
+  
+  // FORCE LIGHT THEME FOR SUPER ADMIN
+  useEffect(() => {
+    setCurrentTheme(false); // false = light theme
+    console.log('🎨 Super Admin: Forced light theme');
+  }, []);
   
   // Force re-render when theme changes
   const [navThemeRefresh, setNavThemeRefresh] = useState(0);

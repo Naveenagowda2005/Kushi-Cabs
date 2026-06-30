@@ -192,9 +192,9 @@ export default function SuperAdminDriversScreen({ navigation }) {
           <Ionicons name="trash-outline" size={16} color={COLORS.error} />
           <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#1565c020' }]} onPress={() => { setSelectedDriver(driver); setShowIDCard(true); }}>
-          <Ionicons name="card" size={16} color="#1565c0" />
-          <Text style={[styles.actionButtonText, { color: '#1565c0' }]}>ID Card</Text>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.warning + '20' }]} onPress={() => { setSelectedDriver(driver); setShowIDCard(true); }}>
+          <Ionicons name="card" size={16} color={COLORS.warning} />
+          <Text style={[styles.actionButtonText, { color: COLORS.warning }]}>ID Card</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -204,7 +204,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Drivers Management</Text>
-        <TouchableOpacity onPress={fetchDrivers}><Ionicons name="refresh-outline" size={24} color={COLORS.superAdmin.primary} /></TouchableOpacity>
+        <TouchableOpacity onPress={fetchDrivers}><Ionicons name="refresh-outline" size={24} color={COLORS.warning} /></TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
@@ -294,7 +294,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: getResponsivePadding(24), paddingTop: hp(6), backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  headerTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.text },
+  headerTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.warning },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 12, marginHorizontal: getResponsivePadding(24), marginVertical: 16, paddingHorizontal: 16 },
   searchIcon: { marginRight: 12 },
   searchInput: { flex: 1, fontSize: getResponsiveFontSize(16), color: COLORS.text, paddingVertical: 16 },
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#1565c0',
+    backgroundColor: COLORS.warning,
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,

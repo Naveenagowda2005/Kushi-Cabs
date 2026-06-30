@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#888',
+    color: '#fff',
   },
   tabLabelActive: {
     color: '#FF9800',

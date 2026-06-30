@@ -19,7 +19,7 @@ import VendorWaitingForApprovalScreen from '../screens/vendor/VendorWaitingForAp
 const Stack = createNativeStackNavigator();
 
 export default function AuthNavigator() {
-  const { selectedRole, hasSession, hasUser, session, incompleteSignupPhone } = useAuth();
+  const { selectedRole, hasSession, hasUser, session, incompleteSignupPhone, incompleteDriverDocuments } = useAuth();
 
   const getRoleColor = () => {
     switch (selectedRole) {
@@ -58,6 +58,12 @@ export default function AuthNavigator() {
 
   // Determine initial route based on auth state
   const getInitialRouteName = () => {
+    // If driver has incomplete documents (logging in), go directly to document upload
+    if (hasSession() && hasUser() && incompleteDriverDocuments && selectedRole === ROLES.DRIVER) {
+      console.log('AuthNavigator: Driver with incomplete documents detected, starting with DriverDocumentUpload');
+      return 'DriverDocumentUpload';
+    }
+    
     // If we have incomplete signup phone, user just completed signup - show Register
     if (incompleteSignupPhone && selectedRole) {
       console.log('AuthNavigator: Incomplete signup detected, starting with Register');

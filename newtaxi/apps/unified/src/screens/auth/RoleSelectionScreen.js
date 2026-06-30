@@ -198,7 +198,7 @@ function RoleCard({ option, onPress, disabled }) {
         borderColor: borderColor,
         borderWidth: 2,
         borderRadius: 16,
-        backgroundColor: COLORS.surface,
+        backgroundColor: '#0d1929',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -287,13 +287,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: '#ffffff',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -302,14 +302,14 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   roleCard: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#0d1929',
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 4,
-    marginBottom: 4, // Small margin for better spacing
+    marginBottom: 4,
   },
   roleCardContent: {
     flexDirection: 'row',
@@ -334,13 +334,13 @@ const styles = StyleSheet.create({
   },
   roleSubtitle: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     fontWeight: '600',
     marginBottom: 6,
   },
   roleDescription: {
     fontSize: 12,
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     lineHeight: 16,
   },
   arrowContainer: {
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     textAlign: 'center',
     lineHeight: 20,
   },

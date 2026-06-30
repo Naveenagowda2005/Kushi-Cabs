@@ -181,12 +181,12 @@ const DocumentUploadCard = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#e0e0e0',
   },
   header: {
     flexDirection: 'row',
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#000000',
     marginBottom: 6,
   },
   statusBadge: {

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS } from '../../constants';
+import { supabase } from '../../lib/supabase';
 import DocumentViewer from '../../components/DocumentViewer';
 import * as documentService from '../../services/documentService';
 
@@ -45,18 +46,41 @@ const AdminVerificationDashboard = () => {
       setLoading(true);
       const verifications = await documentService.getPendingVerifications();
       
-      // Fetch documents for each driver
-      const verificationsWithDocs = await Promise.all(
-        verifications.map(async (verification) => {
-          const documents = await documentService.getDriverAllDocuments(verification.driver_id);
-          return {
-            ...verification,
-            documents,
-          };
-        })
-      );
-      
-      setPendingVerifications(verificationsWithDocs);
+      // Fetch all documents in one batch query instead of per-driver
+      if (verifications.length > 0) {
+        const driverIds = verifications.map(v => v.driver_id);
+        
+        // Get all documents for all drivers in one query
+        const { data: allDocuments, error: docsError } = await supabase
+          .from('driver_documents')
+          .select('*')
+          .in('driver_id', driverIds)
+          .order('document_type', { ascending: true });
+
+        if (docsError) {
+          console.error('Error fetching documents batch:', docsError);
+          throw docsError;
+        }
+
+        // Group documents by driver_id
+        const documentsByDriver = {};
+        allDocuments?.forEach(doc => {
+          if (!documentsByDriver[doc.driver_id]) {
+            documentsByDriver[doc.driver_id] = [];
+          }
+          documentsByDriver[doc.driver_id].push(doc);
+        });
+
+        // Attach documents to verifications
+        const verificationsWithDocs = verifications.map(verification => ({
+          ...verification,
+          documents: documentsByDriver[verification.driver_id] || [],
+        }));
+
+        setPendingVerifications(verificationsWithDocs);
+      } else {
+        setPendingVerifications([]);
+      }
     } catch (error) {
       console.error('Error loading verifications:', error);
       Alert.alert('Error', 'Failed to load pending verifications');
@@ -138,6 +162,13 @@ const AdminVerificationDashboard = () => {
       doc => doc.status === 'pending_review' || doc.status === 'pending'
     ) || [];
 
+    // Check if driver is re-verification (was already approved, now re-uploading)
+    // Fallback: if any document is 'approved', this is a re-verification
+    const hasAnyApprovedDoc = verification.documents?.some(
+      doc => doc?.status === 'approved'
+    );
+    const isReVerification = verification.is_re_verification === true || hasAnyApprovedDoc;
+
     return (
       <TouchableOpacity
         style={styles.driverCard}
@@ -150,6 +181,20 @@ const AdminVerificationDashboard = () => {
               <Ionicons name="person-circle-outline" size={32} color={COLORS.primary} />
             </View>
             <View style={styles.driverDetails}>
+              {/* NEW / RE-UPLOAD badge */}
+              <View style={isReVerification ? styles.reUploadBadge : styles.newBadge}>
+                <Ionicons
+                  name={isReVerification ? 'refresh-circle-outline' : 'sparkles-outline'}
+                  size={11}
+                  color={isReVerification ? '#ff9800' : '#4caf50'}
+                />
+                <Text style={[
+                  styles.badgeText,
+                  { color: isReVerification ? '#ff9800' : '#4caf50' }
+                ]}>
+                  {isReVerification ? 'RE-UPLOAD' : 'NEW'}
+                </Text>
+              </View>
               <Text style={styles.driverName}>{driver.full_name || 'Unknown'}</Text>
               <Text style={styles.driverPhone}>{driver.phone}</Text>
               <Text style={styles.driverEmail}>{driver.email}</Text>
@@ -164,6 +209,15 @@ const AdminVerificationDashboard = () => {
 
         {selectedDriver?.id === driver.id && (
           <View style={styles.driverDocuments}>
+            {/* Context banner for re-upload requests */}
+            {isReVerification && (
+              <View style={styles.reVerifyBanner}>
+                <Ionicons name="information-circle-outline" size={16} color="#ff9800" />
+                <Text style={styles.reVerifyBannerText}>
+                  This driver is already approved. They re-uploaded one or more documents for your review. Their dashboard access continues uninterrupted.
+                </Text>
+              </View>
+            )}
             <Text style={styles.documentsTitle}>Documents</Text>
             {pendingDocuments && pendingDocuments.length > 0 ? (
               pendingDocuments.map((doc) => (
@@ -404,6 +458,37 @@ const styles = StyleSheet.create({
   driverDetails: {
     flex: 1,
   },
+  newBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#4caf5020',
+    borderWidth: 1,
+    borderColor: '#4caf5060',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 4,
+    gap: 3,
+  },
+  reUploadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#ff980020',
+    borderWidth: 1,
+    borderColor: '#ff980060',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 4,
+    gap: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   driverName: {
     fontSize: 14,
     fontWeight: '600',
@@ -425,6 +510,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: `${COLORS.primary}05`,
+  },
+  reVerifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ff980015',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+    gap: 8,
+  },
+  reVerifyBannerText: {
+    fontSize: 12,
+    color: COLORS.text,
+    flex: 1,
+    lineHeight: 16,
   },
   documentsTitle: {
     fontSize: 12,

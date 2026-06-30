@@ -21,7 +21,7 @@ import * as documentService from '../../services/documentService';
 const REQUIRED_DOCUMENTS = ['DL', 'VEHICLE_FRONT', 'INSURANCE', 'FC', 'EMISSION', 'RC', 'AADHAR', 'BANK_PASSBOOK_FRONT', 'DRIVER_SELFIE'];
 
 const DriverDocumentUploadScreen = ({ navigation }) => {
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
   const [driverId, setDriverId] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [uploading, setUploading] = useState({});
@@ -31,31 +31,59 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Get current user
+  // Get current user from auth context first, fallback to supabase
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
+        console.log('DriverDocumentUploadScreen: Getting current user, session user id:', session?.user?.id);
+        
+        // Use session from AuthContext first
+        if (session?.user?.id) {
+          console.log('DriverDocumentUploadScreen: Setting driverId from session:', session.user.id);
+          setDriverId(session.user.id);
+          return;
+        }
+        
+        // Fallback to supabase auth
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          console.log('DriverDocumentUploadScreen: Setting driverId from supabase:', user.id);
           setDriverId(user.id);
+        } else {
+          console.error('DriverDocumentUploadScreen: No user found');
+          Alert.alert('Error', 'User not authenticated');
+          setLoading(false);
         }
       } catch (error) {
-        console.error('Error getting user:', error);
+        console.error('DriverDocumentUploadScreen: Error getting user:', error);
+        Alert.alert('Error', 'Failed to get user information');
+        setLoading(false);
       }
     };
+    
     getCurrentUser();
-  }, []);
+  }, [session]);
 
   // Load documents
   const loadDocuments = useCallback(async () => {
-    if (!driverId) return;
+    if (!driverId) {
+      console.log('loadDocuments: No driverId yet, skipping');
+      return;
+    }
 
     try {
       setLoading(true);
       console.log('loadDocuments: Loading documents for driver:', driverId);
       
-      const docs = await documentService.getDriverAllDocuments(driverId);
+      // Add timeout protection
+      const docsPromise = documentService.getDriverAllDocuments(driverId);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Document loading timeout')), 15000)
+      );
       
+      const docs = await Promise.race([docsPromise, timeoutPromise]);
+      
+      console.log('loadDocuments: Retrieved documents count:', docs?.length);
       console.log('loadDocuments: Retrieved documents:', docs);
       
       // Create a map of documents by type
@@ -66,15 +94,17 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
 
       // Ensure all required documents are in the list
       const allDocs = REQUIRED_DOCUMENTS.map(type => 
-        docMap[type] || { document_type: type, status: 'pending' }
+        docMap[type] || { document_type: type, status: 'pending', document_data: null }
       );
 
+      console.log('loadDocuments: Final documents list count:', allDocs.length);
       console.log('loadDocuments: Final documents list:', allDocs);
 
       setDocuments(allDocs);
     } catch (error) {
       console.error('Error loading documents:', error);
-      Alert.alert('Error', 'Failed to load documents');
+      Alert.alert('Error', 'Failed to load documents: ' + error.message);
+      setDocuments(REQUIRED_DOCUMENTS.map(type => ({ document_type: type, status: 'pending', document_data: null })));
     } finally {
       setLoading(false);
     }

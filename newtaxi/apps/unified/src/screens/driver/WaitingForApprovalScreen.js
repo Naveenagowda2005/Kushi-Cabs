@@ -17,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import * as documentService from '../../services/documentService';
 
 const WaitingForApprovalScreen = ({ navigation }) => {
-  const { signIn, signOut } = useAuth();
+  const { signIn, signOut, session } = useAuth();
   const [driverId, setDriverId] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [documents, setDocuments] = useState([]);
@@ -26,38 +26,74 @@ const WaitingForApprovalScreen = ({ navigation }) => {
   const [checkingApproval, setCheckingApproval] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Get current user
+  // Get current user from auth context first, fallback to supabase
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
+        console.log('WaitingForApprovalScreen: Getting current user, session user id:', session?.user?.id);
+        
+        // Use session from AuthContext first
+        if (session?.user?.id) {
+          console.log('WaitingForApprovalScreen: Setting driverId from session:', session.user.id);
+          setDriverId(session.user.id);
+          return;
+        }
+        
+        // Fallback to supabase auth
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          console.log('WaitingForApprovalScreen: Setting driverId from supabase:', user.id);
           setDriverId(user.id);
+        } else {
+          console.error('WaitingForApprovalScreen: No user found');
+          Alert.alert('Error', 'User not authenticated');
+          setLoading(false);
         }
       } catch (error) {
-        console.error('Error getting user:', error);
+        console.error('WaitingForApprovalScreen: Error getting user:', error);
+        Alert.alert('Error', 'Failed to get user information');
+        setLoading(false);
       }
     };
+    
     getCurrentUser();
-  }, []);
+  }, [session]);
 
   // Load verification status and documents
   const loadVerificationStatus = useCallback(async () => {
-    if (!driverId) return;
+    if (!driverId) {
+      console.log('loadVerificationStatus: No driverId yet, skipping');
+      return;
+    }
 
     try {
       setLoading(true);
       console.log('loadVerificationStatus: Loading for driver:', driverId);
 
-      const status = await documentService.getDriverVerificationStatus(driverId);
+      // Add timeout protection for both queries
+      const statusPromise = documentService.getDriverVerificationStatus(driverId);
+      const docsPromise = documentService.getDriverAllDocuments(driverId);
+      
+      const statusTimeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Status loading timeout')), 15000)
+      );
+      const docsTimeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Documents loading timeout')), 15000)
+      );
+      
+      const [status, docs] = await Promise.all([
+        Promise.race([statusPromise, statusTimeoutPromise]),
+        Promise.race([docsPromise, docsTimeoutPromise]),
+      ]);
+      
       console.log('loadVerificationStatus: Status:', status);
+      console.log('loadVerificationStatus: Docs count:', docs?.length);
+      
       setVerificationStatus(status);
-
-      // Also load individual documents to show per-document status
-      const docs = await documentService.getDriverAllDocuments(driverId);
       setDocuments(docs || []);
     } catch (error) {
       console.error('Error loading verification status:', error);
+      Alert.alert('Error', 'Failed to load approval status: ' + error.message);
     } finally {
       setLoading(false);
     }

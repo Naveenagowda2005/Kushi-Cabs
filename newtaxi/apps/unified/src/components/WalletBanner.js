@@ -26,12 +26,12 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 16,
     paddingVertical: 6,
     gap: 6,
   },
-  bannerLow: { backgroundColor: '#2a1a00' },
+  bannerLow: { backgroundColor: '#fff3e0' },
   text: { color: '#4caf50', fontSize: 12, flex: 1 },
   textLow: { color: '#ff9800' },
 });

@@ -258,7 +258,7 @@ export default function SignUpScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder={roleConfig.inputLabel}
-              placeholderTextColor={COLORS.textSecondary}
+              placeholderTextColor="#999999"
               value={form.phone}
               onChangeText={(text) => {
                 // Allow only digits and limit to 10 digits
@@ -288,7 +288,7 @@ export default function SignUpScreen({ navigation }) {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter 6-digit OTP"
-                  placeholderTextColor={COLORS.textSecondary}
+                  placeholderTextColor="#999999"
                   value={otp}
                   onChangeText={(text) => {
                     const digitsOnly = text.replace(/[^0-9]/g, '').slice(0, 6);
@@ -313,11 +313,11 @@ export default function SignUpScreen({ navigation }) {
 
           <Animated.View
             style={{
-              borderColor: useAnimatedBorder('#9333ea', '#00d4ff', 2000),
+              borderColor: useAnimatedBorder('#ff9800', '#ffb74d', 2000),
               borderWidth: 2,
               borderRadius: 12,
-              backgroundColor: roleConfig.color + 'da',
-              shadowColor: roleConfig.color,
+              backgroundColor: '#ffffff',
+              shadowColor: '#ff9800',
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.25,
               shadowRadius: 10,
@@ -360,7 +360,7 @@ export default function SignUpScreen({ navigation }) {
 
           <View style={styles.termsRow}>
             <TouchableOpacity style={styles.checkbox} onPress={() => setAgreed(prev => !prev)}>
-              <Ionicons name={agreed ? 'checkbox' : 'square-outline'} size={20} color={agreed ? roleConfig.color : COLORS.textSecondary} />
+              <Ionicons name={agreed ? 'checkbox' : 'square-outline'} size={20} color={agreed ? '#ffffff' : '#ffffff'} />
             </TouchableOpacity>
             <View style={styles.policiesListContainer}>
               <Text style={styles.termsLabel}>I agree to all policies:</Text>
@@ -450,31 +450,39 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: getResponsiveFontSize(16),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     marginBottom: 8,
   },
   description: {
     fontSize: getResponsiveFontSize(14),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     textAlign: 'center',
     lineHeight: 20,
   },
   sectionTitle: {
     fontSize: getResponsiveFontSize(18),
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#ffffff',
     marginBottom: 16,
   },
   form: {
     marginBottom: hp(3),
   },
   inputContainer: {
-    ...glassStyles.input,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
     paddingHorizontal: 16,
     minHeight: 56,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   inputIcon: {
     marginRight: 12,
@@ -482,7 +490,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: getResponsiveFontSize(16),
-    color: COLORS.text,
+    color: '#000000',
     paddingVertical: 16,
   },
   otpContainer: {
@@ -502,7 +510,7 @@ const styles = StyleSheet.create({
   },
   otpSubtitle: {
     fontSize: getResponsiveFontSize(12),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     marginBottom: 16,
   },
   resendOtpButton: {
@@ -533,7 +541,7 @@ const styles = StyleSheet.create({
   signUpButtonText: {
     fontSize: getResponsiveFontSize(18),
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#000000',
   },
   footer: {
     flexDirection: 'row',
@@ -558,7 +566,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   termsLabel: {
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     fontSize: getResponsiveFontSize(11),
     fontWeight: '600',
     marginBottom: 6,
@@ -582,7 +590,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   termsText: {
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     flex: 1,
     fontSize: getResponsiveFontSize(13),
   },
@@ -592,7 +600,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: getResponsiveFontSize(14),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
   },
   loginLink: {
     fontSize: getResponsiveFontSize(14),

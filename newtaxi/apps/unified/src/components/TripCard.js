@@ -138,7 +138,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             <Ionicons name="location" size={16} color="#4caf50" />
             <View style={styles.locationContent}>
               <Text style={styles.locationLabel}>Pickup</Text>
-              <Text style={styles.location} numberOfLines={1}>{trip.pickup_location}</Text>
+              <Text style={styles.location}>{trip.pickup_location}</Text>
             </View>
           </View>
         </View>
@@ -154,7 +154,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             <Ionicons name="flag" size={16} color="#e94560" />
             <View style={styles.locationContent}>
               <Text style={styles.locationLabel}>Dropoff</Text>
-              <Text style={styles.location} numberOfLines={1}>{trip.dropoff_location}</Text>
+              <Text style={styles.location}>{trip.dropoff_location}</Text>
             </View>
           </View>
         </View>
@@ -259,14 +259,6 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </Text>
       </View>
 
-      {/* Additional Info Note */}
-      <View style={styles.noteItem}>
-        <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>
-          You must accept all charges conditions before accepting trip
-        </Text>
-      </View>
-
       {/* Action Buttons */}
       <View style={styles.actionRow}>
         <TouchableOpacity 
@@ -294,7 +286,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 14,
-    padding: 12,
+    padding: 10,
     marginBottom: 8,
     borderWidth: 2,
     borderColor: '#ff9800',
@@ -303,14 +295,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   tripType: {
     color: '#ff9800',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   paymentBadge: {
     backgroundColor: '#f5f5f5',
@@ -319,7 +311,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   paymentText: {
-    color: '#333',
+    color: '#000',
     fontSize: 10,
     fontWeight: '600',
   },
@@ -327,7 +319,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 6,
+    marginBottom: 4,
     flexWrap: 'wrap',
   },
   fareKmBox: {
@@ -344,13 +336,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  fareText: { color: '#333', fontWeight: 'bold', fontSize: 16 },
+  fareText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
   kmBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  kmText: { color: '#333', fontWeight: 'bold', fontSize: 16 },
+  kmText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
   commissionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -372,7 +364,7 @@ const styles = StyleSheet.create({
   locationsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     backgroundColor: '#f5f5f5',
     borderRadius: 10,
     borderWidth: 1,
@@ -398,14 +390,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   locationLabel: {
-    color: '#666',
+    color: '#000',
     fontSize: 10,
     marginBottom: 1,
   },
   location: { 
-    color: '#333', 
+    color: '#000', 
     fontSize: 15,
     flex: 1,
+    flexWrap: 'wrap',
   },
   packageBadge: {
     flexDirection: 'row',
@@ -415,7 +408,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    marginVertical: 6,
+    marginVertical: 4,
     alignSelf: 'flex-start',
   },
   packageText: {
@@ -427,50 +420,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginVertical: 8,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#ff9800',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#ff9800',
   },
   carDetail: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     flex: 1,
   },
   carDetailText: {
-    color: '#2196f3',
-    fontSize: 10,
-    fontWeight: '500',
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '600',
   },
   inclusionsRow: {
     flexDirection: 'row',
     gap: 4,
-    marginVertical: 8,
+    marginVertical: 6,
     flexWrap: 'nowrap',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   inclusionBox: {
     flex: 1,
     alignItems: 'center',
   },
   inclusionLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000',
   },
   inclusionStatus: {
-    fontSize: 8,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
   },
   inclusionDivider: {
     fontSize: 10,
-    color: '#333',
+    color: '#000',
     marginHorizontal: 2,
   },
   inclusionBadge: {
@@ -532,9 +525,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  lockText: { color: '#ff9800', fontSize: 10, flex: 1 },
+  lockText: { color: '#000', fontSize: 10, flex: 1 },
   carrierNote: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -555,12 +548,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingTop: 4,
+    paddingTop: 2,
     paddingBottom: 2,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   departureLabel: {
-    color: '#333',
+    color: '#000',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -577,13 +570,13 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', alignItems: 'center' },
   footerText: { color: '#888', fontSize: 10, marginLeft: 4 },
   notesHeader: {
-    marginTop: 4,
-    paddingTop: 4,
+    marginTop: 2,
+    paddingTop: 3,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#ff9800',
   },
   notesTitle: {
-    color: '#333',
+    color: '#000',
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 4,
@@ -591,13 +584,13 @@ const styles = StyleSheet.create({
   noteItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
+    gap: 6,
+    marginBottom: 2,
   },
   noteText: {
-    color: '#ff9800',
-    fontSize: 10,
-    fontWeight: '500',
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '600',
     flex: 1,
   },
   notesSection: {
@@ -692,10 +685,10 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#ff9800',
   },
   acceptBtn: {
     flex: 1,

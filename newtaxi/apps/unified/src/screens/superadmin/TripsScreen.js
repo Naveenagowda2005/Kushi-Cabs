@@ -29,7 +29,7 @@ function ZoomableImage({ imageUrl, title }) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
+    <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
         <Image
           source={{ uri: imageUrl }}
@@ -362,7 +362,7 @@ export default function SuperAdminTripsScreen() {
             </Text>
           </View>
           <View style={styles.locationRow}>
-            <Ionicons name="flag" size={14} color="#e94560" />
+            <Ionicons name="flag" size={14} color={COLORS.text} />
             <Text style={styles.locationText} numberOfLines={1}>
               {item.dropoff_location}
             </Text>
@@ -663,60 +663,66 @@ export default function SuperAdminTripsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#ffffff',
   },
   header: {
-    backgroundColor: COLORS.primary,
-    padding: 20,
-    paddingTop: 50,
+    backgroundColor: COLORS.surface,
+    padding: 12,
+    paddingTop: 24,
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.warning,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.textLight,
+    color: COLORS.warning,
+    marginBottom: 0,
   },
   subtitle: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginTop: 4,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 0,
     opacity: 0.8,
   },
   filterContainer: {
-    backgroundColor: '#16213e',
+    backgroundColor: COLORS.background,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: COLORS.border,
   },
   filterButton: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     marginHorizontal: 4,
     borderRadius: 20,
-    backgroundColor: '#0f3460',
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.textSecondary,
   },
   filterButtonActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.warning,
+    borderColor: COLORS.warning,
   },
   filterText: {
-    color: '#888',
+    color: COLORS.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },
   filterTextActive: {
-    color: COLORS.textLight,
+    color: COLORS.text,
   },
   list: {
     padding: 16,
     paddingBottom: 24,
   },
   tripCard: {
-    backgroundColor: '#16213e',
+    backgroundColor: COLORS.surface,
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#0f3460',
+    borderWidth: 2,
+    borderColor: COLORS.warning,
   },
   tripHeader: {
     flexDirection: 'row',
@@ -740,23 +746,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tripId: {
-    color: '#888',
+    color: COLORS.textTertiary,
     fontSize: 11,
     marginTop: 2,
   },
   fare: {
-    color: '#4caf50',
+    color: COLORS.success,
     fontWeight: 'bold',
     fontSize: 16,
   },
   section: {
-    marginBottom: 12,
-    paddingBottom: 12,
+    marginBottom: 6,
+    paddingBottom: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: COLORS.border,
   },
   sectionTitle: {
-    color: '#aaa',
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 8,
@@ -769,7 +775,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   locationText: {
-    color: '#ccc',
+    color: COLORS.text,
     fontSize: 13,
     flex: 1,
   },
@@ -780,7 +786,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoText: {
-    color: '#fff',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -790,13 +796,13 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#0f3460',
+    backgroundColor: COLORS.backgroundSecondary,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2196f3',
+    borderColor: COLORS.info,
   },
   phoneText: {
-    color: '#2196f3',
+    color: COLORS.info,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -807,16 +813,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   detailLabel: {
-    color: '#888',
+    color: COLORS.textSecondary,
     fontSize: 13,
   },
   detailValue: {
-    color: '#fff',
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '600',
   },
   timestamp: {
-    color: '#4caf50',
+    color: COLORS.success,
     fontSize: 12,
     marginBottom: 4,
   },
@@ -828,21 +834,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: '#ff980011',
+    backgroundColor: COLORS.warningLight,
     borderWidth: 1,
-    borderColor: '#ff9800',
+    borderColor: COLORS.warning,
   },
   publishButtonActive: {
-    backgroundColor: '#4caf5011',
-    borderColor: '#4caf50',
+    backgroundColor: COLORS.successLight,
+    borderColor: COLORS.success,
   },
   publishButtonText: {
-    color: '#ff9800',
+    color: COLORS.warning,
     fontSize: 13,
     fontWeight: '600',
   },
   publishButtonTextActive: {
-    color: '#4caf50',
+    color: COLORS.success,
   },
   empty: {
     alignItems: 'center',
@@ -872,7 +878,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     borderRadius: 8,
-    backgroundColor: '#0f3460',
+    backgroundColor: COLORS.backgroundSecondary,
     marginBottom: 8,
   },
   imageErrorPlaceholder: {
@@ -884,17 +890,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    color: '#666',
+    color: COLORS.textTertiary,
     fontSize: 11,
     marginTop: 4,
   },
   loadingText: {
-    color: '#888',
+    color: COLORS.textSecondary,
     fontSize: 11,
     marginTop: 4,
   },
   odometerLabel: {
-    color: '#aaa',
+    color: COLORS.textSecondary,
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
@@ -909,12 +915,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#16213e',
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: COLORS.border,
   },
   modalTitle: {
-    color: '#fff',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -930,11 +936,11 @@ const styles = StyleSheet.create({
   zoomableContainer: {
     width: '100%',
     height: 400,
-    backgroundColor: '#000',
+    backgroundColor: '#ffffff',
   },
   scrollViewContainer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#ffffff',
   },
   zoomableImageWrapper: {
     width: '100%',

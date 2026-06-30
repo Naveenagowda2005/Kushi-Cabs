@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Share,
   Alert,
+  PanResponder,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
@@ -24,6 +26,9 @@ const DocumentViewer = ({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [scale] = useState(new Animated.Value(1));
+  const [imageWidth, setImageWidth] = useState(0);
+  const [imageHeight, setImageHeight] = useState(0);
 
   // Convert base64 to data URI for display
   const imageUri = documentData ? base64ToDataUri(documentData) : null;
@@ -45,6 +50,36 @@ const DocumentViewer = ({
     }
   };
 
+  const handleImageLayout = (e) => {
+    const { width, height } = e.nativeEvent.layout;
+    setImageWidth(width);
+    setImageHeight(height);
+  };
+
+  const zoomIn = () => {
+    Animated.timing(scale, {
+      toValue: 2,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const zoomOut = () => {
+    Animated.timing(scale, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const resetZoom = () => {
+    Animated.timing(scale, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  };
+
   return (
     <Modal
       visible={visible}
@@ -53,14 +88,17 @@ const DocumentViewer = ({
       onRequestClose={onClose}
     >
       {isFullScreen ? (
-        // Full screen view
+        // Full screen view with zoom controls
         <View style={styles.fullScreenContainer}>
           <View style={styles.fullScreenHeader}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setIsFullScreen(false)}
+              onPress={() => {
+                setIsFullScreen(false);
+                resetZoom();
+              }}
             >
-              <Ionicons name="close" size={28} color={COLORS.text} />
+              <Ionicons name="close" size={28} color="#ffffff" />
             </TouchableOpacity>
             <Text style={styles.fullScreenTitle}>
               {getDocumentLabel(documentType)}
@@ -73,6 +111,7 @@ const DocumentViewer = ({
             scrollEventThrottle={16}
             maximumZoomScale={3}
             minimumZoomScale={1}
+            zoomEnabled={true}
           >
             {isLoading && (
               <View style={styles.loadingContainer}>
@@ -80,16 +119,18 @@ const DocumentViewer = ({
               </View>
             )}
             {!imageError && imageUri && (
-              <Image
-                source={{ uri: imageUri }}
-                style={styles.fullScreenImage}
-                onLoadStart={() => setIsLoading(true)}
-                onLoadEnd={() => setIsLoading(false)}
-                onError={() => {
-                  setImageError(true);
-                  setIsLoading(false);
-                }}
-              />
+              <Animated.View style={{ transform: [{ scale }] }}>
+                <Image
+                  source={{ uri: imageUri }}
+                  style={styles.fullScreenImage}
+                  onLoadStart={() => setIsLoading(true)}
+                  onLoadEnd={() => setIsLoading(false)}
+                  onError={() => {
+                    setImageError(true);
+                    setIsLoading(false);
+                  }}
+                />
+              </Animated.View>
             )}
             {imageError && (
               <View style={styles.errorContainer}>
@@ -98,6 +139,19 @@ const DocumentViewer = ({
               </View>
             )}
           </ScrollView>
+
+          {/* Zoom controls footer */}
+          <View style={styles.zoomControls}>
+            <TouchableOpacity style={styles.zoomButton} onPress={zoomOut}>
+              <Ionicons name="remove-outline" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomButton} onPress={resetZoom}>
+              <Ionicons name="home-outline" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomButton} onPress={zoomIn}>
+              <Ionicons name="add-outline" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
         // Modal view
@@ -209,6 +263,7 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 8,
     marginRight: -8,
+    color: '#ffffff',
   },
   imageContainer: {
     width: '100%',
@@ -271,7 +326,7 @@ const styles = StyleSheet.create({
   // Full screen styles
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#000000',
   },
   fullScreenHeader: {
     flexDirection: 'row',
@@ -281,12 +336,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingTop: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: '#333333',
+    backgroundColor: '#1a1a1a',
   },
   fullScreenTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#ffffff',
     flex: 1,
     textAlign: 'center',
   },
@@ -295,11 +351,31 @@ const styles = StyleSheet.create({
   },
   fullScreenContent: {
     flex: 1,
+    backgroundColor: '#000000',
   },
   fullScreenImage: {
     width: '100%',
-    height: '100%',
+    height: 'auto',
+    aspectRatio: 1,
     resizeMode: 'contain',
+  },
+  zoomControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#1a1a1a',
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+    gap: 16,
+  },
+  zoomButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

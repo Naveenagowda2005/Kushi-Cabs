@@ -909,7 +909,7 @@ export default function LoginScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder={roleConfig.inputLabel}
-              placeholderTextColor={COLORS.textSecondary}
+              placeholderTextColor="#999999"
               value={form.identifier}
               onChangeText={(text) => {
                 // Phone for all roles - only 10 digits
@@ -942,7 +942,7 @@ export default function LoginScreen({ navigation }) {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter 6-digit OTP"
-                  placeholderTextColor={COLORS.textSecondary}
+                  placeholderTextColor="#999999"
                   value={otp}
                   onChangeText={(text) => {
                     const digitsOnly = text.replace(/[^0-9]/g, '').slice(0, 6);
@@ -967,11 +967,11 @@ export default function LoginScreen({ navigation }) {
 
           <Animated.View
             style={{
-              borderColor: useAnimatedBorder('#9333ea', '#00d4ff', 2000),
+              borderColor: useAnimatedBorder('#ff9800', '#ffb74d', 2000),
               borderWidth: 2,
               borderRadius: 12,
-              backgroundColor: roleConfig.color + 'da',
-              shadowColor: roleConfig.color,
+              backgroundColor: '#ffffff',
+              shadowColor: '#ff9800',
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.25,
               shadowRadius: 10,
@@ -1108,7 +1108,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: getResponsiveFontSize(16),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     textAlign: 'center',
   },
   sessionInfo: {
@@ -1153,12 +1153,20 @@ const styles = StyleSheet.create({
     marginBottom: hp(4),
   },
   inputContainer: {
-    ...glassStyles.input,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
     paddingHorizontal: 16,
     minHeight: 56,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   inputIcon: {
     marginRight: 12,
@@ -1166,7 +1174,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: getResponsiveFontSize(16),
-    color: COLORS.text,
+    color: '#000000',
     paddingVertical: 16,
   },
   eyeButton: {
@@ -1189,7 +1197,7 @@ const styles = StyleSheet.create({
   },
   otpSubtitle: {
     fontSize: getResponsiveFontSize(12),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     marginBottom: 16,
   },
   resendOtpButton: {
@@ -1220,7 +1228,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontSize: getResponsiveFontSize(18),
     fontWeight: '600',
-    color: COLORS.textLight,
+    color: '#000000',
   },
   divider: {
     flexDirection: 'row',
@@ -1235,13 +1243,14 @@ const styles = StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     fontSize: getResponsiveFontSize(14),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
   },
   signUpButton: {
-    ...glassStyles.buttonSecondary,
     paddingVertical: 18,
     alignItems: 'center',
     borderWidth: 2,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
   },
   signUpButtonText: {
     fontSize: getResponsiveFontSize(16),
@@ -1253,19 +1262,19 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: getResponsiveFontSize(14),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     fontWeight: '500',
   },
   footerSubtext: {
     fontSize: getResponsiveFontSize(12),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     marginTop: 4,
     opacity: 0.7,
     textAlign: 'center',
   },
   loadingText: {
     fontSize: getResponsiveFontSize(16),
-    color: COLORS.textSecondary,
+    color: '#ffffff',
     marginTop: 16,
   },
 });

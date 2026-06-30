@@ -255,7 +255,7 @@ export default function DriverProfileScreen({ navigation }) {
             );
           }}
         >
-          <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+          <Ionicons name="ellipsis-vertical" size={24} color="#ff9800" />
         </TouchableOpacity>
       </View>
 
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
     backgroundColor: '#ffffff',
   },
-  headerTitle: { color: '#333', fontSize: 18, fontWeight: '600' },
+  headerTitle: { color: '#ff9800', fontSize: 18, fontWeight: '600' },
   settingsBtn: { padding: 8 },
   
   container: { flex: 1, backgroundColor: '#f0f0f0' },
