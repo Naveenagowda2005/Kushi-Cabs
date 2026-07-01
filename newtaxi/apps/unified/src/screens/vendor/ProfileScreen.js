@@ -319,14 +319,12 @@ export default function VendorProfileScreen({ navigation }) {
           <Text style={styles.roleText}>Vendor</Text>
         </View>
 
-        {/* ID Card Button */}
-        <TouchableOpacity 
-          style={styles.idCardButton}
-          onPress={() => setShowIDCard(true)}
-        >
-          <Ionicons name="card" size={16} color="#fff" />
-          <Text style={styles.idCardButtonText}>View ID Card</Text>
-        </TouchableOpacity>
+        {/* Vendor ID under vendor badge - Same format as IDCard */}
+        {vendor?.id && (
+          <Text style={styles.userId}>
+            ID: KUSHV{String(vendor.id.charCodeAt(0)).padStart(6, '0')}
+          </Text>
+        )}
       </View>
 
       {/* Wallet */}
@@ -535,7 +533,7 @@ const styles = StyleSheet.create({
   avatarText: { color: '#333', fontSize: 36, fontWeight: 'bold' },
   name: { color: '#333', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   phone: { color: '#888', fontSize: 14, marginBottom: 4 },
-  userId: { color: '#aaa', fontSize: 10, marginBottom: 8, fontFamily: 'monospace' },
+  userId: { color: '#4caf50', fontSize: 16, fontWeight: '700', marginBottom: 8, fontFamily: 'monospace', letterSpacing: 1 },
   company: { color: '#666', fontSize: 13, marginBottom: 8 },
   roleBadge: { backgroundColor: '#ff980020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2, borderColor: '#ff9800', alignItems: 'center' },
   roleText: { color: '#ff9800', fontSize: 12, fontWeight: '600' },

@@ -870,4 +870,143 @@ router.get('/vendor-debug/:userId', async (req, res) => {
   }
 });
 
+/**
+ * POST /admin/create-admin-trip
+ * Create a trip assigned to specific drivers
+ * Only super admin can access this endpoint
+ */
+router.post('/create-admin-trip', async (req, res) => {
+  try {
+    const {
+      pickupLocation,
+      dropoffLocation,
+      returnLocation,
+      returnDate,
+      fixedKm,
+      fareAmount,
+      commissionAmount,
+      customerPreAdvance,
+      scheduledAt,
+      passengerName,
+      passengerPhone,
+      carType,
+      carModel,
+      seaterType,
+      fuelType,
+      segmentId,
+      packageId,
+      tollIncluded,
+      stateTaxIncluded,
+      petTravelling,
+      hillsIncluded,
+      notes,
+      createdBy,
+      assignedDriverIds,
+    } = req.body;
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: 'Admin credentials not configured' });
+    }
+
+    // Validate required fields
+    if (!pickupLocation || !dropoffLocation || !fixedKm || !fareAmount || !commissionAmount) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: pickupLocation, dropoffLocation, fixedKm, fareAmount, commissionAmount' 
+      });
+    }
+
+    if (!Array.isArray(assignedDriverIds) || assignedDriverIds.length === 0) {
+      return res.status(400).json({ error: 'At least one driver must be assigned' });
+    }
+
+    console.log(`📝 Creating admin trip: ${pickupLocation} → ${dropoffLocation}`);
+    console.log(`   Assigned to ${assignedDriverIds.length} driver(s)`);
+
+    // Create the trip
+    const tripData = {
+      created_by: createdBy,
+      pickup_location: pickupLocation.trim(),
+      dropoff_location: dropoffLocation.trim(),
+      return_location: returnLocation ? returnLocation.trim() : null,
+      return_date: returnDate || null,
+      fixed_km: parseFloat(fixedKm),
+      fare_amount: parseFloat(fareAmount),
+      commission_amount: parseFloat(commissionAmount),
+      customer_pre_advance: parseFloat(customerPreAdvance) || 0,
+      scheduled_at: scheduledAt || new Date().toISOString(),
+      passenger_name: passengerName.trim(),
+      passenger_phone: passengerPhone.trim(),
+      car_type: carType,
+      car_model: carModel || null,
+      seater_type: seaterType,
+      fuel_type: fuelType,
+      segment_id: segmentId || null,
+      package_id: packageId || null,
+      toll_included: tollIncluded || false,
+      state_tax_included: stateTaxIncluded || false,
+      pet_travelling: petTravelling || false,
+      hills_included: hillsIncluded || false,
+      notes: notes ? notes.trim() : null,
+      status: 'pending',
+      is_published: false,
+      commission_paid: false,
+      is_admin_trip: true,
+      admin_assigned_drivers: assignedDriverIds, // Store as JSON array in trip
+    };
+
+    const { data: trip, error: tripError } = await supabaseAdmin
+      .from('trips')
+      .insert([tripData])
+      .select()
+      .single();
+
+    if (tripError) {
+      console.error('❌ Trip creation error:', tripError.message);
+      return res.status(500).json({ error: 'Failed to create trip', details: tripError.message });
+    }
+
+    console.log(`✅ Admin trip created: ${trip.id}`);
+
+    // Try to create assignments in admin_trip_assignments table (if it exists)
+    const assignments = assignedDriverIds.map(driverId => ({
+      trip_id: trip.id,
+      driver_id: driverId,
+      assigned_at: new Date().toISOString(),
+      assigned_by: createdBy,
+    }));
+
+    const { error: assignError } = await supabaseAdmin
+      .from('admin_trip_assignments')
+      .insert(assignments);
+
+    if (assignError && assignError.code !== 'PGRST116' && assignError.code !== 'PGRST101') {
+      console.warn('⚠️ Could not save admin_trip_assignments:', assignError.message);
+      console.log('   Continuing anyway - driver IDs stored in trip.admin_assigned_drivers');
+    } else if (!assignError) {
+      console.log(`✅ Trip assignments saved for ${assignedDriverIds.length} driver(s)`);
+    }
+
+    res.json({
+      success: true,
+      message: `Admin trip created and assigned to ${assignedDriverIds.length} driver(s)`,
+      trip: {
+        id: trip.id,
+        pickupLocation: trip.pickup_location,
+        dropoffLocation: trip.dropoff_location,
+        fareAmount: trip.fare_amount,
+        commissionAmount: trip.commission_amount,
+        passengerName: trip.passenger_name,
+        assignedDrivers: assignedDriverIds.length,
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ CREATE ADMIN TRIP ERROR:', error);
+    res.status(500).json({
+      error: 'Failed to create admin trip',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

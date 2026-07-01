@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert, TextInput, Modal, ScrollView,
+  RefreshControl, Alert, TextInput, Modal, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
@@ -26,6 +26,11 @@ export default function SuperAdminDriversScreen({ navigation }) {
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [showIDCard, setShowIDCard] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [driverDocuments, setDriverDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documentViewerVisible, setDocumentViewerVisible] = useState(false);
 
   useEffect(() => { fetchDrivers(); }, []);
   useEffect(() => { filterDrivers(); }, [searchQuery, drivers]);
@@ -165,40 +170,93 @@ export default function SuperAdminDriversScreen({ navigation }) {
     ]);
   };
 
-  const DriverCard = ({ driver }) => (
-    <TouchableOpacity style={styles.card} onPress={() => { setSelectedDriver(driver); setModalVisible(true); }}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName}>{driver.full_name || 'No Name'}</Text>
-          <Text style={styles.cardSub}>{driver.phone || 'No Phone'}</Text>
+  const fetchAndViewDriverDocuments = async (driver) => {
+    try {
+      setLoadingDocuments(true);
+      setShowDocumentsModal(true);
+      
+      console.log('📄 Fetching documents for driver:', driver.full_name, 'user_id:', driver.id);
+      
+      const { data: docs, error } = await supabase
+        .from('driver_documents')
+        .select('*')
+        .eq('driver_id', driver.id);
+      
+      if (error) {
+        console.error('Error fetching documents:', error);
+        Alert.alert('Error', 'Failed to load documents');
+        setLoadingDocuments(false);
+        return;
+      }
+      
+      if (!docs || docs.length === 0) {
+        setDriverDocuments([]);
+        console.log('⚠️ No documents found for driver');
+      } else {
+        console.log('✅ Found', docs.length, 'documents for driver');
+        setDriverDocuments(docs);
+      }
+    } catch (e) {
+      console.error('Error in fetchAndViewDriverDocuments:', e);
+      Alert.alert('Error', e.message);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const DriverCard = ({ driver }) => {
+    // Check if this is a dummy driver (license number starts with DUMMY-)
+    const isDummyDriver = driver.drivers?.[0]?.license_number?.toUpperCase().startsWith('DUMMY-');
+
+    return (
+      <TouchableOpacity style={styles.card} onPress={() => { setSelectedDriver(driver); setModalVisible(true); }}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardInfo}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Text style={styles.cardName}>{driver.full_name || 'No Name'}</Text>
+              {isDummyDriver && (
+                <View style={styles.dummyBadge}>
+                  <Ionicons name="flash" size={12} color="#fff" />
+                  <Text style={styles.dummyBadgeText}>DUMMY</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.cardSub}>{driver.phone || 'No Phone'}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: (driver.is_active ? COLORS.success : COLORS.error) + '20' }]}>
+            <Text style={[styles.statusText, { color: driver.is_active ? COLORS.success : COLORS.error }]}>
+              {driver.is_active ? 'Active' : 'Blocked'}
+            </Text>
+          </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: (driver.is_active ? COLORS.success : COLORS.error) + '20' }]}>
-          <Text style={[styles.statusText, { color: driver.is_active ? COLORS.success : COLORS.error }]}>
-            {driver.is_active ? 'Active' : 'Blocked'}
-          </Text>
+        <View style={styles.cardDetails}>
+          <View style={styles.detailItem}><Ionicons name="card-outline" size={16} color={COLORS.textSecondary} /><Text style={styles.detailText}>{driver.drivers?.[0]?.license_number || 'No License'}</Text></View>
+          <View style={styles.detailItem}><Ionicons name="car-outline" size={16} color={COLORS.textSecondary} /><Text style={styles.detailText}>{driver.drivers?.[0]?.vehicle_number || 'No Vehicle'}</Text></View>
+          <View style={styles.detailItem}><Ionicons name="wallet-outline" size={16} color={COLORS.textSecondary} /><Text style={styles.detailText}>₹{driver.wallets?.[0]?.balance || 0}</Text></View>
         </View>
-      </View>
-      <View style={styles.cardDetails}>
-        <View style={styles.detailItem}><Ionicons name="card-outline" size={16} color={COLORS.textSecondary} /><Text style={styles.detailText}>{driver.drivers?.[0]?.license_number || 'No License'}</Text></View>
-        <View style={styles.detailItem}><Ionicons name="car-outline" size={16} color={COLORS.textSecondary} /><Text style={styles.detailText}>{driver.drivers?.[0]?.vehicle_number || 'No Vehicle'}</Text></View>
-        <View style={styles.detailItem}><Ionicons name="wallet-outline" size={16} color={COLORS.textSecondary} /><Text style={styles.detailText}>₹{driver.wallets?.[0]?.balance || 0}</Text></View>
-      </View>
-      <View style={styles.actionButtons}>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: (driver.is_active ? COLORS.error : COLORS.success) + '20' }]} onPress={() => toggleDriverStatus(driver.id, driver.is_active)}>
-          <Ionicons name={driver.is_active ? 'ban-outline' : 'checkmark-circle-outline'} size={16} color={driver.is_active ? COLORS.error : COLORS.success} />
-          <Text style={[styles.actionButtonText, { color: driver.is_active ? COLORS.error : COLORS.success }]}>{driver.is_active ? 'Block' : 'Activate'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.error + '20' }]} onPress={() => deleteDriver(driver.id, driver.users?.phone || driver.phone)}>
-          <Ionicons name="trash-outline" size={16} color={COLORS.error} />
-          <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.warning + '20' }]} onPress={() => { setSelectedDriver(driver); setShowIDCard(true); }}>
-          <Ionicons name="card" size={16} color={COLORS.warning} />
-          <Text style={[styles.actionButtonText, { color: COLORS.warning }]}>ID Card</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: (driver.is_active ? COLORS.error : COLORS.success) + '20' }]} onPress={() => toggleDriverStatus(driver.id, driver.is_active)}>
+            <Ionicons name={driver.is_active ? 'ban-outline' : 'checkmark-circle-outline'} size={16} color={driver.is_active ? COLORS.error : COLORS.success} />
+            <Text style={[styles.actionButtonText, { color: driver.is_active ? COLORS.error : COLORS.success }]}>{driver.is_active ? 'Block' : 'Activate'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.error + '20' }]} onPress={() => deleteDriver(driver.id, driver.users?.phone || driver.phone)}>
+            <Ionicons name="trash-outline" size={16} color={COLORS.error} />
+            <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.warning + '20' }]} onPress={() => { setSelectedDriver(driver); setShowIDCard(true); }}>
+            <Ionicons name="card" size={16} color={COLORS.warning} />
+            <Text style={[styles.actionButtonText, { color: COLORS.warning }]}>ID Card</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#2196F320' }]} onPress={() => fetchAndViewDriverDocuments(driver)}>
+            <Ionicons name="document-outline" size={16} color="#2196F3" />
+            <Text style={[styles.actionButtonText, { color: '#2196F3' }]}>Documents</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -287,6 +345,94 @@ export default function SuperAdminDriversScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Documents Modal */}
+      <Modal visible={showDocumentsModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowDocumentsModal(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Driver Documents</Text>
+            <TouchableOpacity onPress={() => setShowDocumentsModal(false)}>
+              <Ionicons name="close" size={28} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+
+          {loadingDocuments ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.warning} />
+              <Text style={{ marginTop: 12, color: COLORS.textSecondary }}>Loading documents...</Text>
+            </View>
+          ) : driverDocuments.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="document-outline" size={64} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No documents available</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.documentsListContainer}>
+              {driverDocuments.map((doc, index) => (
+                <View key={index} style={styles.documentCard}>
+                  <View style={styles.documentInfo}>
+                    <Ionicons name="document-text-outline" size={24} color={COLORS.warning} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.documentType}>{doc.document_type}</Text>
+                      <Text style={styles.documentDate}>{new Date(doc.created_at).toLocaleDateString()}</Text>
+                      {doc.document_mime_type && (
+                        <Text style={styles.documentMime}>{doc.document_mime_type}</Text>
+                      )}
+                    </View>
+                  </View>
+                  {doc.document_data && (
+                    <TouchableOpacity
+                      style={styles.viewButton}
+                      onPress={() => {
+                        setSelectedDocument({
+                          data: doc.document_data,
+                          type: doc.document_type,
+                          mimeType: doc.document_mime_type
+                        });
+                        setDocumentViewerVisible(true);
+                      }}
+                    >
+                      <Ionicons name="eye-outline" size={18} color="#2196F3" />
+                      <Text style={{ color: '#2196F3', marginLeft: 4, fontWeight: '500' }}>View</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+
+      {/* Document Viewer Modal */}
+      {selectedDocument && (
+        <Modal visible={documentViewerVisible} animationType="fade" transparent onRequestClose={() => setDocumentViewerVisible(false)}>
+          <View style={styles.documentViewerOverlay}>
+            <View style={styles.documentViewerHeader}>
+              <Text style={styles.documentViewerTitle}>{selectedDocument.type}</Text>
+              <TouchableOpacity onPress={() => setDocumentViewerVisible(false)}>
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.documentViewerContent}>
+              {selectedDocument.data && (
+                selectedDocument.data.startsWith('data:') ? (
+                  <Image
+                    source={{ uri: selectedDocument.data }}
+                    style={styles.documentImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: `data:${selectedDocument.mimeType || 'image/jpeg'};base64,${selectedDocument.data}` }}
+                    style={styles.documentImage}
+                    resizeMode="contain"
+                  />
+                )
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -310,11 +456,13 @@ const styles = StyleSheet.create({
   cardSub: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: getResponsiveFontSize(12), fontWeight: '500' },
+  dummyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff9800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  dummyBadgeText: { fontSize: getResponsiveFontSize(10), fontWeight: '700', color: '#fff' },
   cardDetails: { marginBottom: 12 },
   detailItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   detailText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginLeft: 8 },
-  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, flex: 1, justifyContent: 'center' },
+  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  actionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, flex: 1, justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
   actionButtonText: { fontSize: getResponsiveFontSize(12), fontWeight: '500', marginLeft: 4 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: getResponsiveFontSize(18), fontWeight: '600', color: COLORS.textSecondary, marginTop: 16 },
@@ -372,6 +520,100 @@ const styles = StyleSheet.create({
   idCardModalContent: {
     paddingTop: 12,
     paddingBottom: 20,
+  },
+
+  // Document Viewer Styles
+  documentsListContainer: {
+    flex: 1,
+    padding: getResponsivePadding(16),
+  },
+
+  documentCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    elevation: 1,
+  },
+
+  documentInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  documentType: {
+    fontSize: getResponsiveFontSize(14),
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+
+  documentDate: {
+    fontSize: getResponsiveFontSize(12),
+    color: COLORS.textSecondary,
+    marginBottom: 2,
+  },
+
+  documentMime: {
+    fontSize: getResponsiveFontSize(11),
+    color: COLORS.textTertiary,
+    fontStyle: 'italic',
+  },
+
+  viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2196F320',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+
+  documentViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+  },
+
+  documentViewerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingTop: hp(4),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+
+  documentViewerTitle: {
+    fontSize: getResponsiveFontSize(18),
+    fontWeight: '600',
+    color: '#fff',
+  },
+
+  documentViewerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+
+  documentImage: {
+    width: '100%',
+    height: 500,
+    marginVertical: 20,
+    borderRadius: 8,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

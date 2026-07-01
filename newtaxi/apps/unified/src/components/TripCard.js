@@ -10,6 +10,16 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
   const [segmentName, setSegmentName] = useState(null);
   const [packageName, setPackageName] = useState(null);
   
+  // Debug logging
+  useEffect(() => {
+    console.log('🎫 TripCard received:', {
+      trip_id: trip.id,
+      has_notes: !!trip.notes,
+      notes_value: trip.notes,
+      notes_length: trip.notes?.length || 0,
+    });
+  }, [trip.id, trip.notes]);
+  
   // Fetch car details
   useEffect(() => {
     const fetchCarDetails = async () => {
@@ -251,10 +261,20 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         <Text style={styles.notesTitle}>Notes:</Text>
       </View>
 
-      {/* Carrier Note */}
+      {/* User Notes */}
+      {trip.notes && trip.notes.trim() && (
+        <View style={styles.noteItem}>
+          <Ionicons name="document-text-outline" size={12} color="#2196f3" />
+          <Text style={[styles.noteText, { color: '#2196f3' }]} numberOfLines={1}>
+            {trip.notes}
+          </Text>
+        </View>
+      )}
+
+      {/* Carrier Note - Always show */}
       <View style={styles.noteItem}>
         <Ionicons name="alert-circle-outline" size={12} color="#ff9800" />
-        <Text style={styles.noteText}>
+        <Text style={styles.noteText} numberOfLines={1}>
           Carrier must be CNG vehicles
         </Text>
       </View>
@@ -577,19 +597,19 @@ const styles = StyleSheet.create({
   },
   notesTitle: {
     color: '#000',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   noteItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   noteText: {
     color: '#000',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     flex: 1,
   },
@@ -600,7 +620,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#ff9800',
   },
   notesText: {
     color: '#888',
@@ -615,7 +635,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#ff9800',
   },
   taxNoteText: {
     color: '#888',
@@ -641,7 +661,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginVertical: 10,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#ff9800',
   },
   breakdownTitle: {
     color: '#fff',
@@ -667,7 +687,7 @@ const styles = StyleSheet.create({
   },
   breakdownTotal: {
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#ff9800',
     paddingTopMargin: 8,
     marginTop: 8,
     paddingTop: 8,

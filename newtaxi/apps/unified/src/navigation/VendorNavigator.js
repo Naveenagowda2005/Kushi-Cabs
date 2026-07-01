@@ -312,7 +312,7 @@ export default function VendorNavigator() {
       screenOptions={{
         headerShown: true,
         headerStyle: { backgroundColor: '#001a33' },
-        headerTintColor: COLORS.textLight,
+        headerTintColor: '#FF9800',
       }}
     >
       <Stack.Screen
@@ -321,42 +321,46 @@ export default function VendorNavigator() {
         initialParams={{ activeTab: 'Enquiries' }}
         options={{
           title: 'Dashboard',
+          headerTitleStyle: { color: '#FF9800', fontWeight: '700' }
         }}
       />
       <Stack.Screen 
         name="EnquiryDetail" 
         component={VendorEnquiryDetailScreen} 
-        options={{ title: 'Enquiry Details' }} 
+        options={{ title: 'Enquiry Details', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
       />
       <Stack.Screen 
         name="CreateTrip"    
         component={VendorCreateTripScreen}    
-        options={{ title: 'Create Trip' }} 
+        options={{ 
+          title: 'Create Trip',
+          headerTitleStyle: { color: '#FF9800', fontWeight: '700' }
+        }} 
       />
       <Stack.Screen 
         name="CompletedTripDetail" 
         component={CompletedTripDetailScreen} 
-        options={{ title: 'Trip Details' }} 
+        options={{ title: 'Trip Details', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
       />
       <Stack.Screen 
         name="Earnings"    
         component={VendorEarningsScreen} 
-        options={{ title: 'Earnings & Reports' }} 
+        options={{ title: 'Earnings & Reports', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
       />
       <Stack.Screen 
         name="Settings"    
         component={VendorSettingsScreen} 
-        options={{ title: 'Business Settings' }} 
+        options={{ title: 'Business Settings', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
       />
       <Stack.Screen
         name="Terms"
         component={PolicyScreen}
-        options={{ title: 'Terms & Conditions' }}
+        options={{ title: 'Terms & Conditions', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }}
       />
       <Stack.Screen
         name="CancellationPolicy"
         component={PolicyScreen}
-        options={{ title: 'Cancellation Policy' }}
+        options={{ title: 'Cancellation Policy', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }}
       />
       <Stack.Screen
         name="ViewPolicy"
@@ -368,6 +372,7 @@ export default function VendorNavigator() {
             : route.params?.policyType === 'refund_policy' ? 'Refund Policy'
             : route.params?.policyType === 'safety_guidelines' ? 'Safety Guidelines'
             : 'Policy',
+          headerTitleStyle: { color: '#FF9800', fontWeight: '700' }
         })}
       />
     </Stack.Navigator>

@@ -31,6 +31,10 @@ export default function VendorMyTripsScreen({ navigation }) {
       if (error) throw error;
       setTrips(data || []);
       console.log('✅ Trips fetched:', data?.length);
+      if (data && data.length > 0) {
+        console.log('📝 First trip notes field:', data[0].notes);
+        console.log('📝 Sample trip data:', JSON.stringify(data[0], null, 2));
+      }
       return true;
     } catch (err) {
       console.error('Error fetching trips:', err.message);
@@ -278,18 +282,30 @@ export default function VendorMyTripsScreen({ navigation }) {
         </View>
       </View>
 
+      {/* Notes Display */}
+      {item.notes && item.notes.trim() && (
+        <View style={styles.notesPreview}>
+          <Ionicons name="document-text-outline" size={12} color="#2196f3" />
+          <Text style={styles.notesPreviewText} numberOfLines={2}>
+            {item.notes}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.tripFooter}>
         <Text style={styles.commissionText}>
           Commission: ₹{item.commission_amount}
         </Text>
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.editBtn]}
-            onPress={() => navigation.navigate('CreateTrip', { trip: item, editMode: true })}
-          >
-            <Ionicons name="pencil-outline" size={14} color="#2196f3" />
-            <Text style={styles.editBtnText}>Edit</Text>
-          </TouchableOpacity>
+          {item.status !== 'completed' && !item.is_published && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.editBtn]}
+              onPress={() => navigation.navigate('CreateTrip', { trip: item, editMode: true })}
+            >
+              <Ionicons name="pencil-outline" size={14} color="#2196f3" />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+          )}
           {item.is_published ? (
             <TouchableOpacity
               style={[styles.actionBtn, styles.unpublishBtn]}
@@ -493,19 +509,30 @@ export default function VendorMyTripsScreen({ navigation }) {
                     </View>
                   </View>
                 </View>
+
+                {selectedTrip.notes && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionLabel}>Special Instructions</Text>
+                    <View style={styles.infoBox}>
+                      <Text style={styles.notesText}>{selectedTrip.notes}</Text>
+                    </View>
+                  </View>
+                )}
               </ScrollView>
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.editBtn, { flex: 1 }]}
-                    onPress={() => {
-                      navigation.navigate('CreateTrip', { trip: selectedTrip, editMode: true });
-                      setShowModal(false);
-                    }}
-                  >
-                    <Ionicons name="pencil-outline" size={16} color="#2196f3" />
-                    <Text style={styles.editBtnText}>Edit</Text>
-                  </TouchableOpacity>
+                  {selectedTrip.status !== 'completed' && !selectedTrip.is_published && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.editBtn, { flex: 1 }]}
+                      onPress={() => {
+                        navigation.navigate('CreateTrip', { trip: selectedTrip, editMode: true });
+                        setShowModal(false);
+                      }}
+                    >
+                      <Ionicons name="pencil-outline" size={16} color="#2196f3" />
+                      <Text style={styles.editBtnText}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
                   {selectedTrip.is_published ? (
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.unpublishBtn, { flex: 1 }]}
@@ -581,10 +608,10 @@ const styles = StyleSheet.create({
   tripCard: {
     backgroundColor: '#16213e',
     borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#4caf50',
   },
   tripTypeBadge: {
     flexDirection: 'row',
@@ -608,7 +635,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   tripInfo: { flex: 1 },
   returnLocationRow: {
@@ -620,9 +647,9 @@ const styles = StyleSheet.create({
   },
   tripLocations: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   tripDate: {
     color: '#888',
@@ -670,28 +697,28 @@ const styles = StyleSheet.create({
   },
   tripDetails: {
     flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#4caf50',
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
-    marginBottom: 12,
+    borderBottomColor: '#4caf50',
+    marginBottom: 8,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     flex: 1,
   },
   detailText: {
     color: '#2196f3',
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '500',
   },
   extraChargesContainer: {
-    gap: 8,
-    marginBottom: 10,
+    gap: 14,
+    marginBottom: 18,
   },
   extraChargesRow: {
     flexDirection: 'row',
@@ -708,7 +735,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#ff9800',
-    borderRadius: 6,
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -723,8 +750,8 @@ const styles = StyleSheet.create({
   },
   chargeBadgeText: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
   tripFooter: {
     flexDirection: 'row',
@@ -820,7 +847,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: '#ff9800',
   },
   modalTitle: {
     color: '#fff',
@@ -904,7 +931,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a2e',
+    borderBottomColor: '#ff9800',
   },
   chargeLabel: {
     color: '#aaa',
@@ -975,5 +1002,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  notesText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  notesPreview: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#2196f311',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 12,
+    marginBottom: 0,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2196f3',
+  },
+  notesPreviewText: {
+    color: '#2196f3',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 16,
   },
 });

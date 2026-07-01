@@ -43,6 +43,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
     petTravelling:    editingTrip?.pet_travelling || false,
     hillsIncluded:    editingTrip?.hills_included || false,
     fixedKm:          editingTrip?.fixed_km?.toString() || '',
+    notes:            editingTrip?.notes || '',
   });
   const [loading, setLoading] = useState(false);
   const [carTypes, setCarTypes] = useState([]);
@@ -195,6 +196,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         state_tax_included:   form.stateTaxIncluded,
         pet_travelling:       form.petTravelling,
         hills_included:       form.hillsIncluded,
+        notes:                form.notes.trim() || null,
       };
 
       let error;
@@ -221,6 +223,13 @@ export default function VendorCreateTripScreen({ navigation, route }) {
       const commission = parseFloat(form.commissionAmount) || 0;
       const customerPreAdvance = parseFloat(form.customerPreAdvance) || 0;
       const commissionToPay = Math.max(0, commission - customerPreAdvance);
+      
+      console.log('✅ Trip saved successfully:', {
+        trip_id: editMode ? editingTrip.id : 'new',
+        mode: editMode ? 'UPDATE' : 'INSERT',
+        notes: form.notes,
+        notes_length: form.notes?.length || 0,
+      });
       
       const message = editMode 
         ? '✅ Trip Updated'
@@ -512,6 +521,15 @@ export default function VendorCreateTripScreen({ navigation, route }) {
             </Text>
           </View>
         </View>
+
+        <View style={styles.sectionHeader}>
+          <Ionicons name="document-text-outline" size={18} color="#2196f3" />
+          <Text style={styles.sectionTitle}>Notes</Text>
+        </View>
+
+        <Field label="Special Instructions (Optional)" icon="document-text-outline"
+          placeholder="e.g. Avoid traffic, special customer requests, etc."
+          value={form.notes} onChangeText={(v) => update('notes', v)} />
 
         <View style={styles.sectionHeader}>
           <Ionicons name="car-outline" size={18} color="#2196f3" />

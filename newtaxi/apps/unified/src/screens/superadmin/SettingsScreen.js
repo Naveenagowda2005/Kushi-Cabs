@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, FlatList,
+  TextInput, Alert, ActivityIndicator,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
@@ -14,14 +15,7 @@ import { useSystemSettings, updateMinimumWalletBalance } from '../../hooks/useSy
 
 export default function SuperAdminSettingsScreen({ navigation }) {
   const { user, refreshUserProfile, signOut } = useAuth();
-  const { isDarkMode, toggleTheme, forceUpdate } = useTheme();
-  const { settings, loading: settingsLoading, refetch: refetchSettings } = useSystemSettings();
-  
-  // Force re-render when theme changes
-  const [themeRefresh, setThemeRefresh] = useState(0);
-  useEffect(() => {
-    setThemeRefresh(prev => prev + 1);
-  }, [forceUpdate]);
+  const { settings, refetch: refetchSettings } = useSystemSettings();
   
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -33,25 +27,59 @@ export default function SuperAdminSettingsScreen({ navigation }) {
   const [isEditingWallet, setIsEditingWallet] = useState(false);
   const [savingWallet, setSavingWallet] = useState(false);
 
-  // Dummy driver state
+  // Dummy Drivers
+  const [showDummyForm, setShowDummyForm] = useState(false);
   const [dummyPhone, setDummyPhone] = useState('');
   const [dummyName, setDummyName] = useState('');
-  const [creatingDummy, setCreatingDummy] = useState(false);
   const [dummyDrivers, setDummyDrivers] = useState([]);
   const [loadingDummy, setLoadingDummy] = useState(false);
-  const [showDummyForm, setShowDummyForm] = useState(false);
+  const [creatingDummy, setCreatingDummy] = useState(false);
 
-  // Dummy vendor state
+  // Dummy Vendors
+  const [showDummyVendorForm, setShowDummyVendorForm] = useState(false);
   const [dummyVendorPhone, setDummyVendorPhone] = useState('');
   const [dummyVendorName, setDummyVendorName] = useState('');
-  const [creatingDummyVendor, setCreatingDummyVendor] = useState(false);
   const [dummyVendors, setDummyVendors] = useState([]);
   const [loadingDummyVendor, setLoadingDummyVendor] = useState(false);
-  const [showDummyVendorForm, setShowDummyVendorForm] = useState(false);
+  const [creatingDummyVendor, setCreatingDummyVendor] = useState(false);
 
-  // Refs to manage subscriptions and polling
-  const driversSubscriptionRef = useRef(null);
-  const vendorsSubscriptionRef = useRef(null);
+  // Admin Trip Creation
+  const [showCreateAdminTrip, setShowCreateAdminTrip] = useState(false);
+  const [availableDrivers, setAvailableDrivers] = useState([]);
+  const [selectedDrivers, setSelectedDrivers] = useState([]);
+  const [creatingAdminTrip, setCreatingAdminTrip] = useState(false);
+  const [adminTripForm, setAdminTripForm] = useState({
+    pickupLocation: '',
+    dropoffLocation: '',
+    returnLocation: '',
+    returnDate: null,
+    passengerName: '',
+    passengerPhone: '',
+    fareAmount: '',
+    commissionAmount: '',
+    customerPreAdvance: '',
+    scheduledAt: new Date(),
+    carType: '',
+    carModel: '',
+    seaterType: '',
+    fuelType: '',
+    segment: '',
+    package: '',
+    tollIncluded: false,
+    stateTaxIncluded: false,
+    petTravelling: false,
+    hillsIncluded: false,
+    fixedKm: '',
+    notes: '',
+  });
+  const [adminTripOptions, setAdminTripOptions] = useState({
+    segments: [],
+    packages: [],
+    carTypes: [],
+    carModels: [],
+    seaterTypes: [],
+    fuelTypes: [],
+  });
 
   useEffect(() => {
     if (user) {
@@ -67,6 +95,134 @@ export default function SuperAdminSettingsScreen({ navigation }) {
       setMinWalletBalance(settings.minimumWalletBalance.toString());
     }
   }, [settings.minimumWalletBalance]);
+
+  const fetchAvailableDrivers = useCallback(async () => {
+    try {
+      console.log('Fetching available drivers for admin trip assignment');
+      
+      // Get driver role ID
+      const { data: roleData } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'driver')
+        .single();
+
+      if (!roleData) {
+        console.error('Driver role not found');
+        return;
+      }
+
+      // Fetch active drivers
+      const { data: drivers, error } = await supabase
+        .from('users')
+        .select('id, full_name, phone, drivers!inner(license_number, vehicle_number)')
+        .eq('role_id', roleData.id)
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (error) {
+        console.error('Error fetching drivers:', error);
+        return;
+      }
+
+      if (drivers) {
+        setAvailableDrivers(drivers);
+        console.log(`✅ Fetched ${drivers.length} available drivers`);
+      }
+    } catch (e) {
+      console.error('Error in fetchAvailableDrivers:', e);
+    }
+  }, []);
+
+  // Fetch drivers when screen mounts
+  useEffect(() => {
+    fetchAvailableDrivers();
+    fetchAdminTripOptions();
+  }, [fetchAvailableDrivers]);
+
+  const fetchAdminTripOptions = useCallback(async () => {
+    try {
+      console.log('Fetching trip options for admin trip creation');
+      
+      const [carTypesRes, seaterRes, fuelRes, segmentsRes] = await Promise.all([
+        supabase.from('car_types').select('id, name').order('name'),
+        supabase.from('seater_types').select('id, name').order('name'),
+        supabase.from('fuel_types').select('id, name').order('name'),
+        supabase.from('trip_segments').select('id, name, display_order').order('display_order', { ascending: true }),
+      ]);
+
+      setAdminTripOptions({
+        carTypes: carTypesRes.data || [],
+        seaterTypes: seaterRes.data || [],
+        fuelTypes: fuelRes.data || [],
+        segments: segmentsRes.data || [],
+        packages: [],
+        carModels: [],
+      });
+
+      console.log('✅ Trip options fetched');
+    } catch (error) {
+      console.error('Error fetching trip options:', error);
+    }
+  }, []);
+
+  const updateAdminTripForm = useCallback((field, value) => {
+    setAdminTripForm((prev) => ({ ...prev, [field]: value }));
+
+    // Fetch car models when car type changes
+    if (field === 'carType' && value) {
+      fetchCarModelsForAdminTrip(value);
+    }
+
+    // Handle segment changes
+    if (field === 'segment' && value) {
+      fetchPackagesForAdminTrip(value);
+      // Reset package selection
+      setAdminTripForm((prev) => ({ ...prev, package: '' }));
+      
+      // If not Round trip, clear return fields
+      const selectedSegment = adminTripOptions.segments.find(s => s.id === value);
+      if (selectedSegment?.name !== 'Round trips') {
+        setAdminTripForm((prev) => ({ 
+          ...prev, 
+          returnLocation: '',
+          returnDate: null 
+        }));
+      }
+    }
+  }, [adminTripOptions.segments]);
+
+  const fetchCarModelsForAdminTrip = async (carTypeId) => {
+    try {
+      const { data } = await supabase
+        .from('car_models')
+        .select('id, name')
+        .eq('car_type_id', carTypeId)
+        .order('name');
+      
+      if (data) {
+        setAdminTripOptions((prev) => ({ ...prev, carModels: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching car models:', error);
+    }
+  };
+
+  const fetchPackagesForAdminTrip = async (segmentId) => {
+    try {
+      const { data } = await supabase
+        .from('trip_packages')
+        .select('id, name')
+        .eq('segment_id', segmentId)
+        .order('name');
+      
+      if (data) {
+        setAdminTripOptions((prev) => ({ ...prev, packages: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching packages:', error);
+    }
+  };
 
   const fetchDummyDrivers = useCallback(async () => {
     try {
@@ -123,101 +279,91 @@ export default function SuperAdminSettingsScreen({ navigation }) {
       setLoadingDummyVendor(true);
       console.log('🔄 Fetching dummy vendors from Supabase');
       
-      // Step 1: Get all vendors first (without nested join)
-      const { data: allVendors, error: vendorError } = await supabase
+      const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .select('id, user_id, company_name, commission_pct');
 
-      console.log('📊 Raw vendors query result:', allVendors);
-      console.log('❌ Vendors query error:', vendorError);
-      
       if (vendorError) {
-        console.error('⚠️ Error fetching vendors from Supabase:', vendorError);
+        console.error('⚠️ Vendors table query failed:', vendorError.message);
+        setDummyVendors([]);
+        setLoadingDummyVendor(false);
         return;
       }
 
-      if (!allVendors || allVendors.length === 0) {
+      if (!vendorData || vendorData.length === 0) {
         console.log('⚠️ No vendors found in database');
         setDummyVendors([]);
+        setLoadingDummyVendor(false);
         return;
       }
 
-      console.log(`✅ Found ${allVendors.length} total vendors in database`);
-      
-      // Filter for dummy vendors (company_name starts with DUMMY or Test)
-      const dummyVendorsList = allVendors.filter(vendor => {
-        const companyName = vendor.company_name || '';
-        const matches = companyName.toUpperCase().startsWith('DUMMY') || 
-                       companyName.toUpperCase().startsWith('TEST');
-        console.log(`  - Vendor: "${companyName}" → ${matches ? '✅ MATCHED' : '❌ NO MATCH'}`);
-        return matches;
-      });
-      
-      console.log(`📊 Filtered to ${dummyVendorsList.length} dummy vendors`);
+      // Filter to only DUMMY vendors (company_name starts with DUMMY)
+      const dummyVendorsList = vendorData.filter(v => 
+        v.company_name && v.company_name.trim().toUpperCase().startsWith('DUMMY')
+      );
+
+      console.log(`✅ Found ${dummyVendorsList.length} dummy vendors out of ${vendorData.length} total vendors`);
       
       if (dummyVendorsList.length === 0) {
-        console.log('⚠️ No dummy vendors found (all vendors do not match DUMMY/Test pattern)');
+        console.log('⚠️ No dummy vendors found');
         setDummyVendors([]);
+        setLoadingDummyVendor(false);
         return;
       }
 
-      // Step 2: Get user data for each vendor
-      const userIds = dummyVendorsList.map(v => v.user_id);
-      console.log(`📊 Fetching user data for ${userIds.length} vendors...`);
+      // Get user data for dummy vendors only
+      const userIds = dummyVendorsList.map(v => v.user_id).filter(id => id);
+      
+      console.log(`📊 Fetching user data for ${userIds.length} dummy vendors`);
       
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('id, full_name, phone, is_active, verification_status, created_at')
+        .select('id, full_name, phone, is_active, verification_status')
         .in('id', userIds);
 
       if (userError) {
-        console.warn('⚠️ Warning: Could not fetch user data:', userError);
-        // Continue anyway - we have vendor data
-      } else {
-        console.log(`📊 Fetched user data for ${userData?.length || 0} users`);
+        console.warn('⚠️ Could not fetch user data:', userError.message);
       }
 
-      // Step 3: Combine vendor and user data
+      // Create user map
       const userMap = {};
       (userData || []).forEach(user => {
-        userMap[user.id] = user;
+        if (user && user.id) userMap[user.id] = user;
       });
 
+      // Transform dummy vendor data
       const transformedData = dummyVendorsList.map(vendor => {
         const user = userMap[vendor.user_id];
         return {
-          id: vendor.user_id,
+          id: vendor.user_id || vendor.id,
           full_name: user?.full_name || vendor.company_name || 'Unknown',
           phone: user?.phone,
           is_active: user?.is_active,
-          verification_status: user?.verification_status || 'unknown',
-          created_at: user?.created_at,
-          company_name: vendor.company_name,
+          verification_status: user?.verification_status || 'pending',
+          company_name: vendor.company_name?.trim() || 'Unknown Vendor',
           commission_pct: vendor.commission_pct
         };
-      });
+      }).filter(v => v.full_name); // Filter out empty entries
 
-      console.log(`✅ Transformed ${transformedData.length} vendors:`, transformedData);
+      console.log(`✅ Loaded ${transformedData.length} dummy vendors`);
       setDummyVendors(transformedData);
     } catch (e) {
-      console.error('❌ Error fetching dummy vendors:', e);
+      console.error('❌ Vendor fetch error:', e.message);
+      setDummyVendors([]);
     } finally {
       setLoadingDummyVendor(false);
     }
   }, []);
 
-  // Fetch on mount and when screen is focused
+  // Fetch on mount only
   useEffect(() => {
+    console.log('Settings screen mounted - fetching data once');
     fetchDummyDrivers();
     fetchDummyVendors();
-
-    return () => {
-      // Cleanup if needed
-    };
-  }, [fetchDummyDrivers, fetchDummyVendors]);
+  }, []); // Empty dependency array - run only once on mount
 
   useFocusEffect(useCallback(() => { 
-    console.log('Settings screen focused - refreshing lists once');
+    console.log('Settings screen focused - refreshing lists');
     fetchDummyDrivers();
     fetchDummyVendors();
 
@@ -425,6 +571,150 @@ export default function SuperAdminSettingsScreen({ navigation }) {
       Alert.alert('Error', err.message || 'Failed to update wallet balance');
     } finally {
       setSavingWallet(false);
+    }
+  };
+
+  const validateAdminTripForm = () => {
+    if (!adminTripForm.segment) return 'Please select a trip segment.';
+    if (!adminTripForm.pickupLocation.trim()) return 'Pickup location is required.';
+    if (!adminTripForm.dropoffLocation.trim()) return 'Drop-off location is required.';
+    const selectedSegment = adminTripOptions.segments.find(s => s.id === adminTripForm.segment);
+    if (selectedSegment?.name === 'Round trips') {
+      if (!adminTripForm.returnLocation.trim()) return 'Return location is required for round trips.';
+      if (!adminTripForm.returnDate) return 'Return date is required for round trips.';
+    }
+    if (!adminTripForm.passengerName.trim()) return 'Passenger name is required.';
+    if (!adminTripForm.passengerPhone.trim()) return 'Passenger phone is required.';
+    const fixedKm = parseFloat(adminTripForm.fixedKm);
+    if (!fixedKm || fixedKm <= 0) return 'Enter a valid fixed KM.';
+    const fare = parseFloat(adminTripForm.fareAmount);
+    if (!fare || fare <= 0) return 'Enter a valid trip amount.';
+    const commission = parseFloat(adminTripForm.commissionAmount);
+    if (!commission || commission <= 0) return 'Enter a valid commission amount.';
+    if (!adminTripForm.carType) return 'Please select a car type.';
+    if (!adminTripForm.seaterType) return 'Please select seater type.';
+    if (!adminTripForm.fuelType) return 'Please select fuel type.';
+    if (selectedDrivers.length === 0) return 'Please select at least one driver to assign this trip.';
+    return null;
+  };
+
+  const handleCreateAdminTrip = async () => {
+    const err = validateAdminTripForm();
+    if (err) {
+      Alert.alert('Validation Error', err);
+      return;
+    }
+
+    setCreatingAdminTrip(true);
+    try {
+      console.log('📝 Creating admin trip and assigning to drivers:', selectedDrivers);
+
+      const selectedSegment = adminTripOptions.segments.find(s => s.id === adminTripForm.segment);
+      const isRoundTrip = selectedSegment?.name === 'Round trips';
+
+      const tripData = {
+        pickupLocation: adminTripForm.pickupLocation.trim(),
+        dropoffLocation: adminTripForm.dropoffLocation.trim(),
+        returnLocation: isRoundTrip ? (adminTripForm.returnLocation.trim() || null) : null,
+        returnDate: isRoundTrip ? (adminTripForm.returnDate ? adminTripForm.returnDate.toISOString() : null) : null,
+        fixedKm: parseFloat(adminTripForm.fixedKm),
+        fareAmount: parseFloat(adminTripForm.fareAmount),
+        commissionAmount: parseFloat(adminTripForm.commissionAmount),
+        customerPreAdvance: parseFloat(adminTripForm.customerPreAdvance) || 0,
+        scheduledAt: adminTripForm.scheduledAt ? adminTripForm.scheduledAt.toISOString() : new Date().toISOString(),
+        passengerName: adminTripForm.passengerName.trim(),
+        passengerPhone: adminTripForm.passengerPhone.trim(),
+        carType: adminTripForm.carType,
+        carModel: adminTripForm.carModel,
+        seaterType: adminTripForm.seaterType,
+        fuelType: adminTripForm.fuelType,
+        segmentId: adminTripForm.segment,
+        packageId: adminTripForm.package || null,
+        tollIncluded: adminTripForm.tollIncluded,
+        stateTaxIncluded: adminTripForm.stateTaxIncluded,
+        petTravelling: adminTripForm.petTravelling,
+        hillsIncluded: adminTripForm.hillsIncluded,
+        notes: adminTripForm.notes.trim() || null,
+        createdBy: user.id,
+        assignedDriverIds: selectedDrivers,
+      };
+
+      const endpoint = `${API_CONFIG.ADMIN_API_URL}/admin/create-admin-trip`;
+      console.log('🌐 Calling endpoint:', endpoint);
+      console.log('📦 Payload:', JSON.stringify(tripData, null, 2));
+
+      // Call backend endpoint
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tripData),
+      });
+
+      console.log('📨 Response status:', response.status);
+      const result = await response.json();
+      console.log('📨 Response data:', result);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || result.message || 'Failed to create trip');
+      }
+
+      console.log('✅ Admin trip created:', result.trip.id);
+
+      const commission = parseFloat(adminTripForm.commissionAmount) || 0;
+      const customerPreAdvance = parseFloat(adminTripForm.customerPreAdvance) || 0;
+      const commissionToPay = Math.max(0, commission - customerPreAdvance);
+
+      Alert.alert(
+        '✅ Admin Trip Created',
+        `Trip has been created and assigned to ${selectedDrivers.length} driver(s).\n\nThey will see this trip in their available trips list.\n\n${commissionToPay > 0 ? `Commission to pay: ₹${commissionToPay.toFixed(2)}` : 'No commission required.'}`,
+        [{
+          text: 'OK',
+          onPress: () => {
+            // Reset form
+            setShowCreateAdminTrip(false);
+            setAdminTripForm({
+              pickupLocation: '',
+              dropoffLocation: '',
+              returnLocation: '',
+              returnDate: null,
+              passengerName: '',
+              passengerPhone: '',
+              fareAmount: '',
+              commissionAmount: '',
+              customerPreAdvance: '',
+              scheduledAt: new Date(),
+              carType: '',
+              carModel: '',
+              seaterType: '',
+              fuelType: '',
+              segment: '',
+              package: '',
+              tollIncluded: false,
+              stateTaxIncluded: false,
+              petTravelling: false,
+              hillsIncluded: false,
+              fixedKm: '',
+              notes: '',
+            });
+            setSelectedDrivers([]);
+          }
+        }]
+      );
+    } catch (err) {
+      console.error('CreateAdminTrip error:', err);
+      console.error('Error type:', typeof err);
+      console.error('Error name:', err.name);
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
+      console.error('Error details:', {
+        message: err.message,
+        apiUrl: API_CONFIG.ADMIN_API_URL,
+        isNetworkError: err.message?.includes('Network'),
+        isCorsError: err.message?.includes('CORS'),
+      });
+      Alert.alert('Network Error', 'Failed to reach backend. Make sure:\n1. Backend is running\n2. Both devices are on same network\n3. IP address is correct: ' + API_CONFIG.ADMIN_API_URL);
+    } finally {
+      setCreatingAdminTrip(false);
     }
   };
 
@@ -798,6 +1088,352 @@ export default function SuperAdminSettingsScreen({ navigation }) {
             <Text style={styles.emptyText}>No dummy vendors yet</Text>
           )}
         </View>
+      </View>
+
+      {/* Admin Trip Creation Section */}
+      <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#9c27b0' }]}>
+        <View style={styles.sectionHeader}>
+          <View style={[styles.iconBox, { backgroundColor: '#9c27b020' }]}>
+            <Ionicons name="add-circle-outline" size={24} color="#9c27b0" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Create Admin Trip</Text>
+            <Text style={styles.cardDesc}>Create and assign trips directly to specific drivers. Drivers will see assigned trips in their available list.</Text>
+          </View>
+          <TouchableOpacity onPress={() => setShowCreateAdminTrip(p => !p)}>
+            <Ionicons name={showCreateAdminTrip ? 'chevron-up' : 'add-circle-outline'} size={24} color="#9c27b0" />
+          </TouchableOpacity>
+        </View>
+
+        {showCreateAdminTrip && (
+          <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 16 }}>
+            {/* Trip Segment Selection */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Trip Segment *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={adminTripForm.segment}
+                  onValueChange={(value) => updateAdminTripForm('segment', value)}
+                >
+                  <Picker.Item label="Select Trip Segment" value="" />
+                  {adminTripOptions.segments.map((seg) => (
+                    <Picker.Item key={seg.id} label={seg.name} value={seg.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Pickup Location */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Pickup Location *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Mumbai Airport, Terminal 2"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.pickupLocation}
+                onChangeText={(v) => updateAdminTripForm('pickupLocation', v)}
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Dropoff Location */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Drop-off Location *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Bandra Kurla Complex"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.dropoffLocation}
+                onChangeText={(v) => updateAdminTripForm('dropoffLocation', v)}
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Return Location - Only for Round Trips */}
+            {adminTripOptions.segments.find(s => s.id === adminTripForm.segment)?.name === 'Round trips' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Return Location *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Return pickup point"
+                    placeholderTextColor={COLORS.textTertiary}
+                    value={adminTripForm.returnLocation}
+                    onChangeText={(v) => updateAdminTripForm('returnLocation', v)}
+                    editable={!creatingAdminTrip}
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Return Date *</Text>
+                  <TouchableOpacity 
+                    style={styles.input}
+                    onPress={() => {/* TODO: Add date picker */}}
+                  >
+                    <Text style={{ color: adminTripForm.returnDate ? COLORS.text : COLORS.textTertiary }}>
+                      {adminTripForm.returnDate ? adminTripForm.returnDate.toDateString() : 'Select return date'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Fixed KM */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Fixed KM *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 50"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.fixedKm}
+                onChangeText={(v) => updateAdminTripForm('fixedKm', v)}
+                keyboardType="decimal-pad"
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Trip Amount */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Trip Amount (₹) *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 500"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.fareAmount}
+                onChangeText={(v) => updateAdminTripForm('fareAmount', v)}
+                keyboardType="decimal-pad"
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Customer Pre-Advance */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Customer Pre-Advance (₹)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 100 (optional)"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.customerPreAdvance}
+                onChangeText={(v) => updateAdminTripForm('customerPreAdvance', v)}
+                keyboardType="decimal-pad"
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Commission Amount */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Driver Commission (₹) *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Commission driver pays to unlock customer details"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.commissionAmount}
+                onChangeText={(v) => updateAdminTripForm('commissionAmount', v)}
+                keyboardType="decimal-pad"
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Passenger Name */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Passenger Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Rahul Sharma"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.passengerName}
+                onChangeText={(v) => updateAdminTripForm('passengerName', v)}
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Passenger Phone */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Passenger Phone *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 9876543210"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.passengerPhone}
+                onChangeText={(v) => updateAdminTripForm('passengerPhone', v)}
+                keyboardType="phone-pad"
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Car Type */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Car Type *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={adminTripForm.carType}
+                  onValueChange={(value) => updateAdminTripForm('carType', value)}
+                >
+                  <Picker.Item label="Select Car Type" value="" />
+                  {adminTripOptions.carTypes.map((type) => (
+                    <Picker.Item key={type.id} label={type.name} value={type.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Seater Type */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Seater Type *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={adminTripForm.seaterType}
+                  onValueChange={(value) => updateAdminTripForm('seaterType', value)}
+                >
+                  <Picker.Item label="Select Seater Type" value="" />
+                  {adminTripOptions.seaterTypes.map((seater) => (
+                    <Picker.Item key={seater.id} label={seater.name} value={seater.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Fuel Type */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Fuel Type *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={adminTripForm.fuelType}
+                  onValueChange={(value) => updateAdminTripForm('fuelType', value)}
+                >
+                  <Picker.Item label="Select Fuel Type" value="" />
+                  {adminTripOptions.fuelTypes.map((fuel) => (
+                    <Picker.Item key={fuel.id} label={fuel.name} value={fuel.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Driver Selection */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Assign Drivers * ({selectedDrivers.length} selected)</Text>
+              <View style={{ maxHeight: 200 }}>
+                <ScrollView nestedScrollEnabled>
+                  {availableDrivers.map((driver) => (
+                    <TouchableOpacity
+                      key={driver.id}
+                      style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        gap: 10, 
+                        paddingVertical: 8,
+                        paddingHorizontal: 10,
+                        borderBottomWidth: 1,
+                        borderBottomColor: COLORS.border
+                      }}
+                      onPress={() => {
+                        if (selectedDrivers.includes(driver.id)) {
+                          setSelectedDrivers(selectedDrivers.filter(id => id !== driver.id));
+                        } else {
+                          setSelectedDrivers([...selectedDrivers, driver.id]);
+                        }
+                      }}
+                    >
+                      <View style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 4,
+                        borderWidth: 2,
+                        borderColor: '#9c27b0',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: selectedDrivers.includes(driver.id) ? '#9c27b0' : 'transparent'
+                      }}>
+                        {selectedDrivers.includes(driver.id) && (
+                          <Ionicons name="checkmark" size={14} color="#fff" />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: COLORS.text, fontWeight: '600', fontSize: 13 }}>{driver.full_name}</Text>
+                        <Text style={{ color: COLORS.textSecondary, fontSize: 12 }}>{driver.phone}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+
+            {/* Notes */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Special Instructions (Optional)</Text>
+              <TextInput
+                style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+                placeholder="e.g. Avoid traffic, special customer requests, etc."
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.notes}
+                onChangeText={(v) => updateAdminTripForm('notes', v)}
+                multiline
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Toggle Options */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Extra Charges</Text>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}
+                onPress={() => updateAdminTripForm('tollIncluded', !adminTripForm.tollIncluded)}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: '#9c27b0',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: adminTripForm.tollIncluded ? '#9c27b0' : 'transparent'
+                }}>
+                  {adminTripForm.tollIncluded && (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  )}
+                </View>
+                <Text style={{ color: COLORS.text, fontSize: 13 }}>Toll - Tax - Hills Included</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}
+                onPress={() => updateAdminTripForm('petTravelling', !adminTripForm.petTravelling)}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: '#9c27b0',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: adminTripForm.petTravelling ? '#9c27b0' : 'transparent'
+                }}>
+                  {adminTripForm.petTravelling && (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  )}
+                </View>
+                <Text style={{ color: COLORS.text, fontSize: 13 }}>Pet Travelling Allowed</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Create Button */}
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: '#9c27b0', marginTop: 16 }, creatingAdminTrip && styles.buttonDisabled]}
+              onPress={handleCreateAdminTrip}
+              disabled={creatingAdminTrip}
+            >
+              {creatingAdminTrip ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="add-circle-outline" size={18} color="#fff" />
+                  <Text style={styles.saveButtonText}>Create & Assign Trip</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </ScrollView>
   );

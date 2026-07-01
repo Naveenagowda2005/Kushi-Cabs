@@ -228,7 +228,7 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
       </View>
 
       {/* Edit button — for trip creator and super admin */}
-      {(item.created_by === user?.id || user?.role === 'super_admin') && (
+      {(item.created_by === user?.id || user?.role === 'super_admin') && item.status !== 'completed' && (
         <TouchableOpacity
           style={styles.editBtn}
           onPress={() => navigation.navigate('CreateTrip', { trip: item, editMode: true })}
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
     padding: screenWidth * 0.02,
     marginBottom: 6,
     borderWidth: 2,
-    borderColor: '#ff9800',
+    borderColor: '#4caf50',
   },
   tripTypeBadgeRow: {
     marginBottom: 6,
@@ -778,9 +778,9 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     paddingVertical: 4,
     borderTopWidth: 1,
-    borderTopColor: '#1a1a2e',
+    borderTopColor: '#4caf50',
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a2e',
+    borderBottomColor: '#4caf50',
   },
   carDetail: {
     flexDirection: 'row',
@@ -810,16 +810,16 @@ const styles = StyleSheet.create({
   chargeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     backgroundColor: '#ff9800',
-    borderRadius: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   chargeBadgeText: {
     color: '#fff',
-    fontSize: Math.max(9, screenWidth * 0.026),
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
   carrierNote: {
     flexDirection: 'row',

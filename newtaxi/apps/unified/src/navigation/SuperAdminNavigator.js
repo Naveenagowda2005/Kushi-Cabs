@@ -184,27 +184,32 @@ export default function SuperAdminNavigator() {
         </ScrollView>
       </View>
 
-      {/* Screens — all mounted, only active one visible */}
+      {/* Screens — lazy load only active tab */}
       {!showPolicyManagement ? (
         <>
-          {TABS.map((tab, index) => (
-            <View
-              key={tab.key}
-              style={[styles.screen, index !== activeTab && styles.screenHidden]}
-              pointerEvents={index === activeTab ? 'auto' : 'none'}
-            >
-              <tab.component navigation={{ 
-                navigate: (screenName) => {
-                  if (screenName === 'PolicyManagement') {
-                    setShowPolicyManagement(true);
-                  } else {
-                    const tabIndex = TABS.findIndex(t => t.key === screenName);
-                    if (tabIndex !== -1) handleTabPress(tabIndex);
+          {TABS.map((tab, index) => {
+            // Only render the active tab to prevent memory issues and race conditions
+            if (index !== activeTab) return null;
+            
+            return (
+              <View
+                key={tab.key}
+                style={styles.screen}
+                pointerEvents="auto"
+              >
+                <tab.component navigation={{ 
+                  navigate: (screenName) => {
+                    if (screenName === 'PolicyManagement') {
+                      setShowPolicyManagement(true);
+                    } else {
+                      const tabIndex = TABS.findIndex(t => t.key === screenName);
+                      if (tabIndex !== -1) handleTabPress(tabIndex);
+                    }
                   }
-                }
-              }} />
-            </View>
-          ))}
+                }} />
+              </View>
+            );
+          })}
         </>
       ) : (
         <View style={styles.screen}>
@@ -221,12 +226,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
 
   screen: { flex: 1 },
-  screenHidden: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    opacity: 0,
-    zIndex: -1,
-  },
 
   tabBar: {
     backgroundColor: COLORS.surface,

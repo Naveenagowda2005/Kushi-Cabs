@@ -221,7 +221,17 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
             <Text style={styles.notesTitle}>Notes:</Text>
           </View>
 
-          {/* Note 1: Carrier */}
+          {/* User Notes */}
+          {trip.notes && trip.notes.trim() && (
+            <View style={styles.noteItem}>
+              <Ionicons name="document-text-outline" size={12} color="#2196f3" />
+              <Text style={[styles.noteText, { color: '#2196f3' }]}>
+                {trip.notes}
+              </Text>
+            </View>
+          )}
+
+          {/* Carrier Note - Always show */}
           {(carType || seaterType) && (
             <View style={styles.noteItem}>
               <Ionicons name="alert-circle-outline" size={12} color="#ff9800" />
@@ -230,14 +240,6 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
               </Text>
             </View>
           )}
-
-          {/* Note 2: Additional Info */}
-          <View style={styles.noteItem}>
-            <Ionicons name="information-circle-outline" size={12} color="#ff9800" />
-            <Text style={styles.noteText}>
-              Driver must accept all charges conditions before accepting trip
-            </Text>
-          </View>
 
           {/* Trip Creator Details - if pre-advance exceeds commission */}
           {/* REMOVED: Collect from Trip Creator box to reduce clutter */}
@@ -278,16 +280,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: screenWidth * 0.04,
-    marginBottom: 12,
+    marginBottom: 6,
     borderWidth: 2,
-    borderColor: '#ff9800',
+    borderColor: '#4caf50',
     minHeight: 180,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   tripTypeContainer: {
     flexDirection: 'row',
@@ -316,7 +318,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 6,
     flexWrap: 'wrap',
   },
   fareKmBox: {
@@ -352,7 +354,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 6,
     paddingRight: screenWidth * 0.25,
   },
   locationContent: {
@@ -376,7 +378,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginVertical: 10,
+    marginVertical: 6,
     alignSelf: 'flex-start',
   },
   packageText: {
@@ -387,12 +389,12 @@ const styles = StyleSheet.create({
   carDetailsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginVertical: 10,
+    marginVertical: 6,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#4caf50',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#4caf50',
   },
   carDetail: {
     flexDirection: 'row',
@@ -419,48 +421,48 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#ff9800',
     borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   chargeBadgeText: {
     color: '#fff',
-    fontSize: Math.max(10, screenWidth * 0.028),
-    fontWeight: '600',
+    fontSize: Math.max(18, screenWidth * 0.048),
+    fontWeight: '700',
   },
   inclusionsRow: {
     flexDirection: 'row',
-    gap: 4,
-    marginVertical: 10,
+    gap: 8,
+    marginVertical: 6,
     flexWrap: 'nowrap',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   inclusionBox: {
     flex: 1,
     alignItems: 'center',
   },
   inclusionLabel: {
-    fontSize: Math.max(9, screenWidth * 0.022),
-    fontWeight: '600',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '700',
     color: '#333',
   },
   inclusionStatus: {
-    fontSize: Math.max(8, screenWidth * 0.02),
-    fontWeight: '600',
+    fontSize: Math.max(11, screenWidth * 0.028),
+    fontWeight: '700',
   },
   inclusionDivider: {
-    fontSize: Math.max(10, screenWidth * 0.025),
+    fontSize: Math.max(14, screenWidth * 0.035),
     color: '#555',
-    marginHorizontal: 2,
+    marginHorizontal: 4,
   },
   enquiryLocationsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginVertical: 10,
+    marginVertical: 6,
     paddingHorizontal: 8,
     paddingVertical: 6,
     backgroundColor: '#f5f5f5',
@@ -517,10 +519,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   notesHeader: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#4caf50',
   },
   notesTitle: {
     color: '#fff',
@@ -532,7 +534,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   noteText: {
     color: '#ff9800',
@@ -547,7 +549,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#4caf50',
   },
   notesText: {
     color: '#888',
@@ -562,7 +564,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#4caf50',
   },
   taxNoteText: {
     color: '#888',
@@ -614,7 +616,7 @@ const styles = StyleSheet.create({
   },
   breakdownTotal: {
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#4caf50',
     marginTop: 8,
     paddingTop: 8,
   },
@@ -676,10 +678,10 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 14,
-    paddingTop: 14,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#4caf50',
   },
   actionButton: {
     flex: 1,

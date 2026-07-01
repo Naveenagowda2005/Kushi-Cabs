@@ -70,6 +70,7 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`   - POST /admin/update-admin-phone - Update admin phone`);
   console.log(`   - GET /admin/user/:userId - Get user info`);
   console.log(`   - GET /admin/vendor-debug/:userId - Debug vendor setup`);
+  console.log(`   - POST /admin/create-admin-trip - Create admin trip`);
   console.log(`   - GET /health - Health check`);
 });
 

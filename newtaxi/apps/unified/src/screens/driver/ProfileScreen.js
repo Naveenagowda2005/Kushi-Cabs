@@ -281,14 +281,13 @@ export default function DriverProfileScreen({ navigation }) {
           <Text style={styles.roleText}>Driver</Text>
         </View>
 
-        {/* ID Card Button */}
-        <TouchableOpacity 
-          style={styles.idCardButton}
-          onPress={() => setShowIDCard(true)}
-        >
-          <Ionicons name="card" size={16} color="#fff" />
-          <Text style={styles.idCardButtonText}>View ID Card</Text>
-        </TouchableOpacity>
+        {/* Driver ID */}
+        <View style={styles.driverIDBox}>
+          <View style={styles.driverIDContainer}>
+            <Text style={styles.driverIDLabel}>ID: </Text>
+            <Text style={styles.driverIDValue}>{`KUSHD${String(driverProfile?.id?.charCodeAt(0) || 12345).padStart(6, '0')}`}</Text>
+          </View>
+        </View>
       </View>
 
 
@@ -502,6 +501,33 @@ const styles = StyleSheet.create({
   phone: { color: '#666', fontSize: 13, marginBottom: 6 },
   roleBadge: { backgroundColor: '#ff980020', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 2, borderColor: '#ff9800' },
   roleText: { color: '#ff9800', fontSize: 12, fontWeight: '600' },
+
+  driverIDBox: {
+    marginTop: 10,
+  },
+
+  driverIDContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff980020',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#ff9800',
+  },
+
+  driverIDLabel: {
+    fontSize: 14,
+    color: '#ff9800',
+    fontWeight: '600',
+  },
+
+  driverIDValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ff9800',
+  },
 
   idCardButton: {
     marginTop: 10,
