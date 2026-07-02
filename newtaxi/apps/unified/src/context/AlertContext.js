@@ -12,10 +12,35 @@ export const AlertProvider = ({ children }) => {
   const [enquiries, setEnquiries] = useState(0);
   const [isDriverOnline, setIsDriverOnline] = useState(false);
   const [vendorTrips, setVendorTrips] = useState(0);
+  const [hasActiveTrip, setHasActiveTrip] = useState(false);  // ✅ NEW: Check if driver has active trip
   
   const continuousAlertRef = useRef(null);
   const hasPlayedInitialRef = useRef(false);
   const backgroundCheckRef = useRef(null);
+
+  // Check if driver has an active/in-progress trip
+  const checkActiveTrip = useCallback(async () => {
+    if (!user?.id || !isDriverOnline) {
+      setHasActiveTrip(false);
+      return;
+    }
+
+    try {
+      const { data: activeTrip, error } = await supabase
+        .from('trips')
+        .select('id')
+        .in('status', ['accepted', 'in_progress'])
+        .eq('accepted_by', user.id)
+        .maybeSingle();
+
+      if (!error) {
+        setHasActiveTrip(!!activeTrip);
+        console.log(`🚗 Active trip check: ${activeTrip ? 'HAS ACTIVE TRIP - silence alerts' : 'No active trip'}`);
+      }
+    } catch (err) {
+      console.warn('Error checking active trip:', err.message);
+    }
+  }, [user?.id, isDriverOnline]);
 
   // Background check: periodically verify trips/enquiries exist
   // This ensures sound continues even if a screen doesn't update AlertContext
@@ -25,6 +50,9 @@ export const AlertProvider = ({ children }) => {
     backgroundCheckRef.current = setInterval(async () => {
       try {
         if (!user?.id) return;
+        
+        // Check for active trip first (highest priority)
+        await checkActiveTrip();
         
         // For drivers: check if they have available trips
         if (isDriverOnline) {
@@ -68,7 +96,7 @@ export const AlertProvider = ({ children }) => {
         console.warn('Background check error:', err.message);
       }
     }, 5000); // Check every 5 seconds
-  }, [user?.id, isDriverOnline]);
+  }, [user?.id, isDriverOnline, checkActiveTrip]);
 
   const stopBackgroundCheck = useCallback(() => {
     if (backgroundCheckRef.current) {
@@ -85,10 +113,10 @@ export const AlertProvider = ({ children }) => {
     // - vendorTrips (vendor's own published trips)
     const hasTripsOrEnquiries = trips > 0 || enquiries > 0 || vendorTrips > 0;
     
-    // For drivers: need to be online AND have trips
+    // For drivers: need to be online AND have trips AND NO active trip
     // For vendors: just need enquiries/vendorTrips (no online status needed)
     const isDriver = trips > 0;
-    const shouldPlayAlert = hasTripsOrEnquiries && !isMuted && (!isDriver || isDriverOnline);
+    const shouldPlayAlert = hasTripsOrEnquiries && !isMuted && (!isDriver || isDriverOnline) && !hasActiveTrip; // ✅ NEW: Don't alert if driver has active trip
 
     if (shouldPlayAlert && !hasPlayedInitialRef.current) {
       console.log('🔔 Alert available - starting continuous ring');
@@ -114,7 +142,7 @@ export const AlertProvider = ({ children }) => {
     } else if (!shouldPlayAlert) {
       // Stop continuous alert
       if (continuousAlertRef.current) {
-        console.log('🔇 Stopping continuous alert');
+        console.log('🔇 Stopping continuous alert (driver has active trip, online: false, or muted)');
         clearInterval(continuousAlertRef.current);
         continuousAlertRef.current = null;
       }
@@ -128,7 +156,7 @@ export const AlertProvider = ({ children }) => {
         clearInterval(continuousAlertRef.current);
       }
     };
-  }, [trips, enquiries, isMuted, vendorTrips, isDriverOnline, startBackgroundCheck, stopBackgroundCheck]);
+  }, [trips, enquiries, isMuted, vendorTrips, isDriverOnline, hasActiveTrip, startBackgroundCheck, stopBackgroundCheck]);
 
   // Memoized update function to prevent re-renders
   const updateAlertData = useCallback((data) => {

@@ -23,7 +23,7 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
     Linking.openURL(`tel:${trip.passenger_phone}`);
   }
 
-  function DetailRow({ label, value, color = '#fff' }) {
+  function DetailRow({ label, value, color = '#333' }) {
     return (
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>{label}</Text>
@@ -34,12 +34,12 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} style={{ backgroundColor: '#ffffff' }}>
 
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={28} color="#fff" />
+            <Ionicons name="chevron-back" size={28} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Trip Details</Text>
           <View style={styles.statusBadge}>
@@ -56,9 +56,18 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
-            <Ionicons name="flag" size={16} color="#1a1a2e" />
+            <Ionicons name="flag" size={16} color="#333" />
             <Text style={styles.summaryLocation} numberOfLines={2}>{trip.dropoff_location}</Text>
           </View>
+          {trip.return_location && (
+            <>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Ionicons name="return-up-back-outline" size={16} color="#ff9800" />
+                <Text style={styles.summaryLocation} numberOfLines={2}>{trip.return_location}</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Fare Breakdown */}
@@ -128,31 +137,31 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { padding: 16, paddingBottom: 100 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingTop: 10 },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', flex: 1, textAlign: 'center' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#0a2a0a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  headerTitle: { color: '#333', fontSize: 20, fontWeight: 'bold', flex: 1, textAlign: 'center' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e8f5e9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   statusText: { color: '#4caf50', fontSize: 12, fontWeight: '600' },
 
-  summaryCard: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 20 },
+  summaryCard: { backgroundColor: '#f5f5f5', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e0e0e0' },
   summaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  summaryLocation: { color: '#fff', fontSize: 14, flex: 1, lineHeight: 20 },
-  summaryDivider: { height: 1, backgroundColor: '#0f3460', marginVertical: 12 },
+  summaryLocation: { color: '#333', fontSize: 14, flex: 1, lineHeight: 20 },
+  summaryDivider: { height: 1, backgroundColor: '#e0e0e0', marginVertical: 12 },
 
-  section: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 14 },
-  sectionTitle: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  section: { backgroundColor: '#f5f5f5', borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#e0e0e0' },
+  sectionTitle: { color: '#333', fontSize: 14, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f3460' },
-  detailLabel: { color: '#888', fontSize: 13 },
-  detailValue: { fontSize: 14, fontWeight: '600' },
-  divider: { height: 1, backgroundColor: '#0f3460', marginVertical: 8 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
+  detailLabel: { color: '#666', fontSize: 13 },
+  detailValue: { fontSize: 14, fontWeight: '600', color: '#333' },
+  divider: { height: 1, backgroundColor: '#e0e0e0', marginVertical: 8 },
 
   phoneButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#4caf50', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   phoneButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
-  footer: { padding: 16, paddingBottom: 32, backgroundColor: '#1a1a2e', borderTopWidth: 1, borderTopColor: '#16213e' },
-  backBtn: { backgroundColor: '#1a1a2e', borderRadius: 12, padding: 16, alignItems: 'center' },
+  footer: { padding: 16, paddingBottom: 32, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e0e0e0' },
+  backBtn: { backgroundColor: '#4caf50', borderRadius: 12, padding: 16, alignItems: 'center' },
   backBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

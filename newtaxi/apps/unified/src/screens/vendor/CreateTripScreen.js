@@ -43,6 +43,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
     petTravelling:    editingTrip?.pet_travelling || false,
     hillsIncluded:    editingTrip?.hills_included || false,
     fixedKm:          editingTrip?.fixed_km?.toString() || '',
+    extraKmCharge:    editingTrip?.extra_km_charge?.toString() || '',
     notes:            editingTrip?.notes || '',
   });
   const [loading, setLoading] = useState(false);
@@ -180,6 +181,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         return_location:      isRoundTrip ? (form.returnLocation.trim() || null) : null,
         return_date:          isRoundTrip ? (form.returnDate ? form.returnDate.toISOString() : null) : null,
         fixed_km:             parseFloat(form.fixedKm),
+        extra_km_charge:      parseFloat(form.extraKmCharge) || 0,
         fare_amount:          parseFloat(form.fareAmount),
         commission_amount:    parseFloat(form.commissionAmount),
         customer_pre_advance: parseFloat(form.customerPreAdvance) || 0,
@@ -359,6 +361,11 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         <Field label="Fixed KM *" icon="map-outline"
           placeholder="e.g. 50"
           value={form.fixedKm} onChangeText={(v) => update('fixedKm', v)}
+          keyboardType="decimal-pad" />
+
+        <Field label="Amount per KM after Fixed KM Crossed (₹)" icon="trending-up-outline"
+          placeholder="e.g. 10 (optional)"
+          value={form.extraKmCharge} onChangeText={(v) => update('extraKmCharge', v)}
           keyboardType="decimal-pad" />
 
         <Field label="Trip Amount (₹) *" icon="cash-outline"

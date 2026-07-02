@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, LogBox } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+
+// Suppress the text strings warning for React Native compatibility
+LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
 export default function TripCard({ trip, onPress, onAccept, onCancel }) {
   const [carType, setCarType] = useState(null);
@@ -124,7 +127,26 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       </View>
 
-      {/* Fare & Fixed KM in one badge box */}
+      {/* Admin Badge - for super admin assigned trips */}
+      {trip.is_admin_trip && (
+        <View style={styles.adminBadge}>
+          <Ionicons name="shield-checkmark" size={14} color="#fff" />
+          <Text style={styles.adminBadgeText}>Admin Assigned</Text>
+        </View>
+      )}
+
+      {/* Vendor Badge - for vendor assigned trips (driver_id set) */}
+      {trip.driver_id && !trip.is_admin_trip && (
+        <View style={styles.vendorBadge}>
+          <Ionicons name="person-circle-outline" size={14} color="#fff" />
+          <Text style={styles.vendorBadgeText}>Vendor Assigned</Text>
+        </View>
+      )}
+      
+      {/* Debug logging for vendor badge */}
+      {trip.driver_id === undefined && console.log('🔍 TripCard - vendor badge NOT shown: driver_id is undefined for trip', trip.id)}
+
+      {/* Fare & Fixed KM in one badge box - Left side */}
       <View style={styles.badgeRow}>
         <View style={styles.fareKmBox}>
           <View style={styles.fareBadge}>
@@ -139,6 +161,15 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
           )}
         </View>
       </View>
+
+      {/* Extra KM Charge - Clear Separate Line */}
+      {trip.extra_km_charge && trip.extra_km_charge > 0 && (
+        <View style={styles.extraKmChargeRow}>
+          <Ionicons name="trending-up-outline" size={14} color="#ff9800" />
+          <Text style={styles.extraKmChargeLabel}>For Extra KM:</Text>
+          <Text style={styles.extraKmChargeValue}>₹{trip.extra_km_charge}/km</Text>
+        </View>
+      )}
 
       {/* Pickup and Dropoff in one row */}
       <View style={styles.locationsRow}>
@@ -215,18 +246,24 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
 
       {/* Toll & Tax & Hills + Pet Travelling - Single Row */}
       <View style={styles.inclusionsRow}>
-        <View style={styles.inclusionBox}>
-          <Text style={styles.inclusionLabel}>Toll - Tax - Hills</Text>
-          <Text style={[styles.inclusionStatus, trip.toll_included ? styles.includedText : styles.excludedText]}>
-            {trip.toll_included ? '✓ Included' : '✗ Excluded'}
-          </Text>
+        <View style={styles.inclusionItem}>
+          <View style={styles.inclusionBox}>
+            <Text style={styles.inclusionLabel}>Toll - Tax - Hills</Text>
+            <Text style={[styles.inclusionStatus, trip.toll_included ? styles.includedText : styles.excludedText]}>
+              {trip.toll_included ? '✓ Included' : '✗ Excluded'}
+            </Text>
+          </View>
         </View>
-        <Text style={styles.inclusionDivider}>-</Text>
-        <View style={styles.inclusionBox}>
-          <Text style={styles.inclusionLabel}>Pet</Text>
-          <Text style={[styles.inclusionStatus, trip.pet_travelling ? styles.includedText : styles.excludedText]}>
-            {trip.pet_travelling ? '✓ Allowed' : '✗ Not Allowed'}
-          </Text>
+        <View style={styles.inclusionDividerContainer}>
+          <Text style={styles.inclusionDivider}>-</Text>
+        </View>
+        <View style={styles.inclusionItem}>
+          <View style={styles.inclusionBox}>
+            <Text style={styles.inclusionLabel}>Pet</Text>
+            <Text style={[styles.inclusionStatus, trip.pet_travelling ? styles.includedText : styles.excludedText]}>
+              {trip.pet_travelling ? '✓ Allowed' : '✗ Not Allowed'}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -335,6 +372,38 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#2196f3',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  adminBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  vendorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ff9800',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  vendorBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -363,6 +432,35 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   kmText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
+  extraKmChargeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fff3e0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff9800',
+  },
+  extraKmChargeLabel: {
+    color: '#333',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  extraKmChargeValue: {
+    color: '#ff9800',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  extraKmBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  extraKmText: { color: '#000', fontWeight: 'bold', fontSize: 14 },
   commissionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -471,6 +569,15 @@ const styles = StyleSheet.create({
   inclusionBox: {
     flex: 1,
     alignItems: 'center',
+  },
+  inclusionItem: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  inclusionDividerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   inclusionLabel: {
     fontSize: 11,

@@ -36,21 +36,31 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'Wallet not found for user: ' || p_user_id::text);
   END IF;
 
-  -- Fetch commission settings
-  SELECT vendor_commission_type, vendor_commission_value
-  INTO v_commission_type, v_commission_value
-  FROM app_settings
-  WHERE id = 'global';
+  -- Calculate commission - use the one already set on the trip, don't recalculate
+  v_commission := COALESCE(v_trip.commission_amount, 0);
+  
+  -- If no commission was set on trip, calculate from settings as fallback
+  IF v_commission = 0 THEN
+    SELECT vendor_commission_type, vendor_commission_value
+    INTO v_commission_type, v_commission_value
+    FROM app_settings
+    WHERE id = 'global';
 
-  IF v_commission_type IS NULL OR v_commission_value IS NULL THEN
-    RETURN json_build_object('success', false, 'error', 'Commission settings not found in app_settings');
-  END IF;
+    IF v_commission_type IS NULL OR v_commission_value IS NULL THEN
+      RETURN json_build_object('success', false, 'error', 'Commission settings not found in app_settings');
+    END IF;
 
-  -- Calculate commission
-  IF v_commission_type = 'percentage' THEN
-    v_commission := (v_trip.fare_amount * v_commission_value) / 100;
+    IF v_commission_type = 'percentage' THEN
+      v_commission := (v_trip.fare_amount * v_commission_value) / 100;
+    ELSE
+      v_commission := v_commission_value;
+    END IF;
   ELSE
-    v_commission := v_commission_value;
+    -- Get the commission type and value for reference in the response
+    SELECT vendor_commission_type, vendor_commission_value
+    INTO v_commission_type, v_commission_value
+    FROM app_settings
+    WHERE id = 'global';
   END IF;
 
   v_customer_preadvance   := COALESCE(v_trip.customer_pre_advance, 0);
@@ -93,10 +103,12 @@ BEGIN
     'Commission ' || v_commission_value::text || '% on trip'
   );
 
-  -- Update trip with commission amount
-  UPDATE trips SET
-    commission_amount = v_commission
-  WHERE id = p_trip_id;
+  -- Update trip with commission amount ONLY if it wasn't already set
+  IF v_trip.commission_amount IS NULL OR v_trip.commission_amount = 0 THEN
+    UPDATE trips SET
+      commission_amount = v_commission
+    WHERE id = p_trip_id;
+  END IF;
 
   RETURN json_build_object(
     'success',               true,

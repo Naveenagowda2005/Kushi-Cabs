@@ -1,10 +1,12 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
   RefreshControl, Alert, Linking, Image, Modal, ScrollView,
-  PanResponder, Dimensions,
+  TextInput, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../hooks/useTheme';
@@ -73,88 +75,44 @@ function ZoomableImage({ imageUrl, title }) {
   );
 }
 
-// Component to handle signed URL loading
+// Component to handle image loading - simplified to avoid crashes
 function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError, isLoading, onLoad, onError }) {
-  const [displayUrl, setDisplayUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Use the URL directly - assume URLs are already public/accessible
+  const displayUrl = imageUrl || null;
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
-  useEffect(() => {
-    const processImageUrl = async () => {
-      try {
-        if (!imageUrl) {
-          setLoading(false);
-          return;
-        }
+  // Handle image load completion
+  const handleImageLoad = () => {
+    console.log(`✅ Image loaded successfully: ${tripId}-${imageType}`);
+    setImgLoaded(true);
+    onLoad?.();
+  };
 
-        // Check if it's already a base64 data URL
-        if (imageUrl.startsWith('data:image/')) {
-          console.log('Using base64 data URL directly for:', imageType);
-          setDisplayUrl(imageUrl);
-          setLoading(false);
-          return;
-        }
-
-        // If it's a regular URL, try to use it directly
-        if (imageUrl.startsWith('http')) {
-          console.log('Using HTTP URL directly for:', imageType);
-          setDisplayUrl(imageUrl);
-          setLoading(false);
-          return;
-        }
-
-        // Extract file path from the URL for storage bucket
-        const filePath = imageUrl.split('/odometer-images/')[1];
-        if (!filePath) {
-          console.warn('Could not extract file path from URL:', imageUrl);
-          setLoading(false);
-          return;
-        }
-
-        // Get signed URL from Supabase
-        const { data, error } = await supabase.storage
-          .from('odometer-images')
-          .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-        if (error) {
-          // Silently fail for missing images (404 is expected)
-          if (error.message?.includes('404') || error.message?.includes('not found')) {
-            console.log('Image not found in storage (expected):', filePath);
-          } else {
-            console.error('Error creating signed URL:', error);
-          }
-          setDisplayUrl(null);
-          onError?.();
-          setLoading(false);
-          return;
-        }
-
-        setDisplayUrl(data?.signedUrl);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error in processImageUrl:', err);
-        onError?.();
-        setLoading(false);
-      }
-    };
-
-    processImageUrl();
-  }, [imageUrl]);
+  // Handle image load errors
+  const handleImageError = (error) => {
+    console.warn(`❌ Image failed to load: ${tripId}-${imageType}`, error);
+    setImgError(true);
+    onError?.();
+  };
 
   return (
     <TouchableOpacity
       style={styles.odometerImageWrapper}
       onPress={() => {
-        console.log('Thumbnail pressed, opening modal with URL:', displayUrl);
-        onPress?.(displayUrl);
+        if (displayUrl && !imgError) {
+          console.log('Thumbnail pressed, opening modal with URL:', displayUrl);
+          onPress?.(displayUrl);
+        }
       }}
-      disabled={isError}
+      disabled={imgError || isError}
     >
-      {isError ? (
+      {imgError || isError ? (
         <View style={[styles.odometerImage, styles.imageErrorPlaceholder]}>
           <Ionicons name="image-outline" size={32} color="#666" />
           <Text style={styles.errorText}>Failed to load</Text>
         </View>
-      ) : loading || isLoading ? (
+      ) : !imgLoaded && !displayUrl ? (
         <View style={[styles.odometerImage, styles.imageLoadingPlaceholder]}>
           <Ionicons name="hourglass-outline" size={32} color="#888" />
           <Text style={styles.loadingText}>Loading...</Text>
@@ -163,13 +121,13 @@ function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError,
         <Image
           source={{ uri: displayUrl }}
           style={styles.odometerImage}
-          onLoad={onLoad}
-          onError={onError}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
         />
       ) : (
-        <View style={[styles.odometerImage, styles.imageErrorPlaceholder]}>
-          <Ionicons name="image-outline" size={32} color="#666" />
-          <Text style={styles.errorText}>No URL</Text>
+        <View style={[styles.odometerImage, styles.imageLoadingPlaceholder]}>
+          <Ionicons name="hourglass-outline" size={32} color="#888" />
+          <Text style={styles.loadingText}>No image</Text>
         </View>
       )}
       <Text style={styles.odometerLabel}>{imageType === 'start' ? 'Start' : 'End'}</Text>
@@ -195,16 +153,56 @@ export default function SuperAdminTripsScreen() {
   
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('all'); // all, pending, accepted, in_progress, completed, cancelled
+  const [filterStatus, setFilterStatus] = useState('all');
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [imageLoadErrors, setImageLoadErrors] = useState({});
   const [imageLoadingStates, setImageLoadingStates] = useState({});
   const [modalSignedUrl, setModalSignedUrl] = useState(null);
+  
+  // Edit trip states
+  const [editingTrip, setEditingTrip] = useState(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editForm, setEditForm] = useState({
+    fare_amount: '',
+    pickup_location: '',
+    dropoff_location: '',
+    return_location: '',
+    return_date: null,
+    passenger_name: '',
+    passenger_phone: '',
+    car_type: '',
+    car_model: '',
+    seater_type: '',
+    fuel_type: '',
+    segment: '',
+    package: '',
+    fixed_km: '',
+    commission_amount: '',
+    customer_pre_advance: '',
+    toll_included: false,
+    state_tax_included: false,
+    pet_travelling: false,
+    hills_included: false,
+    notes: '',
+    created_at: new Date(),
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
+  const [adminTripOptions, setAdminTripOptions] = useState({
+    segments: [],
+    packages: [],
+    carTypes: [],
+    carModels: [],
+    seaterTypes: [],
+    fuelTypes: [],
+  });
+  const [savingTrip, setSavingTrip] = useState(false);
 
   const fetchTrips = useCallback(async () => {
     setLoading(true);
     try {
+      // First fetch trips without relationships to avoid RLS issues
       let query = supabase
         .from('trips')
         .select(`
@@ -213,6 +211,24 @@ export default function SuperAdminTripsScreen() {
           fare_amount,
           pickup_location,
           dropoff_location,
+          return_location,
+          return_date,
+          passenger_name,
+          passenger_phone,
+          car_type,
+          car_model,
+          seater_type,
+          fuel_type,
+          segment_id,
+          package_id,
+          fixed_km,
+          commission_amount,
+          customer_pre_advance,
+          toll_included,
+          state_tax_included,
+          pet_travelling,
+          hills_included,
+          notes,
           start_km,
           end_km,
           start_odometer_url,
@@ -221,21 +237,60 @@ export default function SuperAdminTripsScreen() {
           accepted_at,
           started_at,
           completed_at,
-          creator:created_by(full_name, phone),
-          driver:accepted_by(full_name, phone)
+          created_by,
+          accepted_by,
+          trip_segments(id, name)
         `);
 
       if (filterStatus !== 'all') {
         query = query.eq('status', filterStatus);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data: tripsData, error: tripsError } = await query.order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setTrips(data || []);
+      if (tripsError) throw tripsError;
+
+      // Now fetch user details separately for creators and drivers
+      if (tripsData && tripsData.length > 0) {
+        const userIds = new Set();
+        tripsData.forEach(trip => {
+          if (trip.created_by) userIds.add(trip.created_by);
+          if (trip.accepted_by) userIds.add(trip.accepted_by);
+        });
+
+        if (userIds.size > 0) {
+          const { data: usersData, error: usersError } = await supabase
+            .from('users')
+            .select('id, full_name, phone, role_id')
+            .in('id', Array.from(userIds));
+
+          if (usersError) {
+            console.warn('Error fetching user details:', usersError.message);
+            // Continue anyway with partial data
+          } else {
+            // Create a map of user data
+            const userMap = {};
+            usersData?.forEach(user => {
+              userMap[user.id] = user;
+            });
+
+            // Attach user data to trips
+            const enrichedTrips = tripsData.map(trip => ({
+              ...trip,
+              creator: trip.created_by ? userMap[trip.created_by] : null,
+              driver: trip.accepted_by ? userMap[trip.accepted_by] : null
+            }));
+
+            setTrips(enrichedTrips);
+            return;
+          }
+        }
+      }
+
+      setTrips(tripsData || []);
     } catch (err) {
       console.error('Error fetching trips:', err.message);
-      Alert.alert('Error', 'Failed to fetch trips');
+      Alert.alert('Error', 'Failed to fetch trips: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -243,12 +298,101 @@ export default function SuperAdminTripsScreen() {
 
   useFocusEffect(useCallback(() => { fetchTrips(); }, [fetchTrips]));
 
-  const openImageModal = (imageUrl, title) => {
-    console.log('Opening image modal:', { imageUrl, title });
-    setModalSignedUrl(imageUrl); // For base64, use URL directly; for storage URLs, will be processed
+  const fetchAdminTripOptions = useCallback(async () => {
+    try {
+      console.log('Fetching trip options for edit form');
+      
+      const [carTypesRes, seaterRes, fuelRes, segmentsRes] = await Promise.all([
+        supabase.from('car_types').select('id, name').order('name'),
+        supabase.from('seater_types').select('id, name').order('name'),
+        supabase.from('fuel_types').select('id, name').order('name'),
+        supabase.from('trip_segments').select('id, name, display_order').order('display_order', { ascending: true }),
+      ]);
+
+      setAdminTripOptions({
+        carTypes: carTypesRes.data || [],
+        seaterTypes: seaterRes.data || [],
+        fuelTypes: fuelRes.data || [],
+        segments: segmentsRes.data || [],
+        packages: [],
+        carModels: [],
+      });
+
+      console.log('✅ Trip options fetched for edit form');
+    } catch (error) {
+      console.error('Error fetching trip options:', error);
+    }
+  }, []);
+
+  // Fetch options on mount
+  useEffect(() => {
+    fetchAdminTripOptions();
+  }, [fetchAdminTripOptions]);
+
+  const fetchCarModelsForEditTrip = async (carTypeId) => {
+    try {
+      const { data } = await supabase
+        .from('car_models')
+        .select('id, name')
+        .eq('car_type_id', carTypeId)
+        .order('name');
+      
+      if (data) {
+        setAdminTripOptions((prev) => ({ ...prev, carModels: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching car models:', error);
+    }
+  };
+
+  const fetchPackagesForEditTrip = async (segmentId) => {
+    try {
+      const { data } = await supabase
+        .from('trip_packages')
+        .select('id, name')
+        .eq('segment_id', segmentId)
+        .order('name');
+      
+      if (data) {
+        setAdminTripOptions((prev) => ({ ...prev, packages: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching packages:', error);
+    }
+  };
+
+  const updateEditForm = useCallback((field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+
+    // Fetch car models when car type changes
+    if (field === 'car_type' && value) {
+      fetchCarModelsForEditTrip(value);
+    }
+
+    // Handle segment changes
+    if (field === 'segment' && value) {
+      fetchPackagesForEditTrip(value);
+      // Reset package selection
+      setEditForm((prev) => ({ ...prev, package: '' }));
+      
+      // If not Round trip, clear return fields
+      const selectedSegment = adminTripOptions.segments.find(s => s.id === value);
+      if (selectedSegment?.name !== 'Round trips') {
+        setEditForm((prev) => ({ 
+          ...prev, 
+          return_location: '',
+          return_date: null 
+        }));
+      }
+    }
+  }, [adminTripOptions.segments]);
+
+  const openImageModal = useCallback((imageUrl, title) => {
+    console.log('🖼️ Opening image modal:', { imageUrl: imageUrl?.substring(0, 50) + '...', title });
+    setModalSignedUrl(imageUrl);
     setSelectedImage({ url: imageUrl, title });
     setImageModalVisible(true);
-  };
+  }, []);
 
   const handleImageLoad = (tripId, imageType) => {
     console.log(`Image loaded successfully: ${tripId}-${imageType}`);
@@ -270,15 +414,260 @@ export default function SuperAdminTripsScreen() {
     }));
   };
 
-  const verifyImageUrl = async (url) => {
+  const openEditModal = useCallback(async (trip) => {
+    console.log('✏️ Opening edit modal for trip:', trip.id);
+    
     try {
-      const response = await fetch(url, { method: 'HEAD' });
-      console.log(`URL verification for ${url}: ${response.status}`);
+      // Fetch complete trip data from database to ensure all fields are available
+      const { data: fullTrip, error } = await supabase
+        .from('trips')
+        .select(`
+          id,
+          status,
+          fare_amount,
+          pickup_location,
+          dropoff_location,
+          return_location,
+          return_date,
+          passenger_name,
+          passenger_phone,
+          car_type,
+          car_model,
+          seater_type,
+          fuel_type,
+          segment_id,
+          package_id,
+          fixed_km,
+          commission_amount,
+          customer_pre_advance,
+          toll_included,
+          state_tax_included,
+          pet_travelling,
+          hills_included,
+          notes,
+          created_at
+        `)
+        .eq('id', trip.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching trip details:', error);
+        Alert.alert('Error', 'Failed to load trip details');
+        return;
+      }
+
+      if (!fullTrip) {
+        Alert.alert('Error', 'Trip not found');
+        return;
+      }
+
+      setEditingTrip(fullTrip);
+      setEditForm({
+        fare_amount: fullTrip.fare_amount?.toString() || '',
+        pickup_location: fullTrip.pickup_location || '',
+        dropoff_location: fullTrip.dropoff_location || '',
+        return_location: fullTrip.return_location || '',
+        return_date: fullTrip.return_date ? new Date(fullTrip.return_date) : null,
+        passenger_name: fullTrip.passenger_name || '',
+        passenger_phone: fullTrip.passenger_phone || '',
+        car_type: fullTrip.car_type || '',
+        car_model: fullTrip.car_model || '',
+        seater_type: fullTrip.seater_type || '',
+        fuel_type: fullTrip.fuel_type || '',
+        segment: fullTrip.segment_id || '',
+        package: fullTrip.package_id || '',
+        fixed_km: fullTrip.fixed_km?.toString() || '',
+        commission_amount: fullTrip.commission_amount?.toString() || '',
+        customer_pre_advance: fullTrip.customer_pre_advance?.toString() || '',
+        toll_included: Boolean(fullTrip.toll_included),
+        state_tax_included: Boolean(fullTrip.state_tax_included),
+        pet_travelling: Boolean(fullTrip.pet_travelling),
+        hills_included: Boolean(fullTrip.hills_included),
+        notes: fullTrip.notes || '',
+        created_at: new Date(fullTrip.created_at),
+      });
+
+      // Fetch car models if car type exists
+      if (fullTrip.car_type) {
+        fetchCarModelsForEditTrip(fullTrip.car_type);
+      }
+
+      // Fetch packages if segment exists
+      if (fullTrip.segment_id) {
+        fetchPackagesForEditTrip(fullTrip.segment_id);
+      }
+
+      setEditModalVisible(true);
+      console.log('✅ Edit modal opened with full trip data:', fullTrip);
+    } catch (err) {
+      console.error('Error opening edit modal:', err);
+      Alert.alert('Error', 'Failed to open edit modal');
+    }
+  }, []);
+
+  const handleSaveTrip = async () => {
+    if (!editingTrip) return;
+    
+    try {
+      // Validation
+      if (!editForm.segment) {
+        Alert.alert('Error', 'Please select a trip segment');
+        return;
+      }
+
+      if (!editForm.pickup_location.trim()) {
+        Alert.alert('Error', 'Pickup location is required');
+        return;
+      }
+
+      if (!editForm.dropoff_location.trim()) {
+        Alert.alert('Error', 'Dropoff location is required');
+        return;
+      }
+
+      const selectedSegment = adminTripOptions.segments.find(s => s.id === editForm.segment);
+      if (selectedSegment?.name === 'Round trips') {
+        if (!editForm.return_location.trim()) {
+          Alert.alert('Error', 'Return location is required for round trips');
+          return;
+        }
+        if (!editForm.return_date) {
+          Alert.alert('Error', 'Return date is required for round trips');
+          return;
+        }
+      }
+
+      if (!editForm.passenger_name.trim()) {
+        Alert.alert('Error', 'Passenger name is required');
+        return;
+      }
+
+      if (!editForm.passenger_phone.trim()) {
+        Alert.alert('Error', 'Passenger phone is required');
+        return;
+      }
+
+      const fareAmount = parseFloat(editForm.fare_amount);
+      if (isNaN(fareAmount) || fareAmount < 0) {
+        Alert.alert('Error', 'Please enter a valid fare amount');
+        return;
+      }
+
+      const fixedKm = parseFloat(editForm.fixed_km);
+      if (isNaN(fixedKm) || fixedKm <= 0) {
+        Alert.alert('Error', 'Please enter a valid fixed KM');
+        return;
+      }
+
+      const commissionAmount = parseFloat(editForm.commission_amount);
+      if (isNaN(commissionAmount) || commissionAmount < 0) {
+        Alert.alert('Error', 'Please enter a valid commission amount');
+        return;
+      }
+
+      if (!editForm.car_type) {
+        Alert.alert('Error', 'Please select a car type');
+        return;
+      }
+
+      if (!editForm.seater_type) {
+        Alert.alert('Error', 'Please select a seater type');
+        return;
+      }
+
+      if (!editForm.fuel_type) {
+        Alert.alert('Error', 'Please select a fuel type');
+        return;
+      }
+
+      setSavingTrip(true);
+
+      const customerPreAdvance = parseFloat(editForm.customer_pre_advance) || 0;
+
+      const updates = {
+        fare_amount: fareAmount,
+        pickup_location: editForm.pickup_location.trim(),
+        dropoff_location: editForm.dropoff_location.trim(),
+        return_location: selectedSegment?.name === 'Round trips' ? editForm.return_location.trim() : null,
+        return_date: selectedSegment?.name === 'Round trips' && editForm.return_date ? editForm.return_date.toISOString() : null,
+        passenger_name: editForm.passenger_name.trim(),
+        passenger_phone: editForm.passenger_phone.trim(),
+        car_type: editForm.car_type,
+        car_model: editForm.car_model,
+        seater_type: editForm.seater_type,
+        fuel_type: editForm.fuel_type,
+        segment_id: editForm.segment,
+        package_id: editForm.package || null,
+        fixed_km: fixedKm,
+        commission_amount: commissionAmount,
+        customer_pre_advance: customerPreAdvance,
+        toll_included: editForm.toll_included,
+        state_tax_included: editForm.state_tax_included,
+        pet_travelling: editForm.pet_travelling,
+        hills_included: editForm.hills_included,
+        notes: editForm.notes.trim() || null,
+        created_at: editForm.created_at.toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('trips')
+        .update(updates)
+        .eq('id', editingTrip.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setTrips(prevTrips =>
+        prevTrips.map(trip =>
+          trip.id === editingTrip.id
+            ? { ...trip, ...updates }
+            : trip
+        )
+      );
+
+      Alert.alert('✅ Success', 'Trip updated successfully');
+      setEditModalVisible(false);
+      setEditingTrip(null);
+    } catch (err) {
+      console.error('Error updating trip:', err.message);
+      Alert.alert('Error', 'Failed to update trip: ' + err.message);
+    } finally {
+      setSavingTrip(false);
+    }
+  };
+
+  // Helper function to check if a trip was created by a super admin
+  const isSuperAdminCreatedTrip = useCallback((trip) => {
+    if (!trip.creator) return false;
+    // Check if the creator's role_id is 5 (super_admin role)
+    // In the database, super_admin role has id=5
+    return trip.creator.role_id === 5;
+  }, []);
+
+  const verifyImageUrl = useCallback(async (url) => {
+    if (!url) return false;
+    try {
+      const response = await fetch(url, { method: 'HEAD', timeout: 5000 });
+      console.log(`✅ URL verification for ${url.substring(0, 50)}...: ${response.status}`);
       return response.ok;
     } catch (err) {
-      console.error(`URL verification failed for ${url}:`, err.message);
+      console.warn(`⚠️ URL verification failed for ${url.substring(0, 50)}...`, err.message);
       return false;
     }
+  }, []);
+
+  const handleDateChange = (event, selectedDate) => {
+    if (selectedDate) {
+      setEditForm({...editForm, created_at: selectedDate});
+    }
+    setShowDatePicker(false);
+  };
+
+  const handleReturnDateChange = (event, selectedDate) => {
+    if (selectedDate) {
+      setEditForm({...editForm, return_date: selectedDate});
+    }
+    setShowReturnDatePicker(false);
   };
 
   const getImageUrl = (storagePath) => {
@@ -329,14 +718,6 @@ export default function SuperAdminTripsScreen() {
       ? `${(item.end_km - item.start_km).toFixed(1)} km`
       : 'N/A';
 
-    // Debug logging
-    if (item.start_odometer_url || item.end_odometer_url) {
-      console.log(`Trip ${item.id.slice(0, 8)}: start_odometer_url=${item.start_odometer_url}, end_odometer_url=${item.end_odometer_url}`);
-      // Verify URLs
-      if (item.start_odometer_url) verifyImageUrl(item.start_odometer_url);
-      if (item.end_odometer_url) verifyImageUrl(item.end_odometer_url);
-    }
-
     return (
       <View style={styles.tripCard}>
         {/* Header */}
@@ -350,24 +731,73 @@ export default function SuperAdminTripsScreen() {
               <Text style={styles.tripId}>ID: {item.id.slice(0, 8)}</Text>
             </View>
           </View>
-          <Text style={styles.fare}>₹{item.fare_amount}</Text>
+          <View style={styles.tripHeaderRight}>
+            {isSuperAdminCreatedTrip(item) && (
+              <View style={styles.adminBadge}>
+                <Ionicons name="shield-checkmark" size={12} color="#fff" />
+                <Text style={styles.adminBadgeText}>Admin</Text>
+              </View>
+            )}
+            <Text style={styles.fare}>₹{item.fare_amount}</Text>
+          </View>
         </View>
 
         {/* Locations */}
         <View style={styles.section}>
           <View style={styles.locationRow}>
             <Ionicons name="location" size={14} color="#4caf50" />
+            <Text style={styles.locationLabel}>Pickup:</Text>
             <Text style={styles.locationText} numberOfLines={1}>
               {item.pickup_location}
             </Text>
           </View>
           <View style={styles.locationRow}>
+            <Ionicons name="calendar-outline" size={14} color={COLORS.warning} />
+            <Text style={styles.locationLabel}>Scheduled Date:</Text>
+            <Text style={styles.locationText}>
+              {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+          </View>
+          <View style={styles.locationRow}>
             <Ionicons name="flag" size={14} color={COLORS.text} />
+            <Text style={styles.locationLabel}>Drop:</Text>
             <Text style={styles.locationText} numberOfLines={1}>
               {item.dropoff_location}
             </Text>
           </View>
         </View>
+
+        {/* Trip Type */}
+        {item.trip_segments && (
+          <View style={styles.section}>
+            <View style={styles.tripTypeRow}>
+              <Ionicons name="ticket-outline" size={14} color={COLORS.info} />
+              <Text style={styles.tripTypeText}>{item.trip_segments.name || 'Trip'}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Return Location and Date - Only for Round Trips */}
+        {item.trip_segments?.name === 'Round trips' && item.return_location && (
+          <View style={styles.section}>
+            <View style={styles.locationRow}>
+              <Ionicons name="arrow-undo-outline" size={14} color={COLORS.warning} />
+              <Text style={styles.locationLabel}>Return:</Text>
+              <Text style={styles.locationText} numberOfLines={1}>
+                {item.return_location}
+              </Text>
+            </View>
+            {item.return_date && (
+              <View style={styles.locationRow}>
+                <Ionicons name="calendar-outline" size={14} color={COLORS.warning} />
+                <Text style={styles.locationLabel}>Return Date:</Text>
+                <Text style={styles.locationText}>
+                  {new Date(item.return_date).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Creator/Vendor Info */}
         {item.creator && (
@@ -423,12 +853,6 @@ export default function SuperAdminTripsScreen() {
             <Text style={styles.detailLabel}>End KM:</Text>
             <Text style={styles.detailValue}>{item.end_km || 'N/A'}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date:</Text>
-            <Text style={styles.detailValue}>
-              {new Date(item.created_at).toLocaleDateString()}
-            </Text>
-          </View>
         </View>
 
         {/* Odometer Images */}
@@ -483,6 +907,60 @@ export default function SuperAdminTripsScreen() {
                 ✓ Completed: {new Date(item.completed_at).toLocaleString()}
               </Text>
             )}
+          </View>
+        )}
+
+        {/* Edit Trip Button - Only for super-admin-created trips */}
+        {isSuperAdminCreatedTrip(item) && item.status === 'pending' && (
+          <View style={styles.section}>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.editButton, { flex: 1, marginRight: 6 }]}
+                onPress={() => openEditModal(item)}
+              >
+                <Ionicons name="pencil-outline" size={16} color="#fff" />
+                <Text style={styles.editButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteButton, { flex: 1, marginLeft: 6 }]}
+                onPress={() => {
+                  Alert.alert(
+                    '⚠️ Delete Trip',
+                    'Are you sure you want to delete this trip? This action cannot be undone.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            const { error } = await supabase
+                              .from('trips')
+                              .delete()
+                              .eq('id', item.id);
+
+                            if (error) throw error;
+
+                            // Remove from local state
+                            setTrips(prevTrips =>
+                              prevTrips.filter(trip => trip.id !== item.id)
+                            );
+
+                            Alert.alert('✅ Success', 'Trip deleted successfully');
+                          } catch (err) {
+                            console.error('Error deleting trip:', err.message);
+                            Alert.alert('Error', 'Failed to delete trip: ' + err.message);
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="trash-outline" size={16} color="#fff" />
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -656,6 +1134,454 @@ export default function SuperAdminTripsScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Edit Trip Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setEditModalVisible(false);
+          setEditingTrip(null);
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.editModalHeader}>
+            <Text style={styles.editModalTitle}>Edit Trip</Text>
+            <TouchableOpacity onPress={() => {
+              setEditModalVisible(false);
+              setEditingTrip(null);
+            }}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.editModalContent}>
+            {/* Trip Segment Selection */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Trip Segment *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={editForm.segment}
+                  onValueChange={(value) => updateEditForm('segment', value)}
+                  enabled={!savingTrip}
+                >
+                  <Picker.Item label="Select Trip Segment" value="" />
+                  {adminTripOptions.segments.map((seg) => (
+                    <Picker.Item key={seg.id} label={seg.name} value={seg.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Pickup Location */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Pickup Location *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="location-outline" size={18} color={COLORS.success} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter pickup location"
+                  value={editForm.pickup_location}
+                  onChangeText={(text) => updateEditForm('pickup_location', text)}
+                  multiline
+                  numberOfLines={2}
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Dropoff Location */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Dropoff Location *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="flag-outline" size={18} color={COLORS.danger} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter dropoff location"
+                  value={editForm.dropoff_location}
+                  onChangeText={(text) => updateEditForm('dropoff_location', text)}
+                  multiline
+                  numberOfLines={2}
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Return Location - Only for Round Trips */}
+            {adminTripOptions.segments.find(s => s.id === editForm.segment)?.name === 'Round trips' && (
+              <>
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Return Location *</Text>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="location-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Enter return location"
+                      value={editForm.return_location}
+                      onChangeText={(text) => updateEditForm('return_location', text)}
+                      multiline
+                      numberOfLines={2}
+                      placeholderTextColor={COLORS.textSecondary}
+                      editable={!savingTrip}
+                    />
+                  </View>
+                </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Return Date *</Text>
+                  <TouchableOpacity
+                    style={styles.dateInputContainer}
+                    onPress={() => setShowReturnDatePicker(true)}
+                    disabled={savingTrip}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                    <Text style={styles.dateText}>
+                      {editForm.return_date?.toLocaleDateString('en-IN', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      }) || 'Select return date'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Fixed KM */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Fixed KM *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="speedometer-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. 50"
+                  value={editForm.fixed_km}
+                  onChangeText={(text) => updateEditForm('fixed_km', text)}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Fare Amount */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Trip Fare Amount (₹) *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="cash-outline" size={18} color={COLORS.success} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. 500"
+                  value={editForm.fare_amount}
+                  onChangeText={(text) => updateEditForm('fare_amount', text)}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Commission Amount */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Driver Commission (₹) *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="wallet-outline" size={18} color={COLORS.warning} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Commission driver pays"
+                  value={editForm.commission_amount}
+                  onChangeText={(text) => updateEditForm('commission_amount', text)}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Customer Pre-Advance */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Customer Pre-Advance (₹)</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="card-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. 100 (optional)"
+                  value={editForm.customer_pre_advance}
+                  onChangeText={(text) => updateEditForm('customer_pre_advance', text)}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Passenger Name */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Passenger Name *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Rahul Sharma"
+                  value={editForm.passenger_name}
+                  onChangeText={(text) => updateEditForm('passenger_name', text)}
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Passenger Phone */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Passenger Phone *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="call-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. 9876543210"
+                  value={editForm.passenger_phone}
+                  onChangeText={(text) => updateEditForm('passenger_phone', text)}
+                  keyboardType="phone-pad"
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Car Type */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Car Type *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={editForm.car_type}
+                  onValueChange={(value) => updateEditForm('car_type', value)}
+                  enabled={!savingTrip}
+                >
+                  <Picker.Item label="Select Car Type" value="" />
+                  {adminTripOptions.carTypes.map((type) => (
+                    <Picker.Item key={type.id} label={type.name} value={type.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Car Model */}
+            {editForm.car_type && adminTripOptions.carModels.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Car Model</Text>
+                <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                  <Picker
+                    selectedValue={editForm.car_model}
+                    onValueChange={(value) => updateEditForm('car_model', value)}
+                    enabled={!savingTrip}
+                  >
+                    <Picker.Item label="Select Car Model" value="" />
+                    {adminTripOptions.carModels.map((model) => (
+                      <Picker.Item key={model.id} label={model.name} value={model.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            )}
+
+            {/* Seater Type */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Seater Type *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={editForm.seater_type}
+                  onValueChange={(value) => updateEditForm('seater_type', value)}
+                  enabled={!savingTrip}
+                >
+                  <Picker.Item label="Select Seater Type" value="" />
+                  {adminTripOptions.seaterTypes.map((seater) => (
+                    <Picker.Item key={seater.id} label={seater.name} value={seater.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Fuel Type */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Fuel Type *</Text>
+              <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                <Picker
+                  selectedValue={editForm.fuel_type}
+                  onValueChange={(value) => updateEditForm('fuel_type', value)}
+                  enabled={!savingTrip}
+                >
+                  <Picker.Item label="Select Fuel Type" value="" />
+                  {adminTripOptions.fuelTypes.map((fuel) => (
+                    <Picker.Item key={fuel.id} label={fuel.name} value={fuel.id} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Package */}
+            {editForm.segment && adminTripOptions.packages.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Package</Text>
+                <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                  <Picker
+                    selectedValue={editForm.package}
+                    onValueChange={(value) => updateEditForm('package', value)}
+                    enabled={!savingTrip}
+                  >
+                    <Picker.Item label="Select Package" value="" />
+                    {adminTripOptions.packages.map((pkg) => (
+                      <Picker.Item key={pkg.id} label={pkg.name} value={pkg.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            )}
+
+            {/* Scheduled Date */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Scheduled Date</Text>
+              <TouchableOpacity
+                style={styles.dateInputContainer}
+                onPress={() => setShowDatePicker(true)}
+                disabled={savingTrip}
+              >
+                <Ionicons name="calendar-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                <Text style={styles.dateText}>
+                  {editForm.created_at.toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Notes */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Special Instructions (Optional)</Text>
+              <View style={[styles.inputContainer, { minHeight: 80, alignItems: 'flex-start', paddingTop: 8 }]}>
+                <Ionicons name="document-text-outline" size={18} color={COLORS.info} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.textInput, { textAlignVertical: 'top' }]}
+                  placeholder="e.g. Special requests, additional notes"
+                  value={editForm.notes}
+                  onChangeText={(text) => updateEditForm('notes', text)}
+                  multiline
+                  numberOfLines={4}
+                  placeholderTextColor={COLORS.textSecondary}
+                  editable={!savingTrip}
+                />
+              </View>
+            </View>
+
+            {/* Toggle Options */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Extra Charges & Options</Text>
+              
+              {/* Combined: Toll, Tax, Hills */}
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
+                onPress={() => {
+                  const newState = !editForm.toll_included;
+                  updateEditForm('toll_included', newState);
+                  updateEditForm('state_tax_included', newState);
+                  updateEditForm('hills_included', newState);
+                }}
+                disabled={savingTrip}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: COLORS.info,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: (editForm.toll_included && editForm.state_tax_included && editForm.hills_included) ? COLORS.info : 'transparent'
+                }}>
+                  {(editForm.toll_included && editForm.state_tax_included && editForm.hills_included) && (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  )}
+                </View>
+                <Text style={{ color: COLORS.text, fontSize: 13 }}>Toll • Tax • Hills Included</Text>
+              </TouchableOpacity>
+
+              {/* Separate: Pet Travelling */}
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
+                onPress={() => updateEditForm('pet_travelling', !editForm.pet_travelling)}
+                disabled={savingTrip}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: COLORS.info,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: editForm.pet_travelling ? COLORS.info : 'transparent'
+                }}>
+                  {editForm.pet_travelling && (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  )}
+                </View>
+                <Text style={{ color: COLORS.text, fontSize: 13 }}>Pet Travelling Allowed</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Date Pickers */}
+            {showDatePicker && (
+              <DateTimePicker
+                value={editForm.created_at}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
+
+            {showReturnDatePicker && (
+              <DateTimePicker
+                value={editForm.return_date || new Date()}
+                mode="date"
+                display="default"
+                onChange={handleReturnDateChange}
+              />
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.formButtonContainer}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setEditingTrip(null);
+                }}
+                disabled={savingTrip}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, savingTrip && styles.buttonDisabled]}
+                onPress={handleSaveTrip}
+                disabled={savingTrip}
+              >
+                {savingTrip ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-done" size={18} color="#fff" />
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -736,6 +1662,25 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
+  tripHeaderRight: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#2196f3',
+  },
+  adminBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   statusDot: {
     width: 10,
     height: 10,
@@ -778,6 +1723,22 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 13,
     flex: 1,
+  },
+  locationLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    minWidth: 50,
+  },
+  tripTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tripTypeText: {
+    color: COLORS.info,
+    fontSize: 13,
+    fontWeight: '600',
   },
   infoRow: {
     flexDirection: 'row',
@@ -942,6 +1903,115 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  
+  // Edit Button Styles
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: COLORS.info,
+    borderWidth: 1,
+    borderColor: COLORS.info,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Edit Modal Styles
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: COLORS.info,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  editModalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  editModalContent: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  formLabel: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  inputIcon: {
+    marginRight: 8,
+    marginTop: 4,
+  },
+  textInput: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  formButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.border,
+    borderWidth: 1,
+    borderColor: COLORS.textSecondary,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   zoomableImageWrapper: {
     width: '100%',
     height: 400,
@@ -990,5 +2060,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
+  },
+
+  // Delete Button and Button Row Styles
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#f44336',
+    borderWidth: 1,
+    borderColor: '#f44336',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+
+  // Date Input Styles
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dateText: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 14,
+    marginLeft: 8,
   },
 });

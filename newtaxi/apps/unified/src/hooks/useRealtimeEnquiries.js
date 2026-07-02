@@ -45,12 +45,17 @@ export function useRealtimeEnquiries({ onNewEnquiry, onEnquiryTaken, onTripUpdat
           const old  = payload.old;
           const uid  = userIdRef.current;
 
-          // Enquiry taken by someone else — remove from available list
+          // Enquiry taken by someone ELSE — remove from available list
+          // Only trigger if:
+          // 1. Status changed from pending to non-pending
+          // 2. AND this vendor didn't accept it
+          // 3. BUT if this vendor DID accept it, keep it in "My Trips"
           if (
             old.status === TRIP_STATUS.PENDING &&
             trip.status !== TRIP_STATUS.PENDING &&
             trip.accepted_by !== uid
           ) {
+            console.log('📤 Trip accepted by another vendor, removing from available list:', trip.id);
             onEnquiryTakenRef.current?.(trip.id);
           }
 

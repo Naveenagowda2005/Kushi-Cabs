@@ -198,11 +198,12 @@ export default function DriverActiveTripScreen({ route, navigation }) {
           storage_url: `data:image/jpeg;base64,${base64Image}`,
         });
 
-      // Update trip with end odometer image
+      // Update trip with end odometer image and end KM
       const { error: updateError } = await supabase
         .from('trips')
         .update({
           end_odometer_url: `data:image/jpeg;base64,${base64Image}`,
+          end_km: parseFloat(endKm) || null,
         })
         .eq('id', activeTrip.id);
 
@@ -426,12 +427,20 @@ export default function DriverActiveTripScreen({ route, navigation }) {
               <Row icon="return-up-back-outline" color="#ff9800" text={`Return: ${activeTrip.return_location}`} />
             </>
           )}
-          {activeTrip.passenger_name && (
+          
+          {/* Display message only when trip hasn't started */}
+          {step === STEPS.ACCEPTED && (
             <>
               <View style={styles.divider} />
-              <Row icon="person-outline" color="#888" text={activeTrip.passenger_name} />
+              <View style={styles.vendorDetailsRow}>
+                <Ionicons name="information-circle-outline" size={16} color="#ff9800" />
+                <Text style={styles.vendorDetailsText}>
+                  Start the trip to get customer details
+                </Text>
+              </View>
             </>
           )}
+
           <View style={styles.farePill}>
             <Text style={styles.fareText}>₹{activeTrip.fare_amount}</Text>
           </View>
@@ -672,8 +681,8 @@ export default function DriverActiveTripScreen({ route, navigation }) {
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Distance Travelled:</Text>
                           <Text style={styles.detailValue}>
-                            {activeTrip?.end_km && activeTrip?.start_km
-                              ? (activeTrip.end_km - activeTrip.start_km).toFixed(2)
+                            {(activeTrip?.end_km || endKm) && (activeTrip?.start_km || startKm)
+                              ? ((parseFloat(activeTrip?.end_km || endKm) - parseFloat(activeTrip?.start_km || startKm))).toFixed(2)
                               : 'N/A'} km
                           </Text>
                         </View>
@@ -819,46 +828,48 @@ function StepIndicator({ current }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
-  center: { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  loadingText: { color: '#888', marginTop: 12, fontSize: 14 },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  center: { flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  loadingText: { color: '#666', marginTop: 12, fontSize: 14 },
   scroll: { padding: 16 },
-  stepBar: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#16213e', paddingHorizontal: 16, paddingVertical: 12 },
+  stepBar: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#f5f5f5', paddingHorizontal: 16, paddingVertical: 12 },
   stepItem: { alignItems: 'center', flex: 1 },
-  stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#444', marginBottom: 4 },
+  stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ddd', marginBottom: 4 },
   stepDotActive: { backgroundColor: '#4caf50' },
-  stepLabel: { color: '#666', fontSize: 10 },
+  stepLabel: { color: '#999', fontSize: 10 },
   stepLabelActive: { color: '#4caf50' },
-  tripCard: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 16 },
+  tripCard: { backgroundColor: '#f9f9f9', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#eee' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
-  rowText: { color: '#fff', fontSize: 15, flex: 1 },
-  divider: { height: 1, backgroundColor: '#0f3460', marginVertical: 8 },
-  farePill: { alignSelf: 'flex-end', backgroundColor: '#1a1a2e', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, marginTop: 8 },
-  fareText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  inProgressBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0a2a0a', borderRadius: 10, padding: 12, marginBottom: 16 },
+  rowText: { color: '#333', fontSize: 15, flex: 1 },
+  divider: { height: 1, backgroundColor: '#e0e0e0', marginVertical: 8 },
+  farePill: { alignSelf: 'flex-end', backgroundColor: '#f0f0f0', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, marginTop: 8 },
+  fareText: { color: '#333', fontWeight: 'bold', fontSize: 16 },
+  inProgressBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#e8f5e9', borderRadius: 10, padding: 12, marginBottom: 16 },
   inProgressText: { color: '#4caf50', fontSize: 14, fontWeight: '600' },
-  actionBtn: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
-  actionBtnComplete: { backgroundColor: '#4caf50' },
-  actionBtnDisabled: { backgroundColor: '#444' },
-  actionBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  actionBtn: { backgroundColor: '#f0f0f0', borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#ddd' },
+  actionBtnComplete: { backgroundColor: '#4caf50', borderColor: '#4caf50' },
+  actionBtnDisabled: { backgroundColor: '#eee', borderColor: '#ccc' },
+  actionBtnText: { color: '#333', fontSize: 18, fontWeight: '700' },
   navigationBtn: { backgroundColor: '#2196f3', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16, gap: 8 },
   navigationBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  paymentCard: { backgroundColor: '#16213e', borderRadius: 14, padding: 24, marginBottom: 16, alignItems: 'center' },
-  paymentTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
-  paymentSubtitle: { color: '#aaa', fontSize: 14, textAlign: 'center', marginBottom: 24 },
-  preAdvanceNote: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0a2a4a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16 },
+  paymentCard: { backgroundColor: '#f9f9f9', borderRadius: 14, padding: 24, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#eee' },
+  paymentTitle: { color: '#333', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
+  paymentSubtitle: { color: '#666', fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  preAdvanceNote: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#e3f2fd', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16 },
   preAdvanceText: { color: '#2196f3', fontSize: 12, fontWeight: '500', flex: 1 },
-  vendorDetailsBox: { width: '100%', backgroundColor: '#2a1a00', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#ff9800' },
+  vendorDetailsBox: { width: '100%', backgroundColor: '#fff8e1', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#ffe0b2' },
   vendorDetailsTitle: { color: '#ff9800', fontSize: 12, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   vendorDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  vendorDetailLabel: { color: '#888', fontSize: 12, fontWeight: '600', minWidth: 50 },
-  vendorDetailValue: { color: '#fff', fontSize: 12, fontWeight: '600', flex: 1 },
+  vendorDetailLabel: { color: '#666', fontSize: 12, fontWeight: '600', minWidth: 50 },
+  vendorDetailValue: { color: '#333', fontSize: 12, fontWeight: '600', flex: 1 },
+  vendorDetailsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, marginVertical: 4 },
+  vendorDetailsText: { color: '#ff9800', fontSize: 13, fontWeight: '600', flex: 1 },
   callBtnVendor: { backgroundColor: '#ff9800', borderRadius: 6, padding: 6, justifyContent: 'center', alignItems: 'center' },
-  paymentDetails: { width: '100%', backgroundColor: '#0f3460', borderRadius: 10, padding: 16, marginBottom: 24 },
+  paymentDetails: { width: '100%', backgroundColor: '#f5f5f5', borderRadius: 10, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#eee' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
-  detailRowTotal: { borderTopWidth: 1, borderTopColor: '#1a1a2e', paddingTop: 12, marginTop: 8 },
-  detailLabel: { color: '#aaa', fontSize: 13, flex: 1, flexWrap: 'wrap', paddingRight: 8 },
-  detailValue: { color: '#fff', fontSize: 15, fontWeight: '600', textAlign: 'right' },
+  detailRowTotal: { borderTopWidth: 1, borderTopColor: '#e0e0e0', paddingTop: 12, marginTop: 8 },
+  detailLabel: { color: '#666', fontSize: 13, flex: 1, flexWrap: 'wrap', paddingRight: 8 },
+  detailValue: { color: '#333', fontSize: 15, fontWeight: '600', textAlign: 'right' },
   detailValueTotal: { color: '#4caf50', fontSize: 18, fontWeight: '700' },
   detailValueVendor: { color: '#ff9800', fontSize: 18, fontWeight: '700' },
   actionBtnConfirm: { backgroundColor: '#4caf50', width: '100%' },
@@ -867,42 +878,42 @@ const styles = StyleSheet.create({
   needHelpBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   cancelBtn: { borderWidth: 1, borderColor: '#f44336', borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 10 },
   cancelBtnText: { color: '#f44336', fontSize: 15, fontWeight: '600' },
-  doneTitle: { color: '#fff', fontSize: 28, fontWeight: 'bold', marginTop: 20 },
+  doneTitle: { color: '#333', fontSize: 28, fontWeight: 'bold', marginTop: 20 },
   doneEarnings: { color: '#4caf50', fontSize: 42, fontWeight: 'bold', marginTop: 8 },
-  doneSubtext: { color: '#888', fontSize: 14, marginTop: 4, marginBottom: 16, fontWeight: '500' },
-  doneTripCard: { backgroundColor: '#16213e', borderRadius: 12, padding: 14, marginTop: 16, marginBottom: 8, width: '90%', gap: 6 },
+  doneSubtext: { color: '#666', fontSize: 14, marginTop: 4, marginBottom: 16, fontWeight: '500' },
+  doneTripCard: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 14, marginTop: 16, marginBottom: 8, width: '90%', gap: 6, borderWidth: 1, borderColor: '#eee' },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  doneTripText: { color: '#ccc', fontSize: 13, flex: 1 },
-  collectQuestion: { color: '#fff', fontSize: 17, fontWeight: '600', textAlign: 'center', marginTop: 24, marginBottom: 20, paddingHorizontal: 20 },
+  doneTripText: { color: '#666', fontSize: 13, flex: 1 },
+  collectQuestion: { color: '#333', fontSize: 17, fontWeight: '600', textAlign: 'center', marginTop: 24, marginBottom: 20, paddingHorizontal: 20 },
   collectBtns: { width: '90%', gap: 12 },
   collectYes: { backgroundColor: '#4caf50', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   collectYesText: { color: '#fff', fontSize: 17, fontWeight: '700' },
   collectNo: { backgroundColor: '#ff9800', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   collectNoText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  creatorDetailsBox: { width: '100%', backgroundColor: '#2a1a00', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#ff9800' },
+  creatorDetailsBox: { width: '100%', backgroundColor: '#fff8e1', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#ffe0b2' },
   creatorDetailsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   creatorDetailsTitle: { color: '#ff9800', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  creatorDetailsNote: { color: '#aaa', fontSize: 12, marginBottom: 8 },
+  creatorDetailsNote: { color: '#666', fontSize: 12, marginBottom: 8 },
   creatorDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  creatorDetailLabel: { color: '#888', fontSize: 12, fontWeight: '600', minWidth: 80 },
-  creatorDetailValue: { color: '#fff', fontSize: 12, fontWeight: '600', flex: 1 },
+  creatorDetailLabel: { color: '#666', fontSize: 12, fontWeight: '600', minWidth: 80 },
+  creatorDetailValue: { color: '#333', fontSize: 12, fontWeight: '600', flex: 1 },
   callBtn: { backgroundColor: '#ff9800', borderRadius: 6, padding: 6, justifyContent: 'center', alignItems: 'center' },
-  odometerCard: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#0f3460' },
+  odometerCard: { backgroundColor: '#f9f9f9', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#eee' },
   odometerHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  odometerLabel: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  odometerLabel: { color: '#333', fontSize: 16, fontWeight: '600' },
   odometerInput: { 
-    backgroundColor: '#0f3460',
+    backgroundColor: '#f5f5f5',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#2196f3',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#fff',
+    color: '#333',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
   },
-  odometerHint: { color: '#888', fontSize: 12, fontStyle: 'italic', marginBottom: 12 },
+  odometerHint: { color: '#666', fontSize: 12, fontStyle: 'italic', marginBottom: 12 },
   cameraCaptureBtn: {
     backgroundColor: '#2196f3',
     borderRadius: 10,

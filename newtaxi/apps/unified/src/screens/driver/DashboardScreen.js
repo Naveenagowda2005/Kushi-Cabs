@@ -17,7 +17,7 @@ import WalletBanner from '../../components/WalletBanner';
 import { COLORS } from '../../constants';
 import { initializeAudio, cleanup } from '../../services/soundService';
 
-export default function DriverDashboardScreen({ navigation }) {
+export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const { user, signOut } = useAuth();
   const { isMuted, setIsMuted, updateAlertData } = useAlert();
   
@@ -79,8 +79,27 @@ export default function DriverDashboardScreen({ navigation }) {
   );
 
   // Sync available trips to display trips (for skip functionality)
+  // Sort with both admin-assigned and vendor-assigned trips first (priority)
   useEffect(() => {
-    setDisplayTrips(availableTrips);
+    const sorted = [...availableTrips].sort((a, b) => {
+      // Check if trips are assigned (admin or vendor)
+      const aIsAssigned = a.is_admin_trip || a.driver_id;
+      const bIsAssigned = b.is_admin_trip || b.driver_id;
+      
+      // Assigned trips first (both admin and vendor)
+      if (aIsAssigned && !bIsAssigned) return -1;
+      if (!aIsAssigned && bIsAssigned) return 1;
+      
+      // If both are assigned or both are not, sort by type (admin first)
+      if (aIsAssigned && bIsAssigned) {
+        if (a.is_admin_trip && !b.is_admin_trip) return -1;
+        if (!a.is_admin_trip && b.is_admin_trip) return 1;
+      }
+      
+      // Then by creation date (newest first)
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+    setDisplayTrips(sorted);
   }, [availableTrips]);
 
   // If driver already has an active/in-progress trip, redirect to ActiveTrip screen
@@ -106,12 +125,14 @@ export default function DriverDashboardScreen({ navigation }) {
     },
     onTripUpdated: (trip) => {
       console.log('Trip updated:', trip);
-      // If this driver's trip was accepted, navigate to ActiveTrip
+      // If this driver's trip was accepted or assigned by vendor, refetch active trip
       if (
         (trip.status === 'accepted' || trip.status === 'in_progress') &&
-        trip.accepted_by === user?.id
+        (trip.accepted_by === user?.id || trip.driver_id === user?.id)
       ) {
-        navigation.navigate('ActiveTrip', { trip });
+        console.log('✅ Driver assigned trip detected! Refetching active trip...');
+        refetchActiveTrip(); // Refetch the active trip to pick up the change
+        // The useEffect below will then handle navigation to ActiveTrip screen
       } else {
         refetch();
       }
@@ -301,7 +322,7 @@ export default function DriverDashboardScreen({ navigation }) {
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={styles.tripHistoryCard}
-              onPress={() => navigation.navigate('TripHistory')}
+              onPress={() => onSwitchTab && onSwitchTab('History')}
             >
               <View style={styles.tripHistoryHeader}>
                 <View style={styles.tripHistoryInfo}>
@@ -357,7 +378,7 @@ export default function DriverDashboardScreen({ navigation }) {
               {item.status === 'completed' && (
                 <TouchableOpacity 
                   style={styles.viewDetailsBtn}
-                  onPress={() => navigation.navigate('TripHistory')}
+                  onPress={() => onSwitchTab && onSwitchTab('History')}
                 >
                   <Ionicons name="eye-outline" size={16} color="#fff" />
                   <Text style={styles.viewDetailsBtnText}>View Details</Text>

@@ -15,7 +15,7 @@ export function useSystemSettings() {
       
       const { data, error: fetchError } = await supabase
         .from('app_settings')
-        .select('*')
+        .select('id, minimum_wallet_balance_for_drivers')
         .eq('id', 'global')
         .single();
 
@@ -31,10 +31,13 @@ export function useSystemSettings() {
         const balance = data.minimum_wallet_balance_for_drivers !== undefined && data.minimum_wallet_balance_for_drivers !== null 
           ? data.minimum_wallet_balance_for_drivers 
           : 500;
-        console.log('✅ Setting minimum wallet balance to:', balance);
+        console.log('✅ Setting minimum wallet balance to:', balance, 'Type:', typeof balance);
         setSettings({
-          minimumWalletBalance: balance,
+          minimumWalletBalance: Number(balance), // Ensure it's a number
         });
+      } else {
+        console.warn('⚠️ No data returned from app_settings query, using default');
+        setSettings({ minimumWalletBalance: 500 });
       }
     } catch (err) {
       console.error('useSystemSettings error:', err);

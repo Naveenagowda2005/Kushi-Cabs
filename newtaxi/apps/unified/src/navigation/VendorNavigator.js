@@ -18,6 +18,7 @@ import VendorProfileScreen from '../screens/vendor/ProfileScreen';
 import VendorSettingsScreen from '../screens/vendor/SettingsScreen';
 import VendorDocumentUploadScreen from '../screens/vendor/VendorDocumentUploadScreen';
 import VendorWaitingForApprovalScreen from '../screens/vendor/VendorWaitingForApprovalScreen';
+import AssignDriverScreen from '../screens/vendor/AssignDriverScreen';
 import CompletedTripDetailScreen from '../screens/driver/CompletedTripDetailScreen';
 import PolicyScreen from '../screens/common/PolicyScreen';
 import ViewPolicyScreen from '../screens/common/ViewPolicyScreen';
@@ -328,6 +329,11 @@ export default function VendorNavigator() {
         name="EnquiryDetail" 
         component={VendorEnquiryDetailScreen} 
         options={{ title: 'Enquiry Details', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
+      />
+      <Stack.Screen 
+        name="AssignDriver"
+        component={AssignDriverScreen}
+        options={{ title: 'Assign Driver', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }}
       />
       <Stack.Screen 
         name="CreateTrip"    

@@ -53,25 +53,24 @@ export default function SuperAdminEnquiriesScreen({ navigation }) {
   const fetchEnquiries = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('🔄 Fetching enquiries from trips table');
+      
+      // First, fetch all trips without joins to avoid relationship errors
       const { data, error } = await supabase
         .from('trips')
-        .select(`
-          *,
-          drivers:driver_id (
-            users ( full_name, phone )
-          ),
-          vendors:vendor_id (
-            users ( full_name ),
-            company_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching trips:', error);
+        throw error;
+      }
+
+      console.log(`✅ Fetched ${data?.length || 0} trips`);
       setEnquiries(data || []);
     } catch (error) {
-      console.error('Error fetching enquiries:', error);
-      Alert.alert('Error', 'Failed to load enquiries');
+      console.error('❌ Error fetching enquiries:', error);
+      Alert.alert('Error', 'Failed to load enquiries: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -161,16 +160,10 @@ export default function SuperAdminEnquiriesScreen({ navigation }) {
         </View>
       </View>
 
-      {enquiry.vendors?.company_name && (
+      {enquiry.created_by && (
         <View style={styles.detailItem}>
-          <Ionicons name="business-outline" size={14} color={COLORS.textSecondary} />
-          <Text style={styles.detailText}>Vendor: {enquiry.vendors.company_name}</Text>
-        </View>
-      )}
-      {enquiry.drivers?.users?.full_name && (
-        <View style={[styles.detailItem, { marginTop: 2 }]}>
           <Ionicons name="person-outline" size={14} color={COLORS.textSecondary} />
-          <Text style={styles.detailText}>Driver: {enquiry.drivers.users.full_name}</Text>
+          <Text style={styles.detailText}>Created by: {enquiry.created_by.substring(0, 8)}...</Text>
         </View>
       )}
 
@@ -210,20 +203,13 @@ export default function SuperAdminEnquiriesScreen({ navigation }) {
               <Text style={styles.modalText}>Status: {getStatusText(selectedEnquiry.status)}</Text>
               <Text style={styles.modalText}>Scheduled: {new Date(selectedEnquiry.scheduled_at || selectedEnquiry.created_at).toLocaleString()}</Text>
             </View>
-            {selectedEnquiry.vendors && (
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Vendor</Text>
-                <Text style={styles.modalText}>Company: {selectedEnquiry.vendors.company_name || 'N/A'}</Text>
-                <Text style={styles.modalText}>Owner: {selectedEnquiry.vendors.users?.full_name || 'N/A'}</Text>
-              </View>
-            )}
-            {selectedEnquiry.drivers && (
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Driver</Text>
-                <Text style={styles.modalText}>Name: {selectedEnquiry.drivers.users?.full_name || 'N/A'}</Text>
-                <Text style={styles.modalText}>Phone: {selectedEnquiry.drivers.users?.phone || 'N/A'}</Text>
-              </View>
-            )}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Additional Info</Text>
+              <Text style={styles.modalText}>Trip ID: {selectedEnquiry.id}</Text>
+              <Text style={styles.modalText}>Fixed KM: {selectedEnquiry.fixed_km || 'N/A'}</Text>
+              <Text style={styles.modalText}>Commission: ₹{selectedEnquiry.commission_amount || 0}</Text>
+              <Text style={styles.modalText}>Toll Included: {selectedEnquiry.toll_included ? 'Yes' : 'No'}</Text>
+            </View>
           </View>
         )}
       </View>

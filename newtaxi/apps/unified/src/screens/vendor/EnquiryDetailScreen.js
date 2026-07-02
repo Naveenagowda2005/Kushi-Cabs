@@ -122,12 +122,19 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
         <View style={styles.section}>
           <InfoRow icon="location"             label="Pickup"       value={trip.pickup_location} />
           <InfoRow icon="flag"                 label="Drop-off"     value={trip.dropoff_location} />
-          {trip.passenger_name && (
-            <InfoRow icon="person-outline"     label="Passenger"    value={trip.passenger_name} />
+          
+          {/* Show passenger details only after trip is accepted */}
+          {trip.status !== 'pending' && (
+            <>
+              {trip.passenger_name && (
+                <InfoRow icon="person-outline"     label="Passenger"    value={trip.passenger_name} />
+              )}
+              {trip.passenger_phone && (
+                <InfoRow icon="call-outline"       label="Phone"        value={trip.passenger_phone} />
+              )}
+            </>
           )}
-          {trip.passenger_phone && (
-            <InfoRow icon="call-outline"       label="Phone"        value={trip.passenger_phone} />
-          )}
+          
           <InfoRow icon="time-outline"         label="Scheduled"    value={
             trip.scheduled_at ? new Date(trip.scheduled_at).toLocaleString() : 'ASAP'
           } />
@@ -205,17 +212,19 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
         </View>
       )}
 
-      {/* Cancel/Release button — for accepted trips the vendor owns */}
+      {/* Cancel/Release button — for accepted trips the vendor owns, disabled if driver assigned */}
       {readOnly && (trip.status === 'accepted' || trip.status === 'in_progress') && (
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.cancelBtn, cancelling && styles.btnDisabled]}
+            style={[styles.cancelBtn, cancelling && styles.btnDisabled, trip.driver_id && styles.cancelBtnDisabled]}
             onPress={handleCancel}
-            disabled={cancelling}
+            disabled={cancelling || !!trip.driver_id}
           >
             {cancelling
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.cancelBtnText}>Release Trip Back to Pool</Text>
+              : <Text style={[styles.cancelBtnText, trip.driver_id && styles.cancelBtnDisabledText]}>
+                  {trip.driver_id ? 'Driver Assigned - Cannot Release' : 'Release Trip Back to Pool'}
+                </Text>
             }
           </TouchableOpacity>
         </View>
@@ -225,7 +234,7 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f3460' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { padding: 20 },
   header: {
     flexDirection: 'row',
@@ -235,7 +244,7 @@ const styles = StyleSheet.create({
   },
   fare: { color: '#4caf50', fontSize: 32, fontWeight: 'bold' },
   section: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#f5f5f5',
     borderRadius: 14,
     padding: 16,
     gap: 16,
@@ -243,17 +252,17 @@ const styles = StyleSheet.create({
   },
   infoRow: { flexDirection: 'row', alignItems: 'flex-start' },
   infoIcon: { marginRight: 12, marginTop: 2 },
-  infoLabel: { color: '#888', fontSize: 12, marginBottom: 2 },
-  infoValue: { color: '#fff', fontSize: 15 },
+  infoLabel: { color: '#999', fontSize: 12, marginBottom: 2 },
+  infoValue: { color: '#333', fontSize: 15 },
   footer: {
     padding: 20,
     paddingBottom: 36,
-    backgroundColor: '#0f3460',
+    backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#16213e',
+    borderTopColor: '#e0e0e0',
   },
   acceptBtn: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#4caf50',
     borderRadius: 14,
     padding: 18,
     alignItems: 'center',
@@ -268,6 +277,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtnText: { color: '#f44336', fontSize: 16, fontWeight: '600' },
+  cancelBtnDisabled: {
+    borderColor: '#ccc',
+    backgroundColor: '#f5f5f5',
+    opacity: 0.6,
+  },
+  cancelBtnDisabledText: {
+    color: '#ccc',
+  },
   deleteBtn: {
     backgroundColor: '#f44336',
     borderRadius: 14,

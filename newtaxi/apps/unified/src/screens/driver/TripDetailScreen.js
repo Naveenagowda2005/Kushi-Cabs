@@ -9,6 +9,7 @@ import { useWallet } from '../../hooks/useDriverWallet';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import { initiateDeposit } from '../../services/paymentService';
 import { acceptTrip } from '../../services/tripService';
+import { stopSound } from '../../services/soundService';
 import { supabase } from '../../lib/supabase';
 import { PAYMENT_GATEWAYS, TRIP_STATUS, TRANSACTION_TYPES } from '../../constants';
 
@@ -18,17 +19,20 @@ export default function DriverTripDetailScreen({ route, navigation }) {
   const { wallet, refetch: refetchWallet } = useWallet(user?.id);
   const { settings } = useSystemSettings();
   const [paying, setPaying] = useState(false);
+  const [tripData, setTripData] = useState(trip);
 
   // Has this driver already paid commission for this trip?
-  const commissionPaid = trip.commission_paid && trip.accepted_by === user?.id;
-  const commissionAmount = trip.commission_amount || 0;
-  const customerPreAdvance = trip.customer_pre_advance || 0;
+  const commissionPaid = tripData.commission_paid && tripData.accepted_by === user?.id;
+  const commissionAmount = tripData.commission_amount || 0;
+  const customerPreAdvance = tripData.customer_pre_advance || 0;
   
   // Commission to pay by driver = Commission - Customer Pre-Advance (minimum 0)
   const commissionToPay = Math.max(0, commissionAmount - customerPreAdvance);
   
   const hasEnoughBalance = (wallet?.balance || 0) >= commissionToPay;
-  const minWalletBalance = settings.minimumWalletBalance || 500;
+  const minWalletBalance = settings.minimumWalletBalance !== undefined && settings.minimumWalletBalance !== null 
+    ? settings.minimumWalletBalance 
+    : 500;
   const hasMinimumBalance = (wallet?.balance || 0) >= minWalletBalance;
 
   // ── Accept trip after payment ──────────────
@@ -37,11 +41,11 @@ export default function DriverTripDetailScreen({ route, navigation }) {
     const { error: markErr } = await supabase
       .from('trips')
       .update({ commission_paid: true })
-      .eq('id', trip.id);
+      .eq('id', tripData.id);
     if (markErr) throw new Error('Failed to mark commission paid: ' + markErr.message);
 
     // Accept trip using atomic RPC function
-    const result = await acceptTrip(trip.id, user.id);
+    const result = await acceptTrip(tripData.id, user.id);
     
     if (!result.success) {
       throw new Error(result.error || 'Failed to accept trip');
@@ -73,11 +77,16 @@ export default function DriverTripDetailScreen({ route, navigation }) {
               setPaying(true);
               try {
                 await acceptTripAfterPayment();
+                
+                // STOP SOUND IMMEDIATELY after accept succeeds
+                console.log('✅ Trip accepted - stopping sound immediately');
+                await stopSound().catch(err => console.warn('Error stopping sound:', err));
+                
                 await refetchWallet();
 
                 // Fetch fresh trip data
                 const { data: fullTrip, error: tripErr } = await supabase
-                  .from('trips').select('*').eq('id', trip.id).single();
+                  .from('trips').select('*').eq('id', tripData.id).single();
 
                 if (tripErr) throw tripErr;
 
@@ -145,10 +154,15 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
       // Payment successful - now accept the trip
       await acceptTripAfterPayment();
+      
+      // STOP SOUND IMMEDIATELY after accept succeeds
+      console.log('✅ Trip accepted - stopping sound immediately');
+      await stopSound().catch(err => console.warn('Error stopping sound:', err));
+      
       await refetchWallet();
 
       const { data: fullTrip, error: tripErr } = await supabase
-        .from('trips').select('*').eq('id', trip.id).single();
+        .from('trips').select('*').eq('id', tripData.id).single();
 
       if (tripErr) throw tripErr;
 
@@ -184,7 +198,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
   function InfoRow({ icon, label, value, highlight }) {
     return (
       <View style={styles.infoRow}>
-        <Ionicons name={icon} size={20} color="#1a1a2e" style={styles.infoIcon} />
+        <Ionicons name={icon} size={20} color="#333" style={styles.infoIcon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.infoLabel}>{label}</Text>
           <Text style={[styles.infoValue, highlight && styles.infoValueHighlight]}>{value || '—'}</Text>
@@ -195,12 +209,18 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} style={{ backgroundColor: '#ffffff' }}>
 
         {/* Fare card */}
         <View style={styles.fareCard}>
           <Text style={styles.fareLabel}>Driver Earning</Text>
-          <Text style={styles.fareAmount}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
+          <Text style={styles.fareAmount}>₹{(tripData.fare_amount - commissionAmount).toFixed(2)}</Text>
+          {tripData.is_admin_trip && (
+            <View style={styles.adminBadge}>
+              <Ionicons name="shield-checkmark" size={12} color="#fff" />
+              <Text style={styles.adminBadgeText}>Admin Assigned</Text>
+            </View>
+          )}
           {commissionAmount > 0 && (
             <View style={styles.commissionBadge}>
               <Ionicons name="trending-up-outline" size={14} color="#fff" />
@@ -230,13 +250,13 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
         {/* Trip info — always visible */}
         <View style={styles.section}>
-          <InfoRow icon="location"         label="Pickup"    value={trip.pickup_location} />
-          <InfoRow icon="flag"             label="Drop-off"  value={trip.dropoff_location} />
+          <InfoRow icon="location"         label="Pickup"    value={tripData.pickup_location} />
+          <InfoRow icon="flag"             label="Drop-off"  value={tripData.dropoff_location} />
           <InfoRow icon="time-outline"     label="Scheduled" value={
-            trip.scheduled_at ? new Date(trip.scheduled_at).toLocaleString() : 'ASAP'
+            tripData.scheduled_at ? new Date(tripData.scheduled_at).toLocaleString() : 'ASAP'
           } />
           <InfoRow icon="calendar-outline" label="Created"   value={
-            new Date(trip.created_at).toLocaleString()
+            new Date(tripData.created_at).toLocaleString()
           } />
         </View>
 
@@ -255,8 +275,8 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
           {commissionPaid ? (
             <>
-              <InfoRow icon="person-outline" label="Passenger Name"  value={trip.passenger_name} highlight />
-              <InfoRow icon="call-outline"   label="Passenger Phone" value={trip.passenger_phone} highlight />
+              <InfoRow icon="person-outline" label="Passenger Name"  value={tripData.passenger_name} highlight />
+              <InfoRow icon="call-outline"   label="Passenger Phone" value={tripData.passenger_phone} highlight />
             </>
           ) : (
             <View style={styles.lockedContent}>
@@ -314,7 +334,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
         ) : (
           <TouchableOpacity
             style={styles.startBtn}
-            onPress={() => navigation.replace('ActiveTrip', { trip })}
+            onPress={() => navigation.replace('ActiveTrip', { trip: tripData })}
           >
             <Ionicons name="navigate-outline" size={20} color="#fff" />
             <Text style={styles.startBtnText}>Go to Active Trip</Text>
@@ -326,47 +346,49 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { padding: 20, paddingBottom: 20 },
 
-  fareCard: { backgroundColor: '#1a1a2e', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16 },
-  fareLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
-  fareAmount: { color: '#fff', fontSize: 42, fontWeight: 'bold', marginTop: 4 },
-  commissionBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginTop: 10 },
+  fareCard: { backgroundColor: '#f5f5f5', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#e0e0e0' },
+  fareLabel: { color: '#666', fontSize: 14 },
+  fareAmount: { color: '#333', fontSize: 42, fontWeight: 'bold', marginTop: 4 },
+  commissionBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#666', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginTop: 10 },
   commissionBadgeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  adminBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#64b5f6', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8, borderWidth: 1.5, borderColor: '#90caf9' },
+  adminBadgeText: { color: '#000', fontSize: 13, fontWeight: '700' },
   paymentBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ff9800', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8 },
   paymentBadgeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   coveredBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#4caf50', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8 },
   coveredBadgeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
-  section: { backgroundColor: '#16213e', borderRadius: 14, padding: 16, marginBottom: 14, gap: 14 },
+  section: { backgroundColor: '#f5f5f5', borderRadius: 14, padding: 16, marginBottom: 14, gap: 14, borderWidth: 1, borderColor: '#e0e0e0' },
   sectionLocked: { borderWidth: 1, borderColor: '#ff980040' },
   lockHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   lockTitle: { color: '#ff9800', fontSize: 13, fontWeight: '600' },
   lockTitleUnlocked: { color: '#4caf50' },
   lockedContent: { gap: 10 },
-  lockedText: { color: '#888', fontSize: 12, lineHeight: 18 },
+  lockedText: { color: '#666', fontSize: 12, lineHeight: 18 },
   lockedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   lockedValue: { color: '#aaa', fontSize: 16, letterSpacing: 4 },
 
   infoRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  infoIcon: { marginRight: 12, marginTop: 2 },
-  infoLabel: { color: '#888', fontSize: 12, marginBottom: 2 },
-  infoValue: { color: '#fff', fontSize: 15 },
+  infoIcon: { marginRight: 12, marginTop: 2, color: '#333' },
+  infoLabel: { color: '#666', fontSize: 12, marginBottom: 2 },
+  infoValue: { color: '#333', fontSize: 15, fontWeight: '500' },
   infoValueHighlight: { color: '#4caf50', fontWeight: '600', fontSize: 16 },
 
-  walletCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0a2a0a', borderRadius: 12, padding: 14, gap: 12, marginBottom: 8 },
-  walletCardLow: { backgroundColor: '#2a1a00' },
-  walletLabel: { color: '#888', fontSize: 11 },
+  walletCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e8f5e9', borderRadius: 12, padding: 14, gap: 12, marginBottom: 8, borderWidth: 1, borderColor: '#c8e6c9' },
+  walletCardLow: { backgroundColor: '#fff3e0', borderColor: '#ffe0b2' },
+  walletLabel: { color: '#666', fontSize: 11 },
   walletAmount: { color: '#4caf50', fontSize: 18, fontWeight: 'bold' },
   walletAmountLow: { color: '#ff9800' },
   walletShort: { color: '#ff9800', fontSize: 11, textAlign: 'right' },
 
-  footer: { padding: 20, paddingBottom: 36, backgroundColor: '#1a1a2e', borderTopWidth: 1, borderTopColor: '#16213e' },
+  footer: { padding: 20, paddingBottom: 36, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e0e0e0' },
   payBtn: { backgroundColor: '#4caf50', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  gatewayBtn: { backgroundColor: '#0f3460', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 12 },
+  gatewayBtn: { backgroundColor: '#2196f3', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 12 },
   payBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  startBtn: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  startBtn: { backgroundColor: '#4caf50', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   startBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  btnDisabled: { backgroundColor: '#444' },
+  btnDisabled: { backgroundColor: '#999' },
 });

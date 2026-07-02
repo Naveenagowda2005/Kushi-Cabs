@@ -83,7 +83,10 @@ function DashboardWithTabs({ route, navigation }) {
   }, [activeTab, screenNavigation]);
 
   // Pass navigation to child screens
-  const screenProps = { navigation: screenNavigation };
+  const screenProps = { 
+    navigation: screenNavigation,
+    onSwitchTab: handleTabPress,
+  };
 
   if (activeTab === 'Trips') {
     return <DriverDashboardScreen {...screenProps} />;
@@ -101,8 +104,8 @@ function TripsStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#001a33' },
-        headerTintColor: COLORS.textLight,
+        headerStyle: { backgroundColor: '#ffffff' },
+        headerTintColor: '#333',
       }}
     >
       <Stack.Screen 
@@ -118,7 +121,7 @@ function TripsStack() {
       <Stack.Screen 
         name="ActiveTrip"  
         component={DriverActiveTripScreen}  
-        options={{ title: 'Active Trip', headerBackVisible: false }} 
+        options={{ title: 'Active Trip' }} 
       />
       <Stack.Screen 
         name="TripHistory" 
@@ -186,6 +189,7 @@ function ProfileStack() {
 export default function DriverNavigator() {
   const [showWaitingScreen, setShowWaitingScreen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initialRoute, setInitialRoute] = useState('Dashboard');
 
   useEffect(() => {
     // Check driver's verification status on mount
@@ -299,9 +303,10 @@ export default function DriverNavigator() {
     <Stack.Navigator
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: '#001a33' },
-        headerTintColor: COLORS.textLight,
+        headerStyle: { backgroundColor: '#ffffff' },
+        headerTintColor: '#333',
       }}
+      initialRouteName={initialRoute}
     >
       <Stack.Screen
         name="Dashboard"
@@ -312,14 +317,25 @@ export default function DriverNavigator() {
         }}
       />
       <Stack.Screen 
-        name="TripDetail"  
-        component={DriverTripDetailScreen}  
-        options={{ title: 'Trip Details' }} 
-      />
-      <Stack.Screen 
         name="ActiveTrip"  
         component={DriverActiveTripScreen}  
-        options={{ title: 'Active Trip' }} 
+        options={{ 
+          title: 'Active Trip',
+          headerStyle: { backgroundColor: '#ffffff' },
+          headerTintColor: '#333',
+          headerTitleStyle: { color: '#333', fontWeight: '600' },
+          headerBackVisible: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="TripDetail"  
+        component={DriverTripDetailScreen}  
+        options={{ 
+          title: 'Trip Details',
+          headerStyle: { backgroundColor: '#ffffff' },
+          headerTintColor: '#333',
+          headerTitleStyle: { color: '#333', fontWeight: '600' },
+        }} 
       />
       <Stack.Screen 
         name="CompletedTripDetail" 
@@ -368,9 +384,9 @@ export default function DriverNavigator() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#001a33',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#0d0f1a',
+    borderBottomColor: '#e0e0e0',
     paddingVertical: 8,
     paddingHorizontal: 8,
   },
@@ -391,7 +407,7 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#fff',
+    color: '#666',
   },
   tabLabelActive: {
     color: COLORS.driver.secondary,

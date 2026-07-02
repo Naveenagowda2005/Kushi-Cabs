@@ -310,18 +310,29 @@ export const stopSound = async () => {
     stopVibration();
     
     if (soundObject) {
-      if (soundObject._vibrationInterval) {
-        clearInterval(soundObject._vibrationInterval);
-        console.log('🔇 Vibration interval cleared');
+      // Check if sound is actually loaded before trying to stop
+      try {
+        const status = await soundObject.getStatusAsync();
+        if (status && status.isLoaded) {
+          if (soundObject._vibrationInterval) {
+            clearInterval(soundObject._vibrationInterval);
+            console.log('🔇 Vibration interval cleared');
+          }
+          
+          await soundObject.stopAsync();
+          await soundObject.unloadAsync();
+          console.log('🔇 Sound stopped and unloaded');
+        }
+      } catch (statusErr) {
+        console.warn('⚠️ Could not get sound status:', statusErr.message);
       }
       
-      await soundObject.stopAsync();
-      await soundObject.unloadAsync();
       soundObject = null;
-      console.log('🔇 Sound stopped');
+    } else {
+      console.log('⚠️ No sound object to stop');
     }
   } catch (error) {
-    console.error('❌ Error stopping sound:', error);
+    console.error('❌ Error stopping sound:', error.message);
   }
 };
 

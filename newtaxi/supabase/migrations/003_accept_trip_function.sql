@@ -22,12 +22,21 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'Trip not found');
   END IF;
 
-  IF v_trip.status <> 'pending' THEN
-    RETURN json_build_object('success', false, 'error', 'Trip already accepted or unavailable');
-  END IF;
-
   -- Role-specific checks
   IF p_role = 'driver' THEN
+    -- For drivers: check status based on whether trip is vendor-assigned
+    IF v_trip.driver_id IS NOT NULL THEN
+      -- Vendor-assigned trip: allow 'pending' OR 'accepted' status
+      IF v_trip.status NOT IN ('pending', 'accepted') THEN
+        RETURN json_build_object('success', false, 'error', 'Trip already accepted or unavailable');
+      END IF;
+    ELSE
+      -- Public trip: only allow 'pending' status
+      IF v_trip.status <> 'pending' THEN
+        RETURN json_build_object('success', false, 'error', 'Trip already accepted or unavailable');
+      END IF;
+    END IF;
+
     -- Check driver doesn't already have an active trip
     SELECT * INTO v_driver FROM drivers WHERE user_id = p_user_id;
     IF v_driver.current_trip_id IS NOT NULL THEN
@@ -40,9 +49,9 @@ BEGIN
       RETURN json_build_object('success', false, 'error', 'Insufficient wallet balance');
     END IF;
 
-    -- Assign trip to driver
+    -- Assign trip to driver (update status to in_progress)
     UPDATE trips SET
-      status      = 'accepted',
+      status      = 'in_progress',
       driver_id   = v_driver.id,
       accepted_by = p_user_id,
       accepted_at = NOW()
@@ -55,6 +64,11 @@ BEGIN
     WHERE user_id = p_user_id;
 
   ELSIF p_role = 'vendor' THEN
+    -- Vendor must only accept pending trips
+    IF v_trip.status <> 'pending' THEN
+      RETURN json_build_object('success', false, 'error', 'Trip already accepted or unavailable');
+    END IF;
+
     -- Vendor must accept within 5-min window
     IF NOW() > v_trip.vendor_visible_until THEN
       RETURN json_build_object('success', false, 'error', 'Vendor acceptance window has expired');

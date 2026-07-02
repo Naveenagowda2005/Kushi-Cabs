@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, LogBox } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+
+// Suppress the text strings warning for React Native compatibility
+LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -10,17 +13,11 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
   const [seaterType, setSeaterType] = useState(null);
   const [fuelType, setFuelType] = useState(null);
   const [packageName, setPackageName] = useState(null);
-  const [creatorName, setCreatorName] = useState(null);
-  const [creatorPhone, setCreatorPhone] = useState(null);
 
   // Get segment name directly from enriched data (already fetched by hook)
   const segmentName = trip.segment_name || 'ONE WAY';
 
   const commissionAmount = trip.commission_amount || 0;
-  const customerPreAdvance = trip.customer_pre_advance || 0;
-  
-  // Commission to pay by driver = Commission - Customer Pre-Advance (minimum 0)
-  const commissionToPay = Math.max(0, commissionAmount - customerPreAdvance);
 
   useEffect(() => {
     const fetchCarDetails = async () => {
@@ -65,26 +62,7 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
       }
     };
 
-    const fetchCreatorDetails = async () => {
-      try {
-        if (trip.created_by) {
-          const { data: creator } = await supabase
-            .from('users')
-            .select('full_name, phone')
-            .eq('id', trip.created_by)
-            .maybeSingle();
-          if (creator) {
-            setCreatorName(creator.full_name);
-            setCreatorPhone(creator.phone);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching creator details:', error);
-      }
-    };
-
     fetchCarDetails();
-    fetchCreatorDetails();
   }, [trip.car_type, trip.seater_type, trip.fuel_type, trip.package_id, trip.created_by]);
 
   return (
@@ -122,6 +100,15 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
             </View>
           </View>
 
+          {/* Extra KM Charge - Clear Separate Line */}
+          {trip.extra_km_charge && trip.extra_km_charge > 0 && (
+            <View style={styles.extraKmChargeRow}>
+              <Ionicons name="trending-up-outline" size={14} color="#ff9800" />
+              <Text style={styles.extraKmChargeLabel}>For Extra KM:</Text>
+              <Text style={styles.extraKmChargeValue}>₹{trip.extra_km_charge}/km</Text>
+            </View>
+          )}
+
           {/* Locations in one row */}
           <View style={styles.enquiryLocationsRow}>
             <View style={styles.enquiryLocationItem}>
@@ -129,7 +116,9 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
               <Text style={styles.enquiryLocationLabel}>Pickup</Text>
               <Text style={styles.enquiryLocationText} numberOfLines={1}>{trip.pickup_location}</Text>
             </View>
-            <Text style={styles.enquiryLocationDivider}>→</Text>
+            <View style={styles.enquiryLocationDividerContainer}>
+              <Text style={styles.enquiryLocationDivider}>→</Text>
+            </View>
             <View style={styles.enquiryLocationItem}>
               <Ionicons name="flag" size={12} color="#e94560" />
               <Text style={styles.enquiryLocationLabel}>Drop</Text>
@@ -137,7 +126,9 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
             </View>
             {trip.return_location && (
               <>
-                <Text style={styles.enquiryLocationDivider}>→</Text>
+                <View style={styles.enquiryLocationDividerContainer}>
+                  <Text style={styles.enquiryLocationDivider}>→</Text>
+                </View>
                 <View style={styles.enquiryLocationItem}>
                   <Ionicons name="location-outline" size={12} color="#2196f3" />
                   <Text style={styles.enquiryLocationLabel}>Return</Text>
@@ -201,18 +192,24 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
 
           {/* Extra Charges Display - Toll Tax Hills + Pet in Single Row */}
           <View style={styles.inclusionsRow}>
-            <View style={styles.inclusionBox}>
-              <Text style={styles.inclusionLabel}>Toll - Tax - Hills</Text>
-              <Text style={[styles.inclusionStatus, trip.toll_included ? styles.includedText : styles.excludedText]}>
-                {trip.toll_included ? '✓ Included' : '✗ Excluded'}
-              </Text>
+            <View style={styles.inclusionItem}>
+              <View style={styles.inclusionBox}>
+                <Text style={styles.inclusionLabel}>Toll - Tax - Hills</Text>
+                <Text style={[styles.inclusionStatus, trip.toll_included ? styles.includedText : styles.excludedText]}>
+                  {trip.toll_included ? '✓ Included' : '✗ Excluded'}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.inclusionDivider}>-</Text>
-            <View style={styles.inclusionBox}>
-              <Text style={styles.inclusionLabel}>Pet</Text>
-              <Text style={[styles.inclusionStatus, trip.pet_travelling ? styles.includedText : styles.excludedText]}>
-                {trip.pet_travelling ? '✓ Allowed' : '✗ Not Allowed'}
-              </Text>
+            <View style={styles.inclusionDividerContainer}>
+              <Text style={styles.inclusionDivider}>-</Text>
+            </View>
+            <View style={styles.inclusionItem}>
+              <View style={styles.inclusionBox}>
+                <Text style={styles.inclusionLabel}>Pet</Text>
+                <Text style={[styles.inclusionStatus, trip.pet_travelling ? styles.includedText : styles.excludedText]}>
+                  {trip.pet_travelling ? '✓ Allowed' : '✗ Not Allowed'}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -246,28 +243,43 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
 
           {/* Action Buttons */}
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.acceptButton]}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onAccept?.(trip);
-              }}
-            >
-              <Ionicons name="checkmark-circle" size={18} color="#4caf50" />
-              <Text style={styles.acceptButtonText}>Accept</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton]}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onCancel?.();
-              }}
-            >
-              <Ionicons name="close-circle" size={18} color="#f44336" />
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {trip.status === 'pending' ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.acceptButton]}
+                  activeOpacity={0.7}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    onAccept?.(trip);
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#4caf50" />
+                  <Text style={styles.acceptButtonText}>Accept</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  activeOpacity={0.7}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    onCancel?.();
+                  }}
+                >
+                  <Ionicons name="close-circle" size={18} color="#f44336" />
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.viewDetailsButton]}
+                activeOpacity={0.7}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onPress?.();
+                }}
+              >
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -349,6 +361,29 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: 'bold',
     fontSize: Math.max(14, screenWidth * 0.038),
+  },
+  extraKmChargeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fff3e0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff9800',
+  },
+  extraKmChargeLabel: {
+    color: '#333',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '600',
+    flex: 1,
+  },
+  extraKmChargeValue: {
+    color: '#ff9800',
+    fontSize: Math.max(14, screenWidth * 0.038),
+    fontWeight: '700',
   },
   row: {
     flexDirection: 'row',
@@ -444,6 +479,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
+  inclusionItem: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  inclusionDividerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
   inclusionLabel: {
     fontSize: Math.max(12, screenWidth * 0.032),
     fontWeight: '700',
@@ -474,6 +518,11 @@ const styles = StyleSheet.create({
     minWidth: 70,
     alignItems: 'center',
     gap: 2,
+  },
+  enquiryLocationDividerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 2,
   },
   enquiryLocationLabel: {
     color: '#888',
@@ -525,7 +574,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#4caf50',
   },
   notesTitle: {
-    color: '#fff',
+    color: '#333',
     fontSize: Math.max(12, screenWidth * 0.032),
     fontWeight: '600',
     marginBottom: 6,
@@ -537,7 +586,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   noteText: {
-    color: '#ff9800',
+    color: '#333',
     fontSize: Math.max(12, screenWidth * 0.032),
     fontWeight: '500',
     flex: 1,
@@ -710,5 +759,11 @@ const styles = StyleSheet.create({
     color: '#f44336',
     fontSize: Math.max(12, screenWidth * 0.032),
     fontWeight: '600',
+  },
+  viewDetailsButton: {
+    backgroundColor: '#e94560',
+    borderColor: '#e94560',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

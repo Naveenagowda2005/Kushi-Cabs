@@ -308,12 +308,68 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
       {/* Cancel/Release button — only for accepted/in_progress trips */}
       {canCancel && (
         <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={() => onCancel?.(item.id)}
+          style={[styles.cancelBtn, item.driver_id && styles.releaseBtnDisabled]}
+          onPress={() => !item.driver_id && onCancel?.(item.id)}
+          disabled={!!item.driver_id}
         >
-          <Ionicons name="close-circle-outline" size={16} color="#ff9800" />
-          <Text style={styles.cancelBtnText}>Release Trip</Text>
+          <Ionicons name="close-circle-outline" size={16} color={item.driver_id ? "#ccc" : "#ff9800"} />
+          <Text style={[styles.cancelBtnText, item.driver_id && styles.releaseBtnDisabledText]}>
+            {item.driver_id ? 'Driver Assigned' : 'Release Trip'}
+          </Text>
         </TouchableOpacity>
+      )}
+
+      {/* View Details button — for accepted/in_progress trips */}
+      {(item.status === 'accepted' || item.status === 'in_progress') && (
+        <>
+          <TouchableOpacity
+            style={styles.viewDetailsArrowBtn}
+            onPress={() => navigation.navigate('EnquiryDetail', { trip: item, readOnly: true })}
+          >
+            <Text style={styles.viewDetailsArrowBtnText}>View Details</Text>
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          </TouchableOpacity>
+          
+          {/* Assign Trip button - show "Assigned" if driver already assigned */}
+          {item.driver_id ? (
+            <TouchableOpacity
+              style={[styles.assignTripBtn, styles.assignedBtn]}
+              onPress={async () => {
+                // Fetch assigned driver details
+                try {
+                  const { data: driver } = await supabase
+                    .from('drivers')
+                    .select('*, users(id, full_name, phone, email)')
+                    .eq('id', item.driver_id)
+                    .maybeSingle();
+
+                  if (driver) {
+                    const statusText = item.status === 'accepted' ? 'Accepted' : item.status === 'in_progress' ? 'In Progress' : item.status?.charAt(0).toUpperCase() + item.status?.slice(1);
+                    Alert.alert(
+                      'Assigned Driver',
+                      `Name: ${driver.users?.full_name || 'Unknown'}\nPhone: ${driver.users?.phone || 'N/A'}\nVehicle: ${driver.vehicle_number || 'N/A'}\nStatus: ${statusText}\n\nDriver assigned to this trip.`,
+                      [{ text: 'OK' }]
+                    );
+                  }
+                } catch (err) {
+                  console.error('Error fetching driver:', err);
+                  Alert.alert('Error', 'Could not fetch driver details');
+                }
+              }}
+            >
+              <Ionicons name="checkmark-done" size={16} color="#fff" />
+              <Text style={styles.assignTripBtnText}>Assigned</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.assignTripBtn}
+              onPress={() => navigation.navigate('AssignDriver', { trip: item })}
+            >
+              <Ionicons name="person-add-outline" size={16} color="#fff" />
+              <Text style={styles.assignTripBtnText}>Assign Trip to Driver</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {/* View Details button — only for completed trips */}
@@ -422,7 +478,7 @@ export default function VendorEnquiriesScreen({ navigation }) {
     }
     Alert.alert(
       'Accept Trip',
-      `Accept this trip from ${trip.pickup_location} to ${trip.dropoff_location}?\n\nCommission: ₹${trip.commission_amount || 0}`,
+      `Accept this trip from ${trip.pickup_location} to ${trip.dropoff_location}?`,
       [
         { text: 'No', style: 'cancel' },
         {
@@ -999,6 +1055,50 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cancelBtnText: { color: '#ff9800', fontSize: Math.max(12, screenWidth * 0.032), fontWeight: '600' },
+  releaseBtnDisabled: {
+    borderColor: '#ccc',
+    backgroundColor: '#f5f5f5',
+    opacity: 0.6,
+  },
+  releaseBtnDisabledText: {
+    color: '#ccc',
+  },
+  viewDetailsArrowBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#e94560',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  viewDetailsArrowBtnText: {
+    color: '#fff',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '600',
+  },
+  assignTripBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#4caf50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  assignedBtn: {
+    backgroundColor: '#2196f3',
+    opacity: 0.7,
+  },
+  assignTripBtnText: {
+    color: '#fff',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '600',
+  },
   viewDetailsBtn: {
     flexDirection: 'row',
     alignItems: 'center',

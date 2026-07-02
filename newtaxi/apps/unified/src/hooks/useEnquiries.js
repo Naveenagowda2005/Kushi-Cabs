@@ -78,8 +78,9 @@ export function useVendorTrips(userId) {
       if (vendorRow?.id) {
         // Match trips where:
         // 1. This user created the trip (created_by)
-        // 2. This user accepted the trip (accepted_by)
+        // 2. This user EVER accepted the trip (accepted_by at time of acceptance - now may have driver assigned)
         // 3. This vendor was assigned (vendor_id)
+        // 4. OR this user was accepted_by (vendor accepted it initially, then assigned to driver)
         query = query.or(`created_by.eq.${userId},accepted_by.eq.${userId},vendor_id.eq.${vendorRow.id}`);
       } else {
         // Fallback: match created_by or accepted_by

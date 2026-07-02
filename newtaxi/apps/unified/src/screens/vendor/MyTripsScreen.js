@@ -232,6 +232,13 @@ export default function VendorMyTripsScreen({ navigation }) {
               {item.is_published ? 'Published' : 'Draft'}
             </Text>
           </View>
+          {/* Extra KM Charge Badge */}
+          {item.extra_km_charge && item.extra_km_charge > 0 && (
+            <View style={styles.extraKmChargeBadge}>
+              <Ionicons name="trending-up-outline" size={12} color="#fff" />
+              <Text style={styles.extraKmChargeBadgeText}>₹{item.extra_km_charge}/km</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -460,6 +467,12 @@ export default function VendorMyTripsScreen({ navigation }) {
                       <View style={styles.pricingRow}>
                         <Text style={styles.infoLabel}>Fixed KM</Text>
                         <Text style={styles.infoValue}>{selectedTrip.fixed_km} km</Text>
+                      </View>
+                    )}
+                    {selectedTrip.extra_km_charge && selectedTrip.extra_km_charge > 0 && (
+                      <View style={styles.pricingRow}>
+                        <Text style={styles.infoLabel}>Extra Charge per KM</Text>
+                        <Text style={styles.infoValue}>₹{selectedTrip.extra_km_charge}/km</Text>
                       </View>
                     )}
                   </View>
@@ -694,6 +707,21 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  extraKmChargeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ff9800',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 4,
+  },
+  extraKmChargeBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   tripDetails: {
     flexDirection: 'row',

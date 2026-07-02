@@ -4,6 +4,7 @@ import {
   TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
@@ -80,6 +81,8 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     seaterTypes: [],
     fuelTypes: [],
   });
+  const [showScheduledDatePicker, setShowScheduledDatePicker] = useState(false);
+  const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -92,7 +95,11 @@ export default function SuperAdminSettingsScreen({ navigation }) {
   useEffect(() => {
     if (settings.minimumWalletBalance !== undefined && settings.minimumWalletBalance !== null) {
       console.log('✅ Updated minWalletBalance display to:', settings.minimumWalletBalance);
+      console.log('📊 Current settings object:', settings);
       setMinWalletBalance(settings.minimumWalletBalance.toString());
+    } else {
+      console.warn('⚠️ minimumWalletBalance is undefined or null, using default 500');
+      setMinWalletBalance('500');
     }
   }, [settings.minimumWalletBalance]);
 
@@ -572,6 +579,20 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     } finally {
       setSavingWallet(false);
     }
+  };
+
+  const handleScheduledDateChange = (event, selectedDate) => {
+    if (selectedDate) {
+      setAdminTripForm({...adminTripForm, scheduledAt: selectedDate});
+    }
+    setShowScheduledDatePicker(false);
+  };
+
+  const handleReturnDateChange = (event, selectedDate) => {
+    if (selectedDate) {
+      setAdminTripForm({...adminTripForm, returnDate: selectedDate});
+    }
+    setShowReturnDatePicker(false);
   };
 
   const validateAdminTripForm = () => {
@@ -1163,18 +1184,47 @@ export default function SuperAdminSettingsScreen({ navigation }) {
                     editable={!creatingAdminTrip}
                   />
                 </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Return Date *</Text>
-                  <TouchableOpacity 
-                    style={styles.input}
-                    onPress={() => {/* TODO: Add date picker */}}
-                  >
-                    <Text style={{ color: adminTripForm.returnDate ? COLORS.text : COLORS.textTertiary }}>
-                      {adminTripForm.returnDate ? adminTripForm.returnDate.toDateString() : 'Select return date'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
               </>
+            )}
+
+            {/* Scheduled Date */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Scheduled Date *</Text>
+              <TouchableOpacity 
+                style={styles.input}
+                onPress={() => setShowScheduledDatePicker(true)}
+                disabled={creatingAdminTrip}
+              >
+                <Ionicons name="calendar-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                <Text style={{ color: adminTripForm.scheduledAt ? COLORS.text : COLORS.textTertiary, flex: 1 }}>
+                  {adminTripForm.scheduledAt ? adminTripForm.scheduledAt.toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  }) : 'Select scheduled date'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Return Date - Only for Round Trips */}
+            {adminTripOptions.segments.find(s => s.id === adminTripForm.segment)?.name === 'Round trips' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Return Date *</Text>
+                <TouchableOpacity 
+                  style={styles.input}
+                  onPress={() => setShowReturnDatePicker(true)}
+                  disabled={creatingAdminTrip}
+                >
+                  <Ionicons name="calendar-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                  <Text style={{ color: adminTripForm.returnDate ? COLORS.text : COLORS.textTertiary, flex: 1 }}>
+                    {adminTripForm.returnDate ? adminTripForm.returnDate.toLocaleDateString('en-IN', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    }) : 'Select return date'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Fixed KM */}
@@ -1416,6 +1466,26 @@ export default function SuperAdminSettingsScreen({ navigation }) {
                 <Text style={{ color: COLORS.text, fontSize: 13 }}>Pet Travelling Allowed</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Scheduled Date Picker */}
+            {showScheduledDatePicker && (
+              <DateTimePicker
+                value={adminTripForm.scheduledAt}
+                mode="date"
+                display="default"
+                onChange={handleScheduledDateChange}
+              />
+            )}
+
+            {/* Return Date Picker */}
+            {showReturnDatePicker && (
+              <DateTimePicker
+                value={adminTripForm.returnDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={handleReturnDateChange}
+              />
+            )}
 
             {/* Create Button */}
             <TouchableOpacity

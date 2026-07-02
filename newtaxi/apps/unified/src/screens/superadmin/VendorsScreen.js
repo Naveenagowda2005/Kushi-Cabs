@@ -41,7 +41,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('users').select('id, full_name, phone, is_active, avatar_base64, created_at, role_id').eq('role_id', 2).order('created_at', { ascending: false });
+        .from('users').select('id, full_name, phone, is_active, avatar_base64, created_at, role_id, verification_status').eq('role_id', 2).order('created_at', { ascending: false });
       if (error) throw error;
 
       const vendorsWithDetails = await Promise.all(
@@ -202,6 +202,17 @@ export default function SuperAdminVendorsScreen({ navigation }) {
   const VendorCard = ({ vendor }) => {
     // Check if this is a dummy vendor
     const isDummyVendor = vendor.vendors?.[0]?.company_name?.trim().toUpperCase().startsWith('DUMMY');
+    
+    // Determine approval status
+    const getApprovalStatus = () => {
+      const verificationStatus = vendor.verification_status;
+      if (verificationStatus === 'approved') return { text: 'Approved', color: COLORS.success };
+      if (verificationStatus === 'rejected') return { text: 'Rejected', color: COLORS.error };
+      if (verificationStatus === 'pending') return { text: 'Pending', color: COLORS.warning };
+      return { text: 'Pending', color: COLORS.warning }; // Default
+    };
+    
+    const approval = getApprovalStatus();
 
     return (
       <TouchableOpacity style={styles.card} onPress={() => { setSelectedVendor(vendor); setModalVisible(true); }}>
@@ -219,9 +230,9 @@ export default function SuperAdminVendorsScreen({ navigation }) {
             <Text style={styles.businessName}>{vendor.vendors?.[0]?.company_name || 'No Company'}</Text>
             <Text style={styles.cardSub}>{vendor.phone || 'No Phone'}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: (vendor.is_active ? COLORS.success : COLORS.error) + '20' }]}>
-            <Text style={[styles.statusText, { color: vendor.is_active ? COLORS.success : COLORS.error }]}>
-              {vendor.is_active ? 'Active' : 'Blocked'}
+          <View style={[styles.statusBadge, { backgroundColor: approval.color + '20' }]}>
+            <Text style={[styles.statusText, { color: approval.color }]}>
+              {approval.text}
             </Text>
           </View>
         </View>
@@ -266,8 +277,9 @@ export default function SuperAdminVendorsScreen({ navigation }) {
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}><Text style={styles.statValue}>{vendors.length}</Text><Text style={styles.statLabel}>Total</Text></View>
-        <View style={styles.statItem}><Text style={styles.statValue}>{vendors.filter(v => v.is_active).length}</Text><Text style={styles.statLabel}>Active</Text></View>
-        <View style={styles.statItem}><Text style={styles.statValue}>{vendors.filter(v => !v.is_active).length}</Text><Text style={styles.statLabel}>Blocked</Text></View>
+        <View style={styles.statItem}><Text style={styles.statValue}>{vendors.filter(v => v.verification_status === 'approved').length}</Text><Text style={styles.statLabel}>Approved</Text></View>
+        <View style={styles.statItem}><Text style={styles.statValue}>{vendors.filter(v => v.verification_status === 'pending').length}</Text><Text style={styles.statLabel}>Pending</Text></View>
+        <View style={styles.statItem}><Text style={styles.statValue}>{vendors.filter(v => v.verification_status === 'rejected').length}</Text><Text style={styles.statLabel}>Rejected</Text></View>
       </View>
 
       <FlatList
@@ -293,6 +305,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
                 <Text style={styles.modalText}>Name: {selectedVendor.full_name || 'N/A'}</Text>
                 <Text style={styles.modalText}>Phone: {selectedVendor.phone || 'N/A'}</Text>
                 <Text style={styles.modalText}>Status: <Text style={{ color: selectedVendor.is_active ? COLORS.success : COLORS.error }}>{selectedVendor.is_active ? 'Active' : 'Blocked'}</Text></Text>
+                <Text style={styles.modalText}>Approval: <Text style={{ color: selectedVendor.verification_status === 'approved' ? COLORS.success : selectedVendor.verification_status === 'rejected' ? COLORS.error : COLORS.warning }}>{selectedVendor.verification_status?.charAt(0).toUpperCase() + selectedVendor.verification_status?.slice(1) || 'Pending'}</Text></Text>
                 <Text style={styles.modalText}>Joined: {new Date(selectedVendor.created_at).toLocaleDateString()}</Text>
               </View>
               <View style={styles.modalSection}>

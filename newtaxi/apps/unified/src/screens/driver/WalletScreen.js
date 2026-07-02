@@ -23,7 +23,9 @@ export default function DriverWalletScreen() {
   const [depositAmount, setDepositAmount] = useState('');
   const [isDepositing, setIsDepositing] = useState(false);
 
-  const minWalletBalance = settings.minimumWalletBalance || 100;
+  const minWalletBalance = settings.minimumWalletBalance !== undefined && settings.minimumWalletBalance !== null 
+    ? settings.minimumWalletBalance 
+    : 500;
   const isLow = wallet && wallet.balance < minWalletBalance;
 
   useFocusEffect(useCallback(() => {

@@ -39,7 +39,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('users').select('id, full_name, phone, is_active, avatar_base64, created_at, role_id').eq('role_id', 3).order('created_at', { ascending: false });
+        .from('users').select('id, full_name, phone, is_active, avatar_base64, created_at, role_id, verification_status').eq('role_id', 3).order('created_at', { ascending: false });
       if (error) throw error;
 
       const driversWithDetails = await Promise.all(
@@ -207,6 +207,17 @@ export default function SuperAdminDriversScreen({ navigation }) {
   const DriverCard = ({ driver }) => {
     // Check if this is a dummy driver (license number starts with DUMMY-)
     const isDummyDriver = driver.drivers?.[0]?.license_number?.toUpperCase().startsWith('DUMMY-');
+    
+    // Determine approval status
+    const getApprovalStatus = () => {
+      const verificationStatus = driver.verification_status;
+      if (verificationStatus === 'approved') return { text: 'Approved', color: COLORS.success };
+      if (verificationStatus === 'rejected') return { text: 'Rejected', color: COLORS.error };
+      if (verificationStatus === 'pending') return { text: 'Pending', color: COLORS.warning };
+      return { text: 'Pending', color: COLORS.warning }; // Default
+    };
+    
+    const approval = getApprovalStatus();
 
     return (
       <TouchableOpacity style={styles.card} onPress={() => { setSelectedDriver(driver); setModalVisible(true); }}>
@@ -223,9 +234,9 @@ export default function SuperAdminDriversScreen({ navigation }) {
             </View>
             <Text style={styles.cardSub}>{driver.phone || 'No Phone'}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: (driver.is_active ? COLORS.success : COLORS.error) + '20' }]}>
-            <Text style={[styles.statusText, { color: driver.is_active ? COLORS.success : COLORS.error }]}>
-              {driver.is_active ? 'Active' : 'Blocked'}
+          <View style={[styles.statusBadge, { backgroundColor: approval.color + '20' }]}>
+            <Text style={[styles.statusText, { color: approval.color }]}>
+              {approval.text}
             </Text>
           </View>
         </View>
@@ -272,9 +283,9 @@ export default function SuperAdminDriversScreen({ navigation }) {
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}><Text style={styles.statValue}>{drivers.length}</Text><Text style={styles.statLabel}>Total</Text></View>
-        <View style={styles.statItem}><Text style={styles.statValue}>{drivers.filter(d => d.is_active).length}</Text><Text style={styles.statLabel}>Active</Text></View>
-        <View style={styles.statItem}><Text style={styles.statValue}>{drivers.filter(d => !d.is_active).length}</Text><Text style={styles.statLabel}>Blocked</Text></View>
-        <View style={styles.statItem}><Text style={styles.statValue}>{drivers.filter(d => d.drivers?.[0]?.is_available).length}</Text><Text style={styles.statLabel}>Available</Text></View>
+        <View style={styles.statItem}><Text style={styles.statValue}>{drivers.filter(d => d.verification_status === 'approved').length}</Text><Text style={styles.statLabel}>Approved</Text></View>
+        <View style={styles.statItem}><Text style={styles.statValue}>{drivers.filter(d => d.verification_status === 'pending').length}</Text><Text style={styles.statLabel}>Pending</Text></View>
+        <View style={styles.statItem}><Text style={styles.statValue}>{drivers.filter(d => d.verification_status === 'rejected').length}</Text><Text style={styles.statLabel}>Rejected</Text></View>
       </View>
 
       <FlatList
@@ -300,6 +311,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
                 <Text style={styles.modalText}>Name: {selectedDriver.full_name || 'N/A'}</Text>
                 <Text style={styles.modalText}>Phone: {selectedDriver.phone || 'N/A'}</Text>
                 <Text style={styles.modalText}>Status: <Text style={{ color: selectedDriver.is_active ? COLORS.success : COLORS.error }}>{selectedDriver.is_active ? 'Active' : 'Blocked'}</Text></Text>
+                <Text style={styles.modalText}>Approval: <Text style={{ color: selectedDriver.verification_status === 'approved' ? COLORS.success : selectedDriver.verification_status === 'rejected' ? COLORS.error : COLORS.warning }}>{selectedDriver.verification_status?.charAt(0).toUpperCase() + selectedDriver.verification_status?.slice(1) || 'Pending'}</Text></Text>
                 <Text style={styles.modalText}>Joined: {new Date(selectedDriver.created_at).toLocaleDateString()}</Text>
               </View>
               <View style={styles.modalSection}>
