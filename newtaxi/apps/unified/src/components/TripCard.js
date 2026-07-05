@@ -121,7 +121,15 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
     <Animated.View style={[styles.card]}>
       {/* Header: Trip type and Payment method */}
       <View style={styles.header}>
-        <Text style={styles.tripType}>{(segmentName || trip.segment_name)?.toUpperCase() || 'ONE WAY TRIP'}</Text>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={styles.tripType}>{(segmentName || trip.segment_name)?.toUpperCase() || 'ONE WAY TRIP'}</Text>
+          {trip.isNew && (
+            <View style={styles.newTripBadge}>
+              <Ionicons name="spark" size={12} color="#fff" />
+              <Text style={styles.newTripBadgeText}>New</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.paymentBadge}>
           <Text style={styles.paymentText}>Paid by Cash</Text>
         </View>
@@ -135,16 +143,24 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       )}
 
-      {/* Vendor Badge - for vendor assigned trips (driver_id set) */}
-      {trip.driver_id && !trip.is_admin_trip && (
+      {/* Vendor Badge - for vendor assigned trips (driver_id set AND is_admin_trip is false) */}
+      {trip.driver_id && trip.is_admin_trip === false && (
         <View style={styles.vendorBadge}>
           <Ionicons name="person-circle-outline" size={14} color="#fff" />
           <Text style={styles.vendorBadgeText}>Vendor Assigned</Text>
         </View>
       )}
       
-      {/* Debug logging for vendor badge */}
-      {trip.driver_id === undefined && console.log('🔍 TripCard - vendor badge NOT shown: driver_id is undefined for trip', trip.id)}
+      {/* Debug logging */}
+      {console.log('🔍 TripCard badge check:', {
+        trip_id: trip.id,
+        pickup: trip.pickup_location,
+        dropoff: trip.dropoff_location,
+        driver_id: trip.driver_id,
+        is_admin_trip: trip.is_admin_trip,
+        shows_vendor_badge: !!(trip.driver_id && trip.is_admin_trip === false),
+        shows_admin_badge: !!trip.is_admin_trip,
+      })}
 
       {/* Fare & Fixed KM in one badge box - Left side */}
       <View style={styles.badgeRow}>
@@ -371,6 +387,21 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 10,
     fontWeight: '600',
+  },
+  newTripBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ff4081',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  newTripBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   adminBadge: {
     flexDirection: 'row',

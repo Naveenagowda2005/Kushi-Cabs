@@ -11,33 +11,25 @@ import { useAvailableTrips, useActiveTrip } from '../../hooks/useTrips';
 import { useDriverStatus } from '../../hooks/useDriverStatus';
 import { useWallet } from '../../hooks/useDriverWallet';
 import { useRealtimeTrips } from '../../hooks/useRealtimeTrips';
+import { useViewedTrips } from '../../hooks/useViewedTrips';
 import { supabase } from '../../lib/supabase';
 import TripCard from '../../components/TripCard';
 import WalletBanner from '../../components/WalletBanner';
 import { COLORS } from '../../constants';
-import { initializeAudio, cleanup } from '../../services/soundService';
 
 export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const { user, signOut } = useAuth();
-  const { isMuted, setIsMuted, updateAlertData } = useAlert();
+  const { updateAlertData } = useAlert();
   
   const { trips: availableTrips, loading, refetch } = useAvailableTrips();
-  const { isOnline, toggling, toggleOnline } = useDriverStatus(user?.id);
+  const { isOnline, toggleOnline } = useDriverStatus(user?.id);
   const { wallet } = useWallet(user?.id);
   const { trip: activeTrip, refetch: refetchActiveTrip } = useActiveTrip(user?.id);
+  const { isNewTrip, markAllAsViewed } = useViewedTrips(user?.id);
   const [activeTab, setActiveTab] = useState(0);
   const [completedTrips, setCompletedTrips] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [displayTrips, setDisplayTrips] = useState([]);
-
-  // Initialize audio on mount
-  useEffect(() => {
-    initializeAudio();
-    console.log('🎵 Audio initialized on driver dashboard mount');
-    return () => {
-      cleanup();
-    };
-  }, []);
 
   // Sync available trips and online status to AlertContext
   useEffect(() => {
@@ -78,29 +70,49 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
     }, [refetchActiveTrip, fetchCompletedTrips])
   );
 
+  // Mark all available trips as viewed when they load (only on focus)
+  useEffect(() => {
+    if (availableTrips.length > 0 && activeTab === 0) {
+      // Use a slight delay to avoid race conditions
+      const timer = setTimeout(() => {
+        markAllAsViewed(availableTrips.map(t => t.id));
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, availableTrips.length, markAllAsViewed]);
+
   // Sync available trips to display trips (for skip functionality)
   // Sort with both admin-assigned and vendor-assigned trips first (priority)
   useEffect(() => {
-    const sorted = [...availableTrips].sort((a, b) => {
-      // Check if trips are assigned (admin or vendor)
-      const aIsAssigned = a.is_admin_trip || a.driver_id;
-      const bIsAssigned = b.is_admin_trip || b.driver_id;
-      
-      // Assigned trips first (both admin and vendor)
-      if (aIsAssigned && !bIsAssigned) return -1;
-      if (!aIsAssigned && bIsAssigned) return 1;
-      
-      // If both are assigned or both are not, sort by type (admin first)
-      if (aIsAssigned && bIsAssigned) {
-        if (a.is_admin_trip && !b.is_admin_trip) return -1;
-        if (!a.is_admin_trip && b.is_admin_trip) return 1;
-      }
-      
-      // Then by creation date (newest first)
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
+    const sorted = [...availableTrips]
+      .map(trip => ({
+        ...trip,
+        isNew: isNewTrip(trip.id),
+      }))
+      .sort((a, b) => {
+        // New trips first
+        if (a.isNew && !b.isNew) return -1;
+        if (!a.isNew && b.isNew) return 1;
+
+        // Check if trips are assigned (admin or vendor)
+        const aIsAssigned = a.is_admin_trip || a.driver_id;
+        const bIsAssigned = b.is_admin_trip || b.driver_id;
+        
+        // Assigned trips first (both admin and vendor)
+        if (aIsAssigned && !bIsAssigned) return -1;
+        if (!aIsAssigned && bIsAssigned) return 1;
+        
+        // If both are assigned or both are not, sort by type (admin first)
+        if (aIsAssigned && bIsAssigned) {
+          if (a.is_admin_trip && !b.is_admin_trip) return -1;
+          if (!a.is_admin_trip && b.is_admin_trip) return 1;
+        }
+        
+        // Then by creation date (newest first)
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
     setDisplayTrips(sorted);
-  }, [availableTrips]);
+  }, [availableTrips, isNewTrip]);
 
   // If driver already has an active/in-progress trip, redirect to ActiveTrip screen
   // BUT only if they're on the Available tab (tab 0), not on Trip History tab
@@ -111,12 +123,11 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
     }
   }, [activeTrip, navigation, activeTab]);
   
-  // Setup realtime subscriptions with sound alerts
+  // Setup realtime subscriptions
   useRealtimeTrips({
     userId: user?.id,
     onNewTrip: (trip) => {
       console.log('🔔 New trip available:', trip);
-      // Refetch trips and let the useEffect handle continuous alerting
       refetch();
     },
     onTripTaken: (tripId) => {
@@ -131,8 +142,7 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
         (trip.accepted_by === user?.id || trip.driver_id === user?.id)
       ) {
         console.log('✅ Driver assigned trip detected! Refetching active trip...');
-        refetchActiveTrip(); // Refetch the active trip to pick up the change
-        // The useEffect below will then handle navigation to ActiveTrip screen
+        refetchActiveTrip();
       } else {
         refetch();
       }
@@ -145,39 +155,11 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
       onPress={() => navigation.navigate('TripDetail', { trip: item })}
       onAccept={(trip) => navigation.navigate('TripDetail', { trip })}
       onCancel={() => {
-        // Skip this trip - remove it from the display list
         console.log('Skipped trip:', item.id);
         setDisplayTrips(displayTrips.filter(t => t.id !== item.id));
       }}
     />
   );
-
-  const handleTestSound = async () => {
-    console.log('🎵 TEST: Manually triggering sound alert');
-    const { playLoopingAlert } = require('../../services/soundService');
-    await playLoopingAlert(2).catch(err => console.error('Test sound error:', err));
-  };
-
-  const handleDiagnose = async () => {
-    try {
-      console.log('🔍 AUDIO DIAGNOSTIC REPORT:');
-      console.log('================================');
-      console.log('📊 Sound Object Status:');
-      console.log('  - isLoaded: true (audio file loaded)');
-      console.log('  - volume: 1.0 (maximum)');
-      console.log('  - Audio focus system: Enabled');
-      console.log('  - Speaker routing: Enabled');
-      console.log('\n✅ Audio System Status: WORKING');
-      console.log('\n🔧 TROUBLESHOOTING:');
-      console.log('1. Check device volume - press Volume UP to max');
-      console.log('2. Check NOT in silent/vibrate mode');
-      console.log('3. Check Do Not Disturb is disabled');
-      console.log('4. Try the speaker icon test button');
-      console.log('================================');
-    } catch (err) {
-      console.error('Diagnosis error:', err);
-    }
-  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -213,23 +195,9 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
           <Switch
             value={isOnline}
             onValueChange={toggleOnline}
-            disabled={toggling}
             trackColor={{ false: '#333', true: '#4caf5066' }}
             thumbColor={isOnline ? '#4caf50' : '#666'}
           />
-          <TouchableOpacity 
-            style={{ padding: 8 }}
-            onPress={() => {
-              console.log(`🔊 Sound alerts ${isMuted ? 'unmuted' : 'muted'}`);
-              setIsMuted(!isMuted);
-            }}
-          >
-            <Ionicons 
-              name={isMuted ? "volume-mute" : "volume-high-outline"} 
-              size={22} 
-              color={isMuted ? '#ff6b6b' : COLORS.textLight}
-            />
-          </TouchableOpacity>
           <TouchableOpacity style={{ padding: 8 }} onPress={signOut}>
             <Ionicons name="log-out-outline" size={22} color={COLORS.warning} />
           </TouchableOpacity>
@@ -442,13 +410,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  statusBar: {
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    paddingHorizontal: 16, 
-    paddingVertical: 12,
   },
   statusBarOnline: { 
     backgroundColor: '#ffffff' 

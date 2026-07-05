@@ -321,7 +321,7 @@ export default function VendorNavigator() {
         component={DashboardWithTabs}
         initialParams={{ activeTab: 'Enquiries' }}
         options={{
-          title: 'Dashboard',
+          title: '',
           headerTitleStyle: { color: '#FF9800', fontWeight: '700' }
         }}
       />
@@ -390,30 +390,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#001a33',
     borderBottomWidth: 1,
     borderBottomColor: '#0d0f1a',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    minHeight: 60,
   },
   tabBarContent: {
-    gap: 8,
+    gap: 0,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingVertical: 4,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 0,
     gap: 6,
   },
   tabActive: {
-    backgroundColor: '#FF980020',
+    backgroundColor: '#FF980025',
+    borderBottomWidth: 3,
+    borderBottomColor: '#FF9800',
   },
   tabLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#fff',
+    color: '#888',
   },
   tabLabelActive: {
     color: '#FF9800',
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

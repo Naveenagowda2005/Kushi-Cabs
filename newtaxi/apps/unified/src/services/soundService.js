@@ -191,7 +191,8 @@ export const playQuickAlert = async () => {
 };
 
 /**
- * Alternative looping sound for more reliable playback - SKIP AUDIO FOCUS
+ * Play fixed number of alert sounds (NOT looping indefinitely)
+ * @param {number} loops - Number of times to play the sound (default: 2)
  */
 export const playLoopingAlert = async (loops = 2) => {
   try {
@@ -217,73 +218,77 @@ export const playLoopingAlert = async (loops = 2) => {
       console.warn('⚠️ Could not set audio mode:', e.message);
     }
 
-    console.log('📢 Skipping audio focus - playing sound directly');
+    console.log(`📢 Playing ${loops} rings WITHOUT looping`);
 
-    // STEP 2: Only create new sound if doesn't exist
-    if (!soundObject) {
-      soundObject = new Audio.Sound();
-      const audioSource = require('../../assets/ring.mp3');
+    // STEP 2: Play multiple times sequentially
+    for (let i = 0; i < loops; i++) {
+      if (!soundObject) {
+        soundObject = new Audio.Sound();
+        const audioSource = require('../../assets/ring.mp3');
+        
+        await soundObject.loadAsync(audioSource);
+        console.log(`✅ Sound loaded for ring ${i + 1}/${loops}`);
+        
+        await soundObject.setVolumeAsync(1.0);
+        console.log(`🔊 Volume: 1.0 (MAXIMUM)`);
+        
+        // CRITICAL: DO NOT set looping - play once
+        const status = await soundObject.getStatusAsync();
+        const ringDuration = status.durationMillis || 6000; // 6 seconds
+        console.log(`⏱️ Ring duration: ${ringDuration}ms`);
+      }
       
-      await soundObject.loadAsync(audioSource);
-      console.log('✅ Sound loaded');
+      // Play this ring
+      try {
+        const playback = await soundObject.playAsync();
+        console.log(`▶️ SOUND PLAYING (${i + 1}/${loops}):`, {
+          isPlaying: playback.isPlaying,
+          isLooping: playback.isLooping,
+          volume: playback.volume,
+          durationMillis: playback.durationMillis,
+        });
+        
+        // Trigger vibration for this ring
+        await triggerVibration();
+        
+        // Wait for ring to complete (6 seconds) + 2 second vibration
+        await new Promise(resolve => setTimeout(resolve, 8000));
+        
+      } catch (playErr) {
+        console.error(`❌ Error playing ring ${i + 1}:`, playErr);
+      }
       
-      await soundObject.setVolumeAsync(1.0);
-      console.log('🔊 Volume: 1.0 (MAXIMUM)');
-      
-      console.log(`🔄 Setting sound to loop ${loops} times`);
-      await soundObject.setIsLoopingAsync(true);
-      
-      // Get the actual ring duration from the sound
-      const status = await soundObject.getStatusAsync();
-      const ringDuration = status.durationMillis || 6000; // 6 seconds
-      console.log(`⏱️ Ring duration: ${ringDuration}ms`);
-      
-      // Play the sound
-      const playback = await soundObject.playAsync();
-      console.log('▶️ SOUND PLAYING:', {
-        isPlaying: playback.isPlaying,
-        isLooping: playback.isLooping,
-        volume: playback.volume,
-        durationMillis: playback.durationMillis,
-      });
-      
-      // Wait 3 seconds for the ring to start, then trigger vibration for 2 seconds
-      // Then repeat every ringDuration milliseconds
-      const setupVibration = () => {
-        setTimeout(async () => {
-          await triggerVibration();
-          
-          // Stop vibration after 2 seconds
-          setTimeout(() => {
-            Vibration.cancel();
-            console.log('🔇 Vibration stopped');
-          }, 2000);
-        }, 3000);
-      };
-      
-      // Setup first vibration
-      setupVibration();
-      
-      // Repeat vibration cycle every 6 seconds
-      const vibrationInterval = setInterval(() => {
-        setupVibration();
-      }, ringDuration);
-      
-      soundObject._vibrationInterval = vibrationInterval;
-    } else {
-      // Sound exists, just ensure it's playing
-      const status = await soundObject.getStatusAsync();
-      if (!status.isPlaying) {
-        console.log('▶️ Resuming paused alert sound');
-        await soundObject.playAsync();
+      // Add small pause between rings (except after last ring)
+      if (i < loops - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
-    console.log(`⏱️ Sound will loop indefinitely until stopped`);
+    // CRITICAL: Stop and unload after all rings are done
+    isPlayingAlert = false;
+    if (soundObject) {
+      try {
+        await soundObject.stopAsync();
+        await soundObject.unloadAsync();
+        soundObject = null;
+        console.log(`✅ All ${loops} rings complete - sound stopped and unloaded`);
+      } catch (cleanupErr) {
+        console.warn('⚠️ Error during cleanup:', cleanupErr);
+      }
+    }
 
   } catch (error) {
     console.error('❌ Error in playLoopingAlert:', error);
     isPlayingAlert = false;
+    if (soundObject) {
+      try {
+        await soundObject.stopAsync();
+        await soundObject.unloadAsync();
+        soundObject = null;
+      } catch (cleanupErr) {
+        console.warn('⚠️ Cleanup error:', cleanupErr);
+      }
+    }
     console.log('⚠️ Falling back to haptic feedback');
     await playHapticFeedback().catch(() => {});
   }

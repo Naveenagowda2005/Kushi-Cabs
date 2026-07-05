@@ -1,12 +1,24 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Linking, Alert,
+  TouchableOpacity, Linking, Alert, Image, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CompletedTripDetailScreen({ route, navigation }) {
   const { trip } = route.params;
+  const [selectedImage, setSelectedImage] = React.useState(null);
+
+  // Debug logging
+  console.log('🔍 CompletedTripDetailScreen trip data:', {
+    trip_id: trip?.id,
+    has_driver: !!trip?.driver,
+    driver_data: trip?.driver,
+    passenger_name: trip?.passenger_name,
+    passenger_phone: trip?.passenger_phone,
+    start_odometer_url: trip?.start_odometer_url,
+    end_odometer_url: trip?.end_odometer_url,
+  });
 
   const fareAmount = trip.fare_amount || 0;
   const commissionAmount = trip.commission_amount || 0;
@@ -121,7 +133,114 @@ export default function CompletedTripDetailScreen({ route, navigation }) {
           </View>
         )}
 
+        {/* Customer Details */}
+        {trip.passenger_name && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Customer Details</Text>
+            <DetailRow label="Name" value={trip.passenger_name} />
+            {trip.passenger_phone && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Phone</Text>
+                <TouchableOpacity onPress={handleCallPassenger}>
+                  <View style={styles.phoneButton}>
+                    <Ionicons name="call-outline" size={14} color="#fff" />
+                    <Text style={styles.phoneButtonText}>{trip.passenger_phone}</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Driver Details */}
+        {trip.driver && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Driver Details</Text>
+            {trip.driver.users?.full_name && (
+              <DetailRow label="Name" value={trip.driver.users.full_name} />
+            )}
+            {trip.driver.users?.phone && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Phone</Text>
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${trip.driver.users.phone}`)}>
+                  <View style={styles.phoneButton}>
+                    <Ionicons name="call-outline" size={14} color="#fff" />
+                    <Text style={styles.phoneButtonText}>{trip.driver.users.phone}</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+            {trip.driver.vehicle_number && (
+              <DetailRow label="Vehicle" value={trip.driver.vehicle_number} color="#ff9800" />
+            )}
+            {trip.driver.license_number && (
+              <DetailRow label="License" value={trip.driver.license_number} />
+            )}
+          </View>
+        )}
+
+        {/* Odometer Images */}
+        {(trip.start_odometer_url || trip.end_odometer_url) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Odometer Images</Text>
+            <View style={styles.odometerContainer}>
+              {trip.start_odometer_url && (
+                <TouchableOpacity 
+                  style={styles.odometerImageWrapper}
+                  onPress={() => setSelectedImage({ uri: trip.start_odometer_url, type: 'Start' })}
+                >
+                  <Image 
+                    source={{ uri: trip.start_odometer_url }}
+                    style={styles.odometerImage}
+                  />
+                  <Text style={styles.odometerLabel}>Start</Text>
+                </TouchableOpacity>
+              )}
+              {trip.end_odometer_url && (
+                <TouchableOpacity 
+                  style={styles.odometerImageWrapper}
+                  onPress={() => setSelectedImage({ uri: trip.end_odometer_url, type: 'End' })}
+                >
+                  <Image 
+                    source={{ uri: trip.end_odometer_url }}
+                    style={styles.odometerImage}
+                  />
+                  <Text style={styles.odometerLabel}>End</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
       </ScrollView>
+
+      {/* Image Modal */}
+      <Modal
+        visible={!!selectedImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setSelectedImage(null)}
+            >
+              <Ionicons name="close-outline" size={32} color="#fff" />
+            </TouchableOpacity>
+            {selectedImage && (
+              <>
+                <Image 
+                  source={{ uri: selectedImage.uri }}
+                  style={styles.fullscreenImage}
+                />
+                <Text style={styles.imageTitle}>{selectedImage.type} Odometer</Text>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Footer Button */}
       <View style={styles.footer}>
@@ -164,4 +283,15 @@ const styles = StyleSheet.create({
   footer: { padding: 16, paddingBottom: 32, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e0e0e0' },
   backBtn: { backgroundColor: '#4caf50', borderRadius: 12, padding: 16, alignItems: 'center' },
   backBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  odometerContainer: { flexDirection: 'row', gap: 12 },
+  odometerImageWrapper: { flex: 1, alignItems: 'center' },
+  odometerImage: { width: '100%', height: 150, borderRadius: 10, backgroundColor: '#e0e0e0' },
+  odometerLabel: { color: '#333', fontSize: 12, fontWeight: '600', marginTop: 8 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
+  closeButton: { position: 'absolute', top: 16, right: 16, zIndex: 10 },
+  fullscreenImage: { width: '90%', height: '70%', borderRadius: 8 },
+  imageTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 16 },
 });

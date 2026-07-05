@@ -31,7 +31,7 @@ export default function VendorTripHistoryScreen() {
 
       let query = supabase
         .from('trips')
-        .select('*')
+        .select('*, accepted_by_user:accepted_by(full_name, phone), driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
         .order('created_at', { ascending: false });
 
       if (vendorRow?.id) {
@@ -89,6 +89,33 @@ export default function VendorTripHistoryScreen() {
             <Ionicons name="person-outline" size={16} color="#888" />
             <Text style={styles.meta}>{item.passenger_name}</Text>
           </View>
+        )}
+
+        {/* Show driver details for completed trips */}
+        {item.status === 'completed' && item.driver?.users && (
+          <>
+            <Text style={styles.driverDetailsTitle}>Driver Details</Text>
+            <View style={styles.driverSection}>
+              <View style={styles.row}>
+                <Ionicons name="person-circle-outline" size={16} color="#2196f3" />
+                <Text style={[styles.meta, { color: '#2196f3', fontWeight: '600' }]}>
+                  {item.driver.users.full_name || 'Unknown Driver'}
+                </Text>
+              </View>
+              {item.driver.users.phone && (
+                <View style={styles.row}>
+                  <Ionicons name="call-outline" size={16} color="#2196f3" />
+                  <Text style={[styles.meta, { color: '#2196f3' }]}>{item.driver.users.phone}</Text>
+                </View>
+              )}
+              {item.driver.vehicle_number && (
+                <View style={styles.row}>
+                  <Ionicons name="car-outline" size={16} color="#ff9800" />
+                  <Text style={[styles.meta, { color: '#ff9800', fontWeight: '600' }]}>{item.driver.vehicle_number}</Text>
+                </View>
+              )}
+            </View>
+          </>
         )}
 
         <Text style={styles.date}>{new Date(item.created_at).toLocaleString()}</Text>
@@ -180,6 +207,23 @@ const styles = StyleSheet.create({
   location: { color: '#333', fontSize: 15, flex: 1, fontWeight: '500' },
   meta: { color: '#666', fontSize: 14, flex: 1, fontWeight: '500' },
   commission: { color: '#4caf50', fontSize: 12 },
+  driverSection: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 10,
+    padding: 12,
+    marginVertical: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196f3',
+  },
+  driverDetailsTitle: {
+    color: '#2196f3',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   date: { color: '#888', fontSize: 12, marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyText: { color: '#888', fontSize: 16, marginTop: 12 },

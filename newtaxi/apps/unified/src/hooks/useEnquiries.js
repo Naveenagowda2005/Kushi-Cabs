@@ -72,7 +72,7 @@ export function useVendorTrips(userId) {
 
       let query = supabase
         .from('trips')
-        .select('*')
+        .select('*, driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
         .order('created_at', { ascending: false });
 
       if (vendorRow?.id) {

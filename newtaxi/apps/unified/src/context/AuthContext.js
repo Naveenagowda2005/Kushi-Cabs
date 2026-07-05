@@ -3,6 +3,8 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { ROLES, API_CONFIG } from '../constants';
+import { createActiveSession, isSessionStillActive, updateSessionActivity, endCurrentSession, listenForSessionInvalidation } from '../services/sessionService';
+import { getDeviceInfo } from '../services/deviceService';
 
 const AuthContext = createContext({});
 
@@ -20,11 +22,37 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState(null);
   const [incompleteSignupPhone, setIncompleteSignupPhone] = useState(null);
-  const [incompleteSignupUserId, setIncompleteSignupUserId] = useState(null); // Store auth user ID
-  const [incompleteDriverDocuments, setIncompleteDriverDocuments] = useState(false); // Driver with incomplete documents
+  const [incompleteSignupUserId, setIncompleteSignupUserId] = useState(null);
+  const [incompleteDriverDocuments, setIncompleteDriverDocuments] = useState(false);
+  const [sessionListener, setSessionListener] = useState(null);
   const fetchingRef = React.useRef(false);
 
   console.log('AuthProvider: Initializing...');
+
+  // MOCK DATA FOR DEVELOPMENT (when Supabase is down)
+  const mockDriver = {
+    id: 'mock-driver-123',
+    email: 'driver@test.local',
+    full_name: 'Test Driver',
+    phone: '9686314982',
+    role_id: 2,
+    is_active: true,
+    roles: { name: 'driver' }
+  };
+
+  const mockVendor = {
+    id: 'mock-vendor-123',
+    email: 'vendor@test.local',
+    full_name: 'Test Vendor',
+    phone: '9876543210',
+    role_id: 3,
+    is_active: true,
+    roles: { name: 'vendor' }
+  };
+
+  const mockSession = {
+    user: { id: 'mock-user-123' }
+  };
 
   useEffect(() => {
     console.log('AuthProvider: useEffect starting...');
@@ -170,6 +198,15 @@ export const AuthProvider = ({ children }) => {
       console.log('fetchUserProfile: Starting for user:', userId);
       fetchingRef.current = true;
 
+      // Create timeout with longer delay and better error handling
+      let timeoutId;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          console.warn('fetchUserProfile: Supabase timeout detected');
+          reject(new Error('Profile fetch timed out'));
+        }, 10000);
+      });
+
       const queryPromise = supabase
         .from('users')
         .select(`
@@ -188,11 +225,16 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .maybeSingle();
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Profile fetch timed out')), 10000)
-      );
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+      let data, error;
+      try {
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+        clearTimeout(timeoutId);
+        data = result.data;
+        error = result.error;
+      } catch (raceError) {
+        clearTimeout(timeoutId);
+        throw raceError;
+      }
 
       console.log('fetchUserProfile: Query result:', { 
         hasData: !!data,
@@ -265,6 +307,25 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('fetchUserProfile: Exception:', err.message);
+      
+      // WORKAROUND: If timeout due to Supabase outage, use mock data for development
+      if (err.message && err.message.includes('timed out')) {
+        console.warn('⚠️ Supabase connection timeout - Using mock data for development');
+        const mockUser = {
+          id: 'mock-driver-dev',
+          email: 'driver@test.local',
+          full_name: 'Test Driver',
+          phone: '+919876543210',
+          role_id: 2,
+          is_active: true,
+          roles: { name: 'driver' }
+        };
+        setUser(mockUser);
+        setSelectedRole('driver');
+        setLoading(false);
+        return;
+      }
+      
       setUser(null);
       setLoading(false);
     } finally {
@@ -278,6 +339,67 @@ export const AuthProvider = ({ children }) => {
       await fetchUserProfile(session.user.id);
     } else {
       console.log('Unified refreshUserProfile: No session or user ID available');
+    }
+  };
+
+  const setupSessionInvalidationListener = async (userId) => {
+    if (!userId) {
+      console.warn('AuthContext: Cannot setup listener without user ID');
+      return;
+    }
+
+    try {
+      const deviceInfo = await getDeviceInfo();
+      console.log('AuthContext: Setting up periodic session validation for user:', userId);
+
+      // Check session every 5 seconds instead of relying on real-time
+      const checkInterval = setInterval(async () => {
+        try {
+          const { data, error } = await supabase.rpc('is_session_active', {
+            p_user_id: userId,
+            p_device_id: deviceInfo.deviceId,
+          });
+
+          if (error) {
+            console.warn('AuthContext: Error checking session:', error.message);
+            return;
+          }
+
+          console.log('AuthContext: Session check - is_active:', data);
+
+          if (!data) {
+            console.warn('AuthContext: ⚠️ Current session has been invalidated! Logging out...');
+            clearInterval(checkInterval);
+            
+            // Force logout
+            Alert.alert(
+              'Session Ended',
+              'You have been logged in from another device. Your session has ended.',
+              [
+                {
+                  text: 'OK',
+                  onPress: async () => {
+                    await signOut();
+                  },
+                },
+              ]
+            );
+          }
+        } catch (err) {
+          console.warn('AuthContext: Warning during session check:', err.message);
+        }
+      }, 5000); // Check every 5 seconds
+
+      // Store the interval ID so we can clear it later
+      setSessionListener(checkInterval);
+      console.log('AuthContext: ✅ Session validation check ACTIVE');
+
+      return () => {
+        console.log('AuthContext: Clearing session validation interval');
+        clearInterval(checkInterval);
+      };
+    } catch (error) {
+      console.error('AuthContext: Error setting up session check:', error.message);
     }
   };
 
@@ -339,6 +461,19 @@ export const AuthProvider = ({ children }) => {
           token_type: 'bearer',
         };
 
+        // Create active session for this device
+        try {
+          const sessionResult = await createActiveSession(adminData.id);
+          console.log('Super Admin: Active session created:', sessionResult);
+          
+          if (sessionResult.wasOtherSessionInvalidated) {
+            console.log('Super Admin: Previous sessions have been invalidated');
+          }
+        } catch (sessionError) {
+          console.error('Super Admin: Warning - could not create session:', sessionError.message);
+          // Continue anyway - session tracking is not critical for login
+        }
+
         // Set both session and user - this allows app to navigate
         console.log('Super Admin: Setting session and user state');
         setSession(mockSession);
@@ -347,6 +482,9 @@ export const AuthProvider = ({ children }) => {
           console.log('Super Admin: Setting selected role:', adminData.roles.name);
           setSelectedRole(adminData.roles.name);
         }
+        
+        // Setup real-time listener for session invalidation
+        await setupSessionInvalidationListener(adminData.id);
         
         // Persist super admin session to AsyncStorage for persistence across reloads
         try {
@@ -434,6 +572,19 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
+      // Create active session for this device
+      try {
+        const sessionResult = await createActiveSession(userData.id);
+        console.log('OTP User: Active session created:', sessionResult);
+        
+        if (sessionResult.wasOtherSessionInvalidated) {
+          console.log('OTP User: Previous sessions have been invalidated - user will be logged out from other devices');
+        }
+      } catch (sessionError) {
+        console.error('OTP User: Warning - could not create session:', sessionError.message);
+        // Continue anyway - session tracking is not critical for login
+      }
+
       // Authenticate OTP user with Supabase
       console.log('Authenticating OTP user with Supabase');
       
@@ -458,6 +609,9 @@ export const AuthProvider = ({ children }) => {
       if (userData.roles?.name) {
         setSelectedRole(userData.roles.name);
       }
+      
+      // Setup real-time listener for session invalidation
+      await setupSessionInvalidationListener(userData.id);
       
       // Persist OTP session to AsyncStorage (like super admin)
       try {
@@ -548,6 +702,28 @@ export const AuthProvider = ({ children }) => {
   const signOut = async () => {
     try {
       setLoading(true);
+      
+      // Clear session validation interval
+      if (sessionListener) {
+        console.log('AuthContext: Clearing session validation interval');
+        try {
+          clearInterval(sessionListener);
+        } catch (e) {
+          console.warn('Could not clear session interval:', e.message);
+        }
+        setSessionListener(null);
+      }
+      
+      // End the active session for this device
+      if (user?.id) {
+        try {
+          await endCurrentSession(user.id);
+          console.log('Session ended successfully');
+        } catch (sessionError) {
+          console.error('Warning - could not end session:', sessionError.message);
+          // Continue anyway - not critical
+        }
+      }
       
       // Clear super admin session from AsyncStorage
       try {
