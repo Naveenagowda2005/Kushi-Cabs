@@ -6,12 +6,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../hooks/useTheme';
+import { useAlert } from '../../context/AlertContext';
 import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import IDCard from '../../components/IDCard';
+import { playLoopingAlert } from '../../services/soundService';
 
 export default function SuperAdminVendorsScreen({ navigation }) {
   const { forceUpdate } = useTheme();
+  const { isMuted } = useAlert();
   
   // Force re-render when theme changes
   const [themeRefresh, setThemeRefresh] = useState(0);
@@ -79,6 +82,10 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         })
       );
       setVendors(vendorsWithDetails);
+      
+      // 🔊 Play 3-time sound alert when vendors data is fetched (respects mute via ref)
+      console.log('🔊 Triggering 3-time vendor sound alert');
+      playLoopingAlert(3);
     } catch (error) {
       console.error('Error fetching vendors:', error);
       Alert.alert('Error', 'Failed to load vendors');
@@ -107,6 +114,11 @@ export default function SuperAdminVendorsScreen({ navigation }) {
             const { error } = await supabase.from('users').update({ is_active: !currentStatus }).eq('id', vendorId);
             if (error) throw error;
             Alert.alert('Success', `Vendor ${action}d successfully`);
+            
+            // 🔊 Play 3-time sound alert when vendor status changes (respects mute via ref)
+            console.log('🔊 Triggering 3-time vendor status change sound alert');
+            playLoopingAlert(3);
+            
             fetchVendors();
           } catch (error) { Alert.alert('Error', `Failed to ${action} vendor`); }
         },
@@ -423,6 +435,11 @@ export default function SuperAdminVendorsScreen({ navigation }) {
 
                     console.log('✅ Transaction created');
                     Alert.alert('✅ Success', `₹${numAmount} paid to vendor\nRemaining balance: ₹${newBalance}`);
+                    
+                    // 🔊 Play 3-time sound alert when payment is marked (respects mute via ref)
+                    console.log('🔊 Triggering 3-time vendor payment sound alert');
+                    playLoopingAlert(3);
+                    
                     setPaymentModalVisible(false);
                     fetchVendors();
                     setModalVisible(false);

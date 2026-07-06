@@ -18,7 +18,7 @@ import {
   notifyNewEnquiry,
   notifyCommissionEarned,
 } from '../../services/notificationService';
-import { initializeAudio, cleanup } from '../../services/soundService';
+import { initializeAudio, cleanup, playLoopingAlert } from '../../services/soundService';
 import EnquiryCard from '../../components/EnquiryCard';
 import TripStatusBadge from '../../components/TripStatusBadge';
 
@@ -388,7 +388,7 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
 
 export default function VendorEnquiriesScreen({ navigation }) {
   const { user } = useAuth();
-  const { isMuted, setIsMuted, updateAlertData } = useAlert();
+  const { isMuted, updateAlertData } = useAlert();
   const { vendor } = useVendorProfile(user?.id);
   const { settings } = useAppSettings();
   const { enquiries, loading: loadingEnq, error, refetch: refetchEnq } = useAvailableEnquiries();
@@ -468,6 +468,14 @@ export default function VendorEnquiriesScreen({ navigation }) {
       return () => clearTimeout(timer);
     }
   }, [activeTab, refetchEnq]);
+
+  // 🔊 Play 3-time sound alert when enquiries are loaded
+  useEffect(() => {
+    if (!loadingEnq && liveEnquiries.length > 0 && activeTab === 0) {
+      console.log('🔊 Triggering 3-time enquiry sound alert');
+      playLoopingAlert(3);
+    }
+  }, [liveEnquiries.length, loadingEnq, activeTab]);
 
   const isLoading = activeTab === 0 ? loadingEnq : loadingTrips;
 
@@ -580,11 +588,34 @@ export default function VendorEnquiriesScreen({ navigation }) {
   }
 
   function renderEnquiry({ item }) {
+    // ✅ Mark trip as read when vendor views it (if not already read)
+    const markTripAsRead = async () => {
+      if (!item.vendor_read_at) {
+        try {
+          await supabase
+            .from('trips')
+            .update({ vendor_read_at: new Date().toISOString() })
+            .eq('id', item.id);
+          console.log(`✅ Trip ${item.id} marked as read`);
+          // Refetch to update badge
+          refetchEnq();
+        } catch (err) {
+          console.error('Error marking trip as read:', err);
+        }
+      }
+    };
+
     return (
       <EnquiryCard
         trip={item}
-        onPress={() => navigation.navigate('EnquiryDetail', { trip: item })}
-        onAccept={(trip) => handleAcceptTrip(trip)}
+        onPress={() => {
+          markTripAsRead();
+          navigation.navigate('EnquiryDetail', { trip: item });
+        }}
+        onAccept={(trip) => {
+          markTripAsRead();
+          handleAcceptTrip(trip);
+        }}
         onCancel={() => {}}
       />
     );
@@ -632,19 +663,6 @@ export default function VendorEnquiriesScreen({ navigation }) {
           </TouchableOpacity>
         ))}
         </View>
-        <TouchableOpacity 
-          style={styles.muteButton}
-          onPress={() => {
-            console.log(`🔊 Sound alerts ${isMuted ? 'unmuted' : 'muted'}`);
-            setIsMuted(!isMuted);
-          }}
-        >
-          <Ionicons 
-            name={isMuted ? "volume-mute" : "volume-high-outline"} 
-            size={24} 
-            color={isMuted ? '#ff6b6b' : '#e94560'}
-          />
-        </TouchableOpacity>
       </View>
 
       {error && activeTab === 0 && (
@@ -706,11 +724,6 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     flex: 1,
-  },
-  muteButton: {
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   tab: {
     flex: 1,

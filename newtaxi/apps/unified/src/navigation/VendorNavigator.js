@@ -6,6 +6,7 @@ import { View, ActivityIndicator, TouchableOpacity, Text, StyleSheet, ScrollView
 import { COLORS } from '../constants';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { playTripAlert, initializeAudio } from '../services/soundService';
 
 // Vendor screens
 import VendorEnquiriesScreen from '../screens/vendor/EnquiriesScreen';
@@ -101,6 +102,25 @@ export default function VendorNavigator() {
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Enquiries');
+  const [soundPlayed, setSoundPlayed] = useState(false);
+
+  // Play welcome sound when vendor app fully loads
+  useEffect(() => {
+    if (verificationStatus === 'approved' && !soundPlayed && user?.id) {
+      console.log('🎵 Vendor app loaded - Playing welcome sound (3 rings)');
+      setSoundPlayed(true);
+      
+      // Initialize audio and play welcome sound
+      (async () => {
+        try {
+          await initializeAudio();
+          await playTripAlert(3); // 3 rings for vendor
+        } catch (error) {
+          console.error('❌ Error playing welcome sound:', error);
+        }
+      })();
+    }
+  }, [verificationStatus, soundPlayed, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;

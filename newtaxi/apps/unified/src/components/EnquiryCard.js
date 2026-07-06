@@ -79,6 +79,12 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
             <View style={styles.tripTypeContainer}>
               <Ionicons name="car-outline" size={16} color="#ff9800" />
               <Text style={styles.tripType}>{segmentName ? segmentName.toUpperCase() : 'TRIP'}</Text>
+              {/* ✅ NEW Badge - shows if trip hasn't been read yet */}
+              {!trip.vendor_read_at && (
+                <View style={styles.newBadge}>
+                  <Text style={styles.newBadgeText}>NEW</Text>
+                </View>
+              )}
             </View>
             <View style={styles.paymentBadge}>
               <Text style={styles.paymentText}>Paid by Cash</Text>
@@ -307,6 +313,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  newBadge: {
+    backgroundColor: '#e94560',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  newBadgeText: {
+    color: '#fff',
+    fontSize: Math.max(10, screenWidth * 0.026),
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   tripType: {
     color: '#ff9800',

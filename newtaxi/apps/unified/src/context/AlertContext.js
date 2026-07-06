@@ -6,7 +6,7 @@ const AlertContext = createContext();
 
 export const AlertProvider = ({ children }) => {
   const { user } = useAuth();
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // ✅ Default to false (unmuted)
   const [trips, setTrips] = useState(0);
   const [enquiries, setEnquiries] = useState(0);
   const [isDriverOnline, setIsDriverOnline] = useState(false);
