@@ -26,6 +26,7 @@ export default function VendorMyTripsScreen({ navigation }) {
         .from('trips')
         .select('*')
         .eq('created_by', user.id)
+        .in('status', ['pending', 'accepted', 'in_progress'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -59,6 +60,7 @@ export default function VendorMyTripsScreen({ navigation }) {
         .from('trips')
         .select('*')
         .eq('created_by', user.id)
+        .in('status', ['pending', 'accepted', 'in_progress'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;

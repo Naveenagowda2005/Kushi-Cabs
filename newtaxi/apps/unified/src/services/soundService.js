@@ -43,21 +43,11 @@ export const initializeAudio = async () => {
  * @param {number} duration - Duration to play in milliseconds (default: 3000ms)
  */
 export const playTelephoneRing = async (duration = 3000) => {
+  let localSoundObject = null;
   try {
-    // Stop any currently playing sound first
-    if (soundObject) {
-      try {
-        await soundObject.stopAsync();
-        await soundObject.unloadAsync();
-        soundObject = null;
-      } catch (e) {
-        console.warn('Error stopping/unloading previous sound:', e.message);
-      }
-    }
-
-    // Create fresh sound object
-    soundObject = new Audio.Sound();
-    console.log('🔔 Creating new sound object');
+    // Create a NEW sound object local to this function
+    localSoundObject = new Audio.Sound();
+    console.log('🔔 Creating new sound object for playTelephoneRing');
 
     try {
       console.log('🔔 Loading telephone ring audio from assets');
@@ -66,15 +56,24 @@ export const playTelephoneRing = async (duration = 3000) => {
       const audioSource = require('../../assets/ring.mp3');
       console.log('📂 Audio source loaded:', typeof audioSource);
       
-      await soundObject.loadAsync(audioSource);
+      const loadResult = await localSoundObject.loadAsync(audioSource);
       console.log('✅ Sound loaded successfully');
       
+      // Verify load completed
+      if (!loadResult || !loadResult.isLoaded) {
+        console.warn('⚠️ Load returned but sound not marked as loaded, getting fresh status...');
+        const freshStatus = await localSoundObject.getStatusAsync();
+        if (!freshStatus.isLoaded) {
+          throw new Error('Sound failed to load - status check shows not loaded');
+        }
+      }
+      
       // CRITICAL: Set volume BEFORE playing
-      await soundObject.setVolumeAsync(1.0);
+      await localSoundObject.setVolumeAsync(1.0);
       console.log('🔊 Volume set to maximum (1.0)');
       
       // Get status before playing
-      const statusBefore = await soundObject.getStatusAsync();
+      const statusBefore = await localSoundObject.getStatusAsync();
       console.log('📊 Status before playback:', {
         isLoaded: statusBefore.isLoaded,
         volume: statusBefore.volume,
@@ -83,9 +82,14 @@ export const playTelephoneRing = async (duration = 3000) => {
         duration: statusBefore.durationMillis,
       });
       
+      // Verify sound is actually loaded before attempting playback
+      if (!statusBefore.isLoaded) {
+        throw new Error('Sound failed to load - cannot proceed with playback');
+      }
+      
       // Play with explicit options
       console.log('▶️ Starting playback...');
-      const playback = await soundObject.playAsync();
+      const playback = await localSoundObject.playAsync();
       console.log('▶️ Playback status:', {
         isPlaying: playback.isPlaying,
         volume: playback.volume,
@@ -96,7 +100,7 @@ export const playTelephoneRing = async (duration = 3000) => {
       // Verify playback after 200ms
       const verifyPlayback = setTimeout(async () => {
         try {
-          const status = await soundObject?.getStatusAsync();
+          const status = await localSoundObject?.getStatusAsync();
           if (status) {
             console.log('📊 Playback verification after 200ms:', {
               isPlaying: status.isPlaying,
@@ -115,8 +119,8 @@ export const playTelephoneRing = async (duration = 3000) => {
       // Stop after duration
       const stopTimer = setTimeout(async () => {
         try {
-          if (soundObject) {
-            await soundObject.stopAsync();
+          if (localSoundObject) {
+            await localSoundObject.stopAsync();
             console.log('⏹️ Sound stopped after duration');
           }
         } catch (err) {
@@ -125,8 +129,10 @@ export const playTelephoneRing = async (duration = 3000) => {
       }, duration);
 
       // Store timers for cleanup
-      soundObject._verifyTimer = verifyPlayback;
-      soundObject._stopTimer = stopTimer;
+      if (localSoundObject) {
+        localSoundObject._verifyTimer = verifyPlayback;
+        localSoundObject._stopTimer = stopTimer;
+      }
 
     } catch (loadError) {
       console.error('❌ Error loading/playing audio file:', loadError.message);
@@ -139,6 +145,18 @@ export const playTelephoneRing = async (duration = 3000) => {
     console.error('❌ Error in playTelephoneRing:', error);
     // Ultimate fallback
     await playHapticFeedback().catch(() => {});
+  } finally {
+    // Clean up after duration
+    setTimeout(async () => {
+      try {
+        if (localSoundObject) {
+          await localSoundObject.stopAsync();
+          await localSoundObject.unloadAsync();
+        }
+      } catch (e) {
+        console.warn('Cleanup error:', e.message);
+      }
+    }, duration + 500);
   }
 };
 
@@ -195,16 +213,19 @@ export const playQuickAlert = async () => {
  * @param {number} loops - Number of times to play the sound (default: 2)
  */
 export const playLoopingAlert = async (loops = 2) => {
+  let localSoundObject = null;
+  
   try {
     // If already playing, don't restart
-    if (isPlayingAlert && soundObject) {
+    if (isPlayingAlert) {
       console.log('🔊 Alert already playing, skipping restart');
       return;
     }
 
     isPlayingAlert = true;
+    console.log(`📢 Starting ${loops} alert rings`);
 
-    // STEP 1: Set audio mode FIRST
+    // STEP 1: Set audio mode ONCE at the beginning
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -213,81 +234,118 @@ export const playLoopingAlert = async (loops = 2) => {
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: true,
       });
-      console.log('🔊 Audio mode set for speaker');
+      console.log('🔊 Audio mode configured');
     } catch (e) {
-      console.warn('⚠️ Could not set audio mode:', e.message);
+      console.warn('⚠️ Audio mode config failed:', e.message);
     }
 
-    console.log(`📢 Playing ${loops} rings WITHOUT looping`);
-
-    // STEP 2: Play multiple times sequentially
-    for (let i = 0; i < loops; i++) {
-      // Create a NEW sound object for each ring
-      soundObject = new Audio.Sound();
+    // STEP 2: Load sound ONCE and reuse it
+    try {
+      localSoundObject = new Audio.Sound();
       const audioSource = require('../../assets/ring.mp3');
       
-      await soundObject.loadAsync(audioSource);
-      console.log(`✅ Sound loaded for ring ${i + 1}/${loops}`);
+      console.log('📂 Loading sound asset...');
+      const loadResult = await localSoundObject.loadAsync(audioSource);
+      console.log(`✅ Sound loaded. Duration: ${loadResult.durationMillis}ms, isLoaded: ${loadResult.isLoaded}`);
       
-      await soundObject.setVolumeAsync(1.0);
-      console.log(`🔊 Volume: 1.0 (MAXIMUM)`);
-      
-      // CRITICAL: DO NOT set looping - play once
-      const status = await soundObject.getStatusAsync();
-      const ringDuration = status.durationMillis || 6000; // 6 seconds
-      console.log(`⏱️ Ring duration: ${ringDuration}ms`);
-      
-      // Play this ring
-      try {
-        const playback = await soundObject.playAsync();
-        console.log(`▶️ SOUND PLAYING (${i + 1}/${loops}):`, {
-          isPlaying: playback.isPlaying,
-          isLooping: playback.isLooping,
-          volume: playback.volume,
-          durationMillis: playback.durationMillis,
-        });
-        
-        // Wait for ring to complete (6 seconds only - no vibration)
-        await new Promise(resolve => setTimeout(resolve, 6000));
-        
-      } catch (playErr) {
-        console.error(`❌ Error playing ring ${i + 1}:`, playErr);
+      // Use the load result directly
+      if (!loadResult.isLoaded) {
+        throw new Error('Sound failed to load properly');
       }
-      
-      // Stop and unload this sound object before next ring
-      try {
-        await soundObject.stopAsync();
-        await soundObject.unloadAsync();
-        soundObject = null;
-      } catch (cleanupErr) {
-        console.warn('⚠️ Cleanup error for ring:', cleanupErr);
+
+      // Set volume once
+      await localSoundObject.setVolumeAsync(1.0);
+      console.log('🔊 Volume set to maximum');
+
+      // STEP 3: Play the sound multiple times
+      for (let i = 0; i < loops; i++) {
+        try {
+          console.log(`\n▶️ Playing ring ${i + 1}/${loops}`);
+          
+          // Check status before playing
+          const preStatus = await localSoundObject.getStatusAsync();
+          console.log(`Pre-play status - isLoaded: ${preStatus.isLoaded}, isPlaying: ${preStatus.isPlaying}`);
+          
+          // Verify sound is loaded before attempting playback
+          if (!preStatus.isLoaded) {
+            console.warn('⚠️ Sound not fully loaded, waiting before retry...');
+            await new Promise(resolve => setTimeout(resolve, 200));
+            const retryStatus = await localSoundObject.getStatusAsync();
+            if (!retryStatus.isLoaded) {
+              throw new Error('Sound failed to load after retry');
+            }
+          }
+          
+          // If sound is still playing, wait for it to finish
+          if (preStatus.isPlaying) {
+            console.log('⏸️ Waiting for previous playback to finish...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+          // Reset to beginning and play
+          await localSoundObject.setPositionAsync(0);
+          
+          // Verify sound status one more time before playing
+          const finalPrePlayStatus = await localSoundObject.getStatusAsync();
+          if (!finalPrePlayStatus.isLoaded) {
+            throw new Error('Sound unloaded before playback attempt');
+          }
+          
+          const playStatus = await localSoundObject.playAsync();
+          
+          console.log(`✅ Ring ${i + 1} playing:`, {
+            isPlaying: playStatus.isPlaying,
+            volume: playStatus.volume,
+            durationMillis: playStatus.durationMillis,
+          });
+
+          // Wait for ring to complete
+          const ringDuration = playStatus.durationMillis || 6000;
+          await new Promise(resolve => setTimeout(resolve, ringDuration));
+
+          // Stop playback
+          await localSoundObject.stopAsync();
+          console.log(`⏹️ Ring ${i + 1} stopped`);
+
+        } catch (ringErr) {
+          console.error(`❌ Error on ring ${i + 1}:`, ringErr.message);
+          // Fallback to haptic feedback instead of continuing with broken audio
+          await playHapticFeedback().catch(() => {});
+          // Don't continue to next ring if sound is broken
+          break;
+        }
+
+        // Pause between rings
+        if (i < loops - 1) {
+          console.log('⏸️ Pause between rings...');
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
       }
-      
-      // Add small pause between rings (except after last ring)
-      if (i < loops - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+
+      console.log(`\n✅ All ${loops} rings complete`);
+
+    } catch (loadErr) {
+      console.error('❌ Sound load/play error:', loadErr.message);
+      console.log('📳 Falling back to haptic feedback');
+      await playHapticFeedback().catch(() => {});
     }
 
   } catch (error) {
-    console.error('❌ Error in playLoopingAlert:', error);
-    isPlayingAlert = false;
-    if (soundObject) {
-      try {
-        await soundObject.stopAsync();
-        await soundObject.unloadAsync();
-        soundObject = null;
-      } catch (cleanupErr) {
-        console.warn('⚠️ Cleanup error:', cleanupErr);
-      }
-    }
-    console.log('⚠️ Falling back to haptic feedback');
+    console.error('❌ Critical error in playLoopingAlert:', error.message);
     await playHapticFeedback().catch(() => {});
+  } finally {
+    // Cleanup
+    try {
+      if (localSoundObject) {
+        await localSoundObject.stopAsync();
+        await localSoundObject.unloadAsync();
+        localSoundObject = null;
+      }
+    } catch (cleanupErr) {
+      console.warn('⚠️ Cleanup error:', cleanupErr.message);
+    }
+    isPlayingAlert = false;
   }
-  
-  // Mark alert as finished
-  isPlayingAlert = false;
-  console.log(`✅ All ${loops} rings complete`);
 };
 
 /**

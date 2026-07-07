@@ -169,23 +169,21 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             <Ionicons name="cash-outline" size={14} color="#333" />
             <Text style={styles.fareText}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
           </View>
+          <Text style={styles.separatorText}>|</Text>
           {trip.fixed_km && (
             <View style={styles.kmBadge}>
               <Ionicons name="swap-horizontal-outline" size={14} color="#333" />
               <Text style={styles.kmText}>{trip.fixed_km} km</Text>
             </View>
           )}
+          {trip.extra_km_charge && trip.extra_km_charge > 0 && (
+            <>
+              <Text style={styles.separatorText}>/</Text>
+              <Text style={[styles.kmText, { marginLeft: 2 }]}>Ex ₹{trip.extra_km_charge}/km</Text>
+            </>
+          )}
         </View>
       </View>
-
-      {/* Extra KM Charge - Clear Separate Line */}
-      {trip.extra_km_charge && trip.extra_km_charge > 0 && (
-        <View style={styles.extraKmChargeRow}>
-          <Ionicons name="trending-up-outline" size={14} color="#ff9800" />
-          <Text style={styles.extraKmChargeLabel}>For Extra KM:</Text>
-          <Text style={styles.extraKmChargeValue}>₹{trip.extra_km_charge}/km</Text>
-        </View>
-      )}
 
       {/* Pickup and Dropoff in one row */}
       <View style={styles.locationsRow}>
@@ -195,7 +193,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             <Ionicons name="location" size={16} color="#4caf50" />
             <View style={styles.locationContent}>
               <Text style={styles.locationLabel}>Pickup</Text>
-              <Text style={styles.location}>{trip.pickup_location}</Text>
+              <Text style={styles.location} numberOfLines={0}>{trip.pickup_location}</Text>
             </View>
           </View>
         </View>
@@ -211,7 +209,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
             <Ionicons name="flag" size={16} color="#e94560" />
             <View style={styles.locationContent}>
               <Text style={styles.locationLabel}>Dropoff</Text>
-              <Text style={styles.location}>{trip.dropoff_location}</Text>
+              <Text style={styles.location} numberOfLines={0}>{trip.dropoff_location}</Text>
             </View>
           </View>
         </View>
@@ -236,8 +234,8 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       )}
 
-      {/* Car Details Row */}
-      {(carType || seaterType || fuelType) && (
+      {/* Car Details Row - Hidden */}
+      {false && (carType || seaterType || fuelType) && (
         <View style={styles.carDetailsRow}>
           {carType && (
             <View style={styles.carDetail}>
@@ -303,12 +301,6 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       )}
 
-      {/* Lock indicator — customer details hidden */}
-      <View style={styles.lockRow}>
-        <Ionicons name="lock-closed-outline" size={13} color="#ff9800" />
-        <Text style={styles.lockText}>Pay commission to unlock customer details</Text>
-      </View>
-
       {/* Notes Section */}
       <View style={styles.notesHeader}>
         <Text style={styles.notesTitle}>Notes:</Text>
@@ -371,8 +363,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   tripType: {
-    color: '#ff9800',
-    fontSize: 18,
+    color: '#000',
+    fontSize: 22,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -456,13 +448,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  fareText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
+  fareText: { color: '#000', fontWeight: 'bold', fontSize: 22 },
   kmBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  kmText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
+  separatorText: {
+    color: '#333',
+    fontSize: 18,
+    fontWeight: '700',
+    marginHorizontal: 4,
+  },
+  kmText: { color: '#000', fontWeight: 'bold', fontSize: 22 },
   extraKmChargeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -512,42 +510,54 @@ const styles = StyleSheet.create({
   },
   locationsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    paddingVertical: 12,
     backgroundColor: '#f5f5f5',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    overflow: 'hidden',
+    overflow: 'visible',
+    flexWrap: 'wrap',
   },
   locationSide: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    minWidth: 140,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   locationRowContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 6,
+    gap: 8,
   },
   locationDivider: {
-    width: 1,
+    width: 2,
     backgroundColor: '#e0e0e0',
-    marginVertical: 6,
+    marginVertical: 8,
   },
   locationContent: {
     flex: 1,
   },
   locationLabel: {
     color: '#000',
-    fontSize: 10,
-    marginBottom: 1,
+    fontSize: 12,
+    marginBottom: 3,
+    fontWeight: '600',
   },
   location: { 
     color: '#000', 
-    fontSize: 15,
+    fontSize: 17,
     flex: 1,
     flexWrap: 'wrap',
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  arrowDivider: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 12,
   },
   packageBadge: {
     flexDirection: 'row',
@@ -712,12 +722,12 @@ const styles = StyleSheet.create({
   },
   departureLabel: {
     color: '#000',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   departureTime: {
     color: '#ff9800',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     flex: 1,
     backgroundColor: 'transparent',
@@ -735,7 +745,7 @@ const styles = StyleSheet.create({
   },
   notesTitle: {
     color: '#000',
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 2,
   },
@@ -747,7 +757,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     color: '#000',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },

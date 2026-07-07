@@ -70,7 +70,11 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         supabase.from('fuel_types').select('id, name').order('name'),
       ]);
 
-      if (carTypesRes.data) setCarTypes(carTypesRes.data);
+      if (carTypesRes.data) {
+        // Filter out "Any sedan" from car types
+        const filteredCarTypes = carTypesRes.data.filter(type => type.name !== 'Any sedan');
+        setCarTypes(filteredCarTypes);
+      }
       if (seaterRes.data) setSeaterTypes(seaterRes.data);
       if (fuelRes.data) setFuelTypes(fuelRes.data);
     } catch (error) {

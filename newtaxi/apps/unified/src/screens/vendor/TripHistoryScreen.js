@@ -12,7 +12,7 @@ import TripStatusBadge from '../../components/TripStatusBadge';
 const { width: screenWidth } = Dimensions.get('window');
 const TABS = ['All', 'Active', 'Completed', 'Pending'];
 
-export default function VendorTripHistoryScreen() {
+export default function VendorTripHistoryScreen({ navigation }) {
   const { user } = useAuth();
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +67,7 @@ export default function VendorTripHistoryScreen() {
     pending:   trips.filter(t => t.status === 'pending').length,
   };
 
-  function TripCard({ item }) {
+  function TripCard({ item, navigation }) {
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -91,34 +91,22 @@ export default function VendorTripHistoryScreen() {
           </View>
         )}
 
-        {/* Show driver details for completed trips */}
-        {item.status === 'completed' && item.driver?.users && (
-          <>
-            <Text style={styles.driverDetailsTitle}>Driver Details</Text>
-            <View style={styles.driverSection}>
-              <View style={styles.row}>
-                <Ionicons name="person-circle-outline" size={16} color="#2196f3" />
-                <Text style={[styles.meta, { color: '#2196f3', fontWeight: '600' }]}>
-                  {item.driver.users.full_name || 'Unknown Driver'}
-                </Text>
-              </View>
-              {item.driver.users.phone && (
-                <View style={styles.row}>
-                  <Ionicons name="call-outline" size={16} color="#2196f3" />
-                  <Text style={[styles.meta, { color: '#2196f3' }]}>{item.driver.users.phone}</Text>
-                </View>
-              )}
-              {item.driver.vehicle_number && (
-                <View style={styles.row}>
-                  <Ionicons name="car-outline" size={16} color="#ff9800" />
-                  <Text style={[styles.meta, { color: '#ff9800', fontWeight: '600' }]}>{item.driver.vehicle_number}</Text>
-                </View>
-              )}
-            </View>
-          </>
-        )}
-
         <Text style={styles.date}>{new Date(item.created_at).toLocaleString()}</Text>
+
+        {/* View Details Button */}
+        <TouchableOpacity
+          style={styles.viewDetailsBtn}
+          onPress={() => {
+            if (item.status === 'completed') {
+              navigation.navigate('CompletedTripDetail', { trip: item });
+            } else {
+              navigation.navigate('EnquiryDetail', { trip: item, readOnly: true });
+            }
+          }}
+        >
+          <Ionicons name="eye-outline" size={16} color="#fff" />
+          <Text style={styles.viewDetailsBtnText}>View Details</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -167,7 +155,7 @@ export default function VendorTripHistoryScreen() {
       <FlatList
         data={filteredTrips}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <TripCard item={item} />}
+        renderItem={({ item }) => <TripCard item={item} navigation={navigation} />}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={fetchTrips} tintColor="#e94560" colors={['#e94560']} />
@@ -225,6 +213,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   date: { color: '#888', fontSize: 12, marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
+  viewDetailsBtn: {
+    backgroundColor: '#2196f3',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  viewDetailsBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyText: { color: '#888', fontSize: 16, marginTop: 12 },
 });

@@ -98,29 +98,26 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
                 <Text style={styles.fareText}>₹{(trip.fare_amount - commissionAmount).toFixed(2)}</Text>
               </View>
               {trip.fixed_km && (
-                <View style={styles.kmBadge}>
-                  <Ionicons name="swap-horizontal-outline" size={16} color="#333" />
+                <>
+                  <Text style={styles.fareKmSeparator}>|</Text>
                   <Text style={styles.kmText}>{trip.fixed_km} km</Text>
-                </View>
+                </>
+              )}
+              {trip.extra_km_charge && trip.extra_km_charge > 0 && (
+                <>
+                  <Text style={styles.fareKmSeparator}>|</Text>
+                  <Text style={styles.extraKmChargeText}>Ex ₹{trip.extra_km_charge}/km</Text>
+                </>
               )}
             </View>
           </View>
-
-          {/* Extra KM Charge - Clear Separate Line */}
-          {trip.extra_km_charge && trip.extra_km_charge > 0 && (
-            <View style={styles.extraKmChargeRow}>
-              <Ionicons name="trending-up-outline" size={14} color="#ff9800" />
-              <Text style={styles.extraKmChargeLabel}>For Extra KM:</Text>
-              <Text style={styles.extraKmChargeValue}>₹{trip.extra_km_charge}/km</Text>
-            </View>
-          )}
 
           {/* Locations in one row */}
           <View style={styles.enquiryLocationsRow}>
             <View style={styles.enquiryLocationItem}>
               <Ionicons name="location" size={12} color="#4caf50" />
               <Text style={styles.enquiryLocationLabel}>Pickup</Text>
-              <Text style={styles.enquiryLocationText} numberOfLines={1}>{trip.pickup_location}</Text>
+              <Text style={styles.enquiryLocationText} numberOfLines={0}>{trip.pickup_location}</Text>
             </View>
             <View style={styles.enquiryLocationDividerContainer}>
               <Text style={styles.enquiryLocationDivider}>→</Text>
@@ -128,7 +125,7 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
             <View style={styles.enquiryLocationItem}>
               <Ionicons name="flag" size={12} color="#e94560" />
               <Text style={styles.enquiryLocationLabel}>Drop</Text>
-              <Text style={styles.enquiryLocationText} numberOfLines={1}>{trip.dropoff_location}</Text>
+              <Text style={styles.enquiryLocationText} numberOfLines={0}>{trip.dropoff_location}</Text>
             </View>
             {trip.return_location && (
               <>
@@ -138,7 +135,7 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
                 <View style={styles.enquiryLocationItem}>
                   <Ionicons name="location-outline" size={12} color="#2196f3" />
                   <Text style={styles.enquiryLocationLabel}>Return</Text>
-                  <Text style={[styles.enquiryLocationText, { color: '#2196f3' }]} numberOfLines={1}>{trip.return_location}</Text>
+                  <Text style={[styles.enquiryLocationText, { color: '#2196f3' }]} numberOfLines={0}>{trip.return_location}</Text>
                 </View>
               </>
             )}
@@ -327,11 +324,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   tripType: {
-    color: '#ff9800',
-    fontSize: Math.max(18, screenWidth * 0.045),
-    fontWeight: '600',
+    color: '#000',
+    fontSize: Math.max(24, screenWidth * 0.055),
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   paymentBadge: {
     backgroundColor: '#f5f5f5',
@@ -354,21 +351,21 @@ const styles = StyleSheet.create({
   fareKmBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   fareBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   fareText: {
     color: '#333',
     fontWeight: 'bold',
-    fontSize: Math.max(14, screenWidth * 0.038),
+    fontSize: Math.max(18, screenWidth * 0.048),
   },
   kmBadge: {
     flexDirection: 'row',
@@ -378,6 +375,16 @@ const styles = StyleSheet.create({
   kmText: {
     color: '#333',
     fontWeight: 'bold',
+    fontSize: Math.max(16, screenWidth * 0.042),
+  },
+  fareKmSeparator: {
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: Math.max(18, screenWidth * 0.048),
+  },
+  extraKmChargeText: {
+    color: '#000',
+    fontWeight: '600',
     fontSize: Math.max(14, screenWidth * 0.038),
   },
   extraKmChargeRow: {
@@ -523,40 +530,40 @@ const styles = StyleSheet.create({
   enquiryLocationsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginVertical: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    gap: 6,
+    marginVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     flexWrap: 'wrap',
   },
   enquiryLocationItem: {
-    flex: 1,
-    minWidth: 70,
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   enquiryLocationDividerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
   },
   enquiryLocationLabel: {
     color: '#888',
-    fontSize: Math.max(8, screenWidth * 0.02),
+    fontSize: Math.max(10, screenWidth * 0.026),
     fontWeight: '600',
   },
   enquiryLocationText: {
     color: '#333',
-    fontSize: Math.max(11, screenWidth * 0.032),
+    fontSize: Math.max(13, screenWidth * 0.036),
     fontWeight: '600',
     textAlign: 'center',
+    flexWrap: 'wrap',
+    maxWidth: screenWidth * 0.25,
   },
   enquiryLocationDivider: {
     color: '#555',
-    fontSize: Math.max(12, screenWidth * 0.03),
-    marginHorizontal: 2,
+    fontSize: Math.max(16, screenWidth * 0.038),
+    marginHorizontal: 4,
   },
   includedText: {
     color: '#4caf50',

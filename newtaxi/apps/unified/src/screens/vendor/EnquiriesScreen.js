@@ -113,7 +113,21 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
 
       <View style={styles.myTripHeader}>
         <TripStatusBadge status={item.status} />
-        <Text style={styles.myTripFare}>₹{item.fare_amount}</Text>
+        <View style={styles.fareKmContainer}>
+          <Text style={styles.myTripFare}>₹{item.fare_amount}</Text>
+          {item.fixed_km && (
+            <>
+              <Text style={styles.fareKmSeparator}>|</Text>
+              <Text style={styles.myTripKm}>{item.fixed_km} km</Text>
+            </>
+          )}
+          {item.extra_km_charge && item.extra_km_charge > 0 && (
+            <>
+              <Text style={styles.fareKmSeparator}>|</Text>
+              <Text style={styles.myTripExtraKm}>Ex ₹{item.extra_km_charge}/km</Text>
+            </>
+          )}
+        </View>
       </View>
 
       {/* Locations in one row */}
@@ -305,16 +319,15 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         </TouchableOpacity>
       )}
 
-      {/* Cancel/Release button — only for accepted/in_progress trips */}
+      {/* Cancel/Release button — for accepted/in_progress trips (even with driver assigned) */}
       {canCancel && (
         <TouchableOpacity
-          style={[styles.cancelBtn, item.driver_id && styles.releaseBtnDisabled]}
-          onPress={() => !item.driver_id && onCancel?.(item.id)}
-          disabled={!!item.driver_id}
+          style={styles.cancelBtn}
+          onPress={() => onCancel?.(item.id)}
         >
-          <Ionicons name="close-circle-outline" size={16} color={item.driver_id ? "#ccc" : "#ff9800"} />
-          <Text style={[styles.cancelBtnText, item.driver_id && styles.releaseBtnDisabledText]}>
-            {item.driver_id ? 'Driver Assigned' : 'Release Trip'}
+          <Ionicons name="close-circle-outline" size={16} color="#ff9800" />
+          <Text style={styles.cancelBtnText}>
+            Release Trip
           </Text>
         </TouchableOpacity>
       )}
@@ -330,36 +343,47 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
           
-          {/* Assign Trip button - show "Assigned" if driver already assigned */}
+          {/* Assign Trip button - show "Reassign" if driver already assigned */}
           {item.driver_id ? (
-            <TouchableOpacity
-              style={[styles.assignTripBtn, styles.assignedBtn]}
-              onPress={async () => {
-                // Fetch assigned driver details
-                try {
-                  const { data: driver } = await supabase
-                    .from('drivers')
-                    .select('*, users(id, full_name, phone, email)')
-                    .eq('id', item.driver_id)
-                    .maybeSingle();
+            <>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.assignTripBtn, styles.assignedBtn, { flex: 1 }]}
+                  onPress={async () => {
+                    // Fetch assigned driver details
+                    try {
+                      const { data: driver } = await supabase
+                        .from('drivers')
+                        .select('*, users(id, full_name, phone, email)')
+                        .eq('id', item.driver_id)
+                        .maybeSingle();
 
-                  if (driver) {
-                    const statusText = item.status === 'accepted' ? 'Accepted' : item.status === 'in_progress' ? 'In Progress' : item.status?.charAt(0).toUpperCase() + item.status?.slice(1);
-                    Alert.alert(
-                      'Assigned Driver',
-                      `Name: ${driver.users?.full_name || 'Unknown'}\nPhone: ${driver.users?.phone || 'N/A'}\nVehicle: ${driver.vehicle_number || 'N/A'}\nStatus: ${statusText}\n\nDriver assigned to this trip.`,
-                      [{ text: 'OK' }]
-                    );
-                  }
-                } catch (err) {
-                  console.error('Error fetching driver:', err);
-                  Alert.alert('Error', 'Could not fetch driver details');
-                }
-              }}
-            >
-              <Ionicons name="checkmark-done" size={16} color="#fff" />
-              <Text style={styles.assignTripBtnText}>Assigned</Text>
-            </TouchableOpacity>
+                      if (driver) {
+                        const statusText = item.status === 'accepted' ? 'Accepted' : item.status === 'in_progress' ? 'In Progress' : item.status?.charAt(0).toUpperCase() + item.status?.slice(1);
+                        Alert.alert(
+                          'Assigned Driver',
+                          `Name: ${driver.users?.full_name || 'Unknown'}\nPhone: ${driver.users?.phone || 'N/A'}\nVehicle: ${driver.vehicle_number || 'N/A'}\nStatus: ${statusText}`,
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    } catch (err) {
+                      console.error('Error fetching driver:', err);
+                      Alert.alert('Error', 'Could not fetch driver details');
+                    }
+                  }}
+                >
+                  <Ionicons name="checkmark-done" size={16} color="#fff" />
+                  <Text style={styles.assignTripBtnText}>View Driver</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.assignTripBtn, styles.reassignBtn, { flex: 1, marginLeft: 8 }]}
+                  onPress={() => navigation.navigate('AssignDriver', { trip: item })}
+                >
+                  <Ionicons name="swap-horizontal-outline" size={16} color="#fff" />
+                  <Text style={styles.assignTripBtnText}>Reassign</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           ) : (
             <TouchableOpacity
               style={styles.assignTripBtn}
@@ -394,6 +418,14 @@ export default function VendorEnquiriesScreen({ navigation }) {
   const { enquiries, loading: loadingEnq, error, refetch: refetchEnq } = useAvailableEnquiries();
   const { trips, loading: loadingTrips, refetch: refetchTrips } = useVendorTrips(user?.id);
   const [activeTab, setActiveTab] = useState(0);
+  const [activeStatusFilter, setActiveStatusFilter] = useState('all'); // 'all', 'pending', 'accepted', 'completed'
+
+  // Reset filter to 'all' when switching to My Trips tab, but show only active trips
+  useEffect(() => {
+    if (activeTab === 1) {
+      setActiveStatusFilter('all');
+    }
+  }, [activeTab]);
 
   // Initialize audio on mount
   useEffect(() => {
@@ -479,6 +511,34 @@ export default function VendorEnquiriesScreen({ navigation }) {
 
   const isLoading = activeTab === 0 ? loadingEnq : loadingTrips;
 
+  // Filter trips by status
+  const filteredTrips = trips.filter(trip => {
+    if (activeStatusFilter === 'all') {
+      // Show all active trips (pending, accepted, in_progress)
+      return trip.status === 'pending' || trip.status === 'accepted' || trip.status === 'in_progress';
+    }
+    if (activeStatusFilter === 'pending') return trip.status === 'pending';
+    if (activeStatusFilter === 'accepted') return trip.status === 'accepted' || trip.status === 'in_progress';
+    return true;
+  });
+
+  // Debug logging
+  useEffect(() => {
+    if (activeTab === 1) {
+      console.log(`🔍 Trips Filter Debug:`, {
+        totalTrips: trips.length,
+        activeFilter: activeStatusFilter,
+        filteredCount: filteredTrips.length,
+        statusBreakdown: {
+          pending: trips.filter(t => t.status === 'pending').length,
+          accepted: trips.filter(t => t.status === 'accepted').length,
+          in_progress: trips.filter(t => t.status === 'in_progress').length,
+          completed: trips.filter(t => t.status === 'completed').length,
+        }
+      });
+    }
+  }, [activeTab, trips, activeStatusFilter, filteredTrips.length]);
+
   async function handleAcceptTrip(trip) {
     if (!vendor?.id) {
       Alert.alert('Error', 'Vendor profile not found. Please contact support.');
@@ -520,9 +580,18 @@ export default function VendorEnquiriesScreen({ navigation }) {
   }
 
   async function handleCancelTrip(tripId) {
+    // Find the trip to check if driver is assigned
+    const trip = trips.find(t => t.id === tripId);
+    const hasDriver = trip?.driver_id;
+
+    const title = hasDriver ? 'Release Trip & Remove Driver' : 'Release Trip';
+    const message = hasDriver 
+      ? 'This will release the trip back to the pool and remove the assigned driver. Are you sure?'
+      : 'Release this trip back to the pool so others can accept it?';
+
     Alert.alert(
-      'Cancel Trip',
-      'Release this trip back to the pool so others can accept it?',
+      title,
+      message,
       [
         { text: 'No', style: 'cancel' },
         {
@@ -544,6 +613,12 @@ export default function VendorEnquiriesScreen({ navigation }) {
                 .eq('id', tripId);
               
               if (error) throw error;
+
+              // Show appropriate success message
+              const successMsg = hasDriver
+                ? '✅ Trip released and driver assignment removed'
+                : '✅ Trip released successfully';
+              Alert.alert('Success', successMsg);
               
               refetchTrips();
               refetchEnq();
@@ -641,7 +716,7 @@ export default function VendorEnquiriesScreen({ navigation }) {
     );
   }
 
-  const data = activeTab === 0 ? liveEnquiries : trips;
+  const data = activeTab === 0 ? liveEnquiries : filteredTrips;
 
   return (
     <View style={styles.container}>
@@ -671,6 +746,33 @@ export default function VendorEnquiriesScreen({ navigation }) {
           <TouchableOpacity onPress={refetchEnq}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Status Filter Tabs - Only show on My Trips tab */}
+      {activeTab === 1 && (
+        <View style={styles.statusFilterContainer}>
+          {['all', 'pending', 'accepted'].map((status) => (
+            <TouchableOpacity
+              key={status}
+              style={[
+                styles.statusFilterTab,
+                activeStatusFilter === status && styles.statusFilterTabActive,
+              ]}
+              onPress={() => setActiveStatusFilter(status)}
+            >
+              <Text
+                style={[
+                  styles.statusFilterText,
+                  activeStatusFilter === status && styles.statusFilterTextActive,
+                ]}
+              >
+                {status === 'all' && 'All'}
+                {status === 'pending' && 'Pending'}
+                {status === 'accepted' && 'Accepted'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
 
@@ -803,6 +905,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   myTripFare: { color: '#4caf50', fontWeight: 'bold', fontSize: Math.max(18, screenWidth * 0.048) },
+  fareKmContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fareKmSeparator: {
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: Math.max(14, screenWidth * 0.038),
+  },
+  myTripKm: {
+    color: '#333',
+    fontWeight: '600',
+    fontSize: Math.max(14, screenWidth * 0.038),
+  },
+  myTripExtraKm: {
+    color: '#000',
+    fontWeight: '600',
+    fontSize: Math.max(12, screenWidth * 0.032),
+  },
   locationsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -934,27 +1056,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notesHeader: {
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 2,
     borderTopColor: '#1a1a2e',
   },
   notesTitle: {
     color: '#fff',
-    fontSize: Math.max(12, screenWidth * 0.032),
-    fontWeight: '600',
-    marginBottom: 6,
+    fontSize: Math.max(16, screenWidth * 0.042),
+    fontWeight: '700',
+    marginBottom: 10,
   },
   noteItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 10,
+    paddingVertical: 6,
   },
   noteText: {
     color: '#ff9800',
-    fontSize: Math.max(10, screenWidth * 0.028),
-    fontWeight: '500',
+    fontSize: Math.max(13, screenWidth * 0.036),
+    fontWeight: '600',
     flex: 1,
   },
   creatorDetailsBox: {
@@ -1103,9 +1226,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
   assignedBtn: {
     backgroundColor: '#2196f3',
-    opacity: 0.7,
+    opacity: 1,
+  },
+  reassignBtn: {
+    backgroundColor: '#ff9800',
   },
   assignTripBtnText: {
     color: '#fff',
@@ -1123,6 +1254,35 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   viewDetailsBtnText: { color: '#fff', fontSize: Math.max(12, screenWidth * 0.032), fontWeight: '600' },
+  statusFilterContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: screenWidth * 0.04,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    gap: 8,
+  },
+  statusFilterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    backgroundColor: '#f5f5f5',
+  },
+  statusFilterTabActive: {
+    backgroundColor: '#ff9800',
+  },
+  statusFilterText: {
+    color: '#666',
+    fontSize: Math.max(12, screenWidth * 0.032),
+    fontWeight: '600',
+  },
+  statusFilterTextActive: {
+    color: '#fff',
+  },
   fab: {
     position: 'absolute',
     bottom: Math.max(24, screenHeight * 0.03),

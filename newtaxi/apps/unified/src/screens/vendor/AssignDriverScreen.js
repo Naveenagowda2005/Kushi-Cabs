@@ -20,37 +20,47 @@ export default function AssignDriverScreen({ route, navigation }) {
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [imageErrors, setImageErrors] = useState({});
+  const [filterTab, setFilterTab] = useState('approved'); // 'approved' or 'dummy'
 
   useEffect(() => {
     fetchAvailableDrivers();
   }, []);
 
-  // Filter drivers based on search query
+  // Filter drivers based on search query and filter tab
   useEffect(() => {
+    let filtered = drivers;
+
+    // Apply filter tab
+    if (filterTab === 'approved') {
+      filtered = filtered.filter(d => !d.users?.full_name?.toLowerCase().includes('dummy'));
+    } else if (filterTab === 'dummy') {
+      filtered = filtered.filter(d => d.users?.full_name?.toLowerCase().includes('dummy'));
+    }
+
+    // Apply search query
     if (searchQuery.trim() === '') {
-      setFilteredDrivers(drivers);
+      setFilteredDrivers(filtered);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = drivers.filter(driver =>
+      filtered = filtered.filter(driver =>
         (driver.users?.full_name || '').toLowerCase().includes(query) ||
         (driver.users?.phone || '').includes(query) ||
         (driver.vehicle_number || '').toLowerCase().includes(query)
       );
       setFilteredDrivers(filtered);
     }
-  }, [searchQuery, drivers]);
+  }, [searchQuery, drivers, filterTab]);
 
   async function fetchAvailableDrivers() {
     try {
       setLoading(true);
-      // Fetch only users who have driver profiles (actual drivers)
-      // Join with drivers table to ensure they are real drivers
+      // Fetch all drivers including dummy drivers
       const { data: usersData, error: usersError } = await supabase
         .from('drivers')
         .select('id, user_id, vehicle_number, is_online, license_number, users!inner(id, full_name, phone, verification_status)')
         .eq('users.verification_status', 'approved')
-        .eq('users.is_active', true)
-        .filter('users.full_name', 'not.ilike', '%dummy%'); // Exclude dummy drivers
+        .eq('users.is_active', true);
+        // Removed: filter to exclude dummy drivers - now allowing them
 
       if (usersError) throw usersError;
       
@@ -67,8 +77,8 @@ export default function AssignDriverScreen({ route, navigation }) {
           const user = driverRecord.user;
           const driverProfile = driverRecord;
 
-          // Skip if no driver profile or if license_number indicates dummy driver
-          if (driverProfile && !driverProfile.license_number?.toUpperCase().startsWith('DUMMY-')) {
+          // Skip if no driver profile
+          if (driverProfile) {
             // Fetch driver SELFIE photo from driver_documents
             let photoUrl = null;
             try {
@@ -119,12 +129,12 @@ export default function AssignDriverScreen({ route, navigation }) {
         })
       );
 
-      // Filter out null values, exclude dummy drivers (double-check), and sort by name
+      // Filter out null values and sort by name (now includes dummy drivers)
       const validDrivers = driversWithDetails
-        .filter(d => d !== null && !(d.users?.full_name?.toLowerCase().includes('dummy')) && !d.license_number?.toUpperCase().startsWith('DUMMY-'))
+        .filter(d => d !== null)
         .sort((a, b) => (a.users?.full_name || '').localeCompare(b.users?.full_name || ''));
 
-      console.log(`✅ Loaded ${validDrivers.length} drivers (filtered ${driversWithDetails.length - validDrivers.length} dummy drivers)`);
+      console.log(`✅ Loaded ${validDrivers.length} drivers (including dummy drivers)`);
       setDrivers(validDrivers);
     } catch (err) {
       console.error('Error fetching drivers:', err);
@@ -140,21 +150,28 @@ export default function AssignDriverScreen({ route, navigation }) {
       return;
     }
 
+    const actionText = trip.driver_id ? 'Reassign' : 'Assign';
+    const driverName = selectedDriver.users?.full_name || 'Unknown';
+    const previousDriver = trip.driver_id ? 'current driver' : '';
+
     Alert.alert(
-      'Assign Trip',
-      `Assign this trip to ${selectedDriver.users?.full_name}?`,
+      `${actionText} Trip`,
+      trip.driver_id 
+        ? `Reassign this trip from the ${previousDriver} to ${driverName}?`
+        : `Assign this trip to ${driverName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Assign',
+          text: actionText,
           style: 'default',
           onPress: async () => {
             setAssigning(true);
             try {
-              console.log('📤 ASSIGNING TRIP:');
+              console.log(`📤 ${actionText.toUpperCase()} TRIP:`);
               console.log('  Trip ID:', trip.id);
               console.log('  Driver ID (from drivers table):', selectedDriver.id);
               console.log('  Driver User ID (auth.uid):', selectedDriver.user_id);
+              console.log('  Previous Driver ID:', trip.driver_id || 'None');
               console.log('  Status before:', trip.status);
               console.log('  Status after:', TRIP_STATUS.ACCEPTED);
 
@@ -162,9 +179,7 @@ export default function AssignDriverScreen({ route, navigation }) {
                 .from('trips')
                 .update({
                   driver_id: selectedDriver.id, // Assign to this driver
-                  // Keep accepted_by = vendor so vendor can still see it in "My Trips"
-                  // Driver sees it via driver_id in RLS policy
-                  status: TRIP_STATUS.ACCEPTED, // Set to accepted, not in_progress
+                  status: TRIP_STATUS.ACCEPTED,
                 })
                 .eq('id', trip.id)
                 .select();
@@ -176,12 +191,12 @@ export default function AssignDriverScreen({ route, navigation }) {
 
               console.log('✅ Trip updated in database:', data);
 
-              Alert.alert('Success', 'Trip assigned to driver successfully!', [
+              Alert.alert('Success', `Trip ${actionText.toLowerCase()}ed to driver successfully!`, [
                 { text: 'OK', onPress: () => navigation.goBack() },
               ]);
             } catch (err) {
-              console.error('❌ Error assigning trip:', err);
-              Alert.alert('Error', err.message || 'Failed to assign trip');
+              console.error(`❌ Error ${actionText.toLowerCase()}ing trip:`, err);
+              Alert.alert('Error', err.message || `Failed to ${actionText.toLowerCase()} trip`);
             } finally {
               setAssigning(false);
             }
@@ -303,6 +318,26 @@ export default function AssignDriverScreen({ route, navigation }) {
         </View>
       </View>
 
+      {/* Filter Tabs */}
+      <View style={styles.filterTabsContainer}>
+        <TouchableOpacity
+          style={[styles.filterTab, filterTab === 'approved' && styles.filterTabActive]}
+          onPress={() => setFilterTab('approved')}
+        >
+          <Text style={[styles.filterTabText, filterTab === 'approved' && styles.filterTabTextActive]}>
+            Approved Drivers
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterTab, filterTab === 'dummy' && styles.filterTabActive]}
+          onPress={() => setFilterTab('dummy')}
+        >
+          <Text style={[styles.filterTabText, filterTab === 'dummy' && styles.filterTabTextActive]}>
+            Dummy Drivers
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search-outline" size={20} color="#888" style={styles.searchIcon} />
@@ -339,7 +374,7 @@ export default function AssignDriverScreen({ route, navigation }) {
         }
       />
 
-      {/* Assign Button */}
+      {/* Assign/Reassign Button */}
       {selectedDriver && (
         <View style={styles.footer}>
           <TouchableOpacity
@@ -351,8 +386,10 @@ export default function AssignDriverScreen({ route, navigation }) {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                <Text style={styles.assignBtnText}>Assign to {selectedDriver.users?.full_name}</Text>
+                <Ionicons name={trip.driver_id ? "swap-horizontal-outline" : "checkmark-circle-outline"} size={20} color="#fff" />
+                <Text style={styles.assignBtnText}>
+                  {trip.driver_id ? 'Reassign to' : 'Assign to'} {selectedDriver.users?.full_name}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -397,6 +434,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  filterTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 12,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  filterTabActive: {
+    borderBottomColor: '#e94560',
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888',
+  },
+  filterTabTextActive: {
+    color: '#e94560',
   },
   tripRoute: {
     fontSize: 16,
