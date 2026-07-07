@@ -36,11 +36,16 @@ export default function DriverActiveTripScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!activeTrip) return;
-    if (activeTrip.status === TRIP_STATUS.IN_PROGRESS) {
-      setStep(STEPS.IN_PROGRESS);
-      setShowNavigationMap(true);
+    
+    // Only update step from trip status if we're in the initial states
+    // Don't override if user has manually progressed to PAYMENT or DONE steps
+    if (step < STEPS.PAYMENT) {
+      if (activeTrip.status === TRIP_STATUS.IN_PROGRESS) {
+        setStep(STEPS.IN_PROGRESS);
+        setShowNavigationMap(true);
+      }
+      if (activeTrip.status === TRIP_STATUS.COMPLETED) setStep(STEPS.DONE);
     }
-    if (activeTrip.status === TRIP_STATUS.COMPLETED) setStep(STEPS.DONE);
 
     // Fetch trip creator details
     const fetchCreatorDetails = async () => {
@@ -75,7 +80,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
     };
 
     fetchCreatorDetails();
-  }, [activeTrip]);
+  }, [activeTrip, step]);
 
   const captureOdometerImage = async (type) => {
     try {
@@ -380,7 +385,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
     }
 
     return (
-      <View style={styles.center}>
+      <ScrollView contentContainerStyle={styles.doneContainer}>
         <Ionicons name="checkmark-circle" size={80} color="#4caf50" />
         <Text style={styles.doneTitle}>Trip Completed!</Text>
         <Text style={styles.doneEarnings}>₹{driverEarning.toFixed(2)}</Text>
@@ -404,10 +409,34 @@ export default function DriverActiveTripScreen({ route, navigation }) {
           )}
         </View>
 
-        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.replace('Dashboard')}>
-          <Text style={styles.actionBtnText}>Back to Dashboard</Text>
+        {/* Payment Collection Question */}
+        <View style={styles.paymentQuestionCard}>
+          <Ionicons name="cash-outline" size={32} color="#4caf50" style={{ marginBottom: 12 }} />
+          <Text style={styles.paymentQuestionText}>Did you collect the payment from the passenger?</Text>
+          
+          <View style={styles.paymentButtonsContainer}>
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.actionBtnYes]}
+              onPress={handleCollectedYes}
+            >
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Yes, Collected</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.actionBtnNo]}
+              onPress={handleCollectedNo}
+            >
+              <Ionicons name="help-circle" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Need Help</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.replace('Dashboard')}>
+          <Text style={styles.cancelBtnText}>Skip for Now</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -954,4 +983,10 @@ const styles = StyleSheet.create({
   },
   infoBox: { backgroundColor: '#0a2a4a', borderRadius: 10, padding: 14, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#2196f3' },
   infoText: { color: '#2196f3', fontSize: 14, fontWeight: '600' },
+  doneContainer: { flexGrow: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', padding: 24, paddingBottom: 40 },
+  paymentQuestionCard: { backgroundColor: '#f9f9f9', borderRadius: 14, padding: 24, marginTop: 24, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#eee', width: '100%' },
+  paymentQuestionText: { color: '#333', fontSize: 18, fontWeight: '600', textAlign: 'center', marginTop: 12 },
+  paymentButtonsContainer: { width: '100%', gap: 12, marginTop: 20 },
+  actionBtnYes: { backgroundColor: '#4caf50', borderColor: '#4caf50', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  actionBtnNo: { backgroundColor: '#ff9800', borderColor: '#ff9800', flexDirection: 'row', justifyContent: 'center', gap: 8 },
 });
