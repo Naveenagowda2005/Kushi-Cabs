@@ -13,7 +13,7 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 CREATE TABLE IF NOT EXISTS payment_orders (
-  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   razorpay_order_id   TEXT,
   razorpay_payment_id TEXT,

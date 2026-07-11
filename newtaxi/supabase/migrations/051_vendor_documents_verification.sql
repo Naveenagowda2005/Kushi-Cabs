@@ -20,7 +20,7 @@ CREATE TYPE vendor_document_type AS ENUM (
 -- ============================================================
 -- Stores individual vendor documents with their verification status
 CREATE TABLE vendor_documents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- References
   vendor_id UUID NOT NULL UNIQUE REFERENCES vendors(id) ON DELETE CASCADE,
@@ -39,7 +39,7 @@ CREATE TABLE vendor_documents (
 -- ============================================================
 -- Tracks overall verification status for each vendor
 CREATE TABLE vendor_verification_status (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- References
   vendor_id UUID UNIQUE NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,

@@ -29,7 +29,7 @@ CREATE TYPE verification_status AS ENUM (
 -- ============================================================
 -- Stores individual driver documents with their verification status
 CREATE TABLE driver_documents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- References
   driver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -62,7 +62,7 @@ CREATE TABLE driver_documents (
 -- ============================================================
 -- Tracks overall verification status for each driver
 CREATE TABLE driver_verification_status (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- References
   driver_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,

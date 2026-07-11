@@ -2,7 +2,7 @@
 -- TAXI SERVICE MANAGEMENT SYSTEM - Initial Schema
 -- ============================================================
 
--- Enable UUID extension
+-- Enable UUID extension (may already exist)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
@@ -31,7 +31,7 @@ CREATE TABLE users (
 -- VENDORS
 -- ============================================================
 CREATE TABLE vendors (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   company_name  TEXT,
   commission_pct NUMERIC(5,2) DEFAULT 10.00,  -- percentage
@@ -42,7 +42,7 @@ CREATE TABLE vendors (
 -- DRIVERS
 -- ============================================================
 CREATE TABLE drivers (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   vendor_id       UUID REFERENCES vendors(id),
   license_number  TEXT,
@@ -64,7 +64,7 @@ CREATE TYPE trip_status AS ENUM (
 );
 
 CREATE TABLE trips (
-  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by          UUID NOT NULL REFERENCES users(id),       -- admin
   accepted_by         UUID REFERENCES users(id),                -- vendor or driver
   driver_id           UUID REFERENCES drivers(id),
@@ -105,7 +105,7 @@ ALTER TABLE drivers ADD CONSTRAINT fk_current_trip
 -- WALLETS
 -- ============================================================
 CREATE TABLE wallets (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   balance    NUMERIC(12,2) DEFAULT 0.00,
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -123,7 +123,7 @@ CREATE TYPE transaction_type AS ENUM (
 );
 
 CREATE TABLE transactions (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wallet_id   UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
   trip_id     UUID REFERENCES trips(id),
   type        transaction_type NOT NULL,
@@ -136,7 +136,7 @@ CREATE TABLE transactions (
 -- DOCUMENTS (odometer images, license, etc.)
 -- ============================================================
 CREATE TABLE documents (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   trip_id     UUID REFERENCES trips(id),
   doc_type    TEXT NOT NULL,  -- 'start_odometer', 'end_odometer', 'license', etc.

@@ -3,6 +3,7 @@
 -- ============================================================
 
 -- Payment status enum
+DROP TYPE IF EXISTS payment_status CASCADE;
 CREATE TYPE payment_status AS ENUM (
   'pending',      -- Payment initiated, awaiting PhonePe response
   'completed',    -- Payment successful
@@ -11,6 +12,7 @@ CREATE TYPE payment_status AS ENUM (
 );
 
 -- Refund status enum
+DROP TYPE IF EXISTS refund_status CASCADE;
 CREATE TYPE refund_status AS ENUM (
   'pending',      -- Refund initiated
   'processing',   -- Refund being processed by PhonePe
@@ -20,7 +22,7 @@ CREATE TYPE refund_status AS ENUM (
 
 -- Payment records - track all driver payments
 CREATE TABLE payments (
-  id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id                 UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   driver_id               UUID NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
   commission_amount       NUMERIC(12,2) NOT NULL,  -- Amount driver must pay
@@ -46,7 +48,7 @@ CREATE TABLE payments (
 
 -- Refund records - track refunds when driver cancels
 CREATE TABLE refunds (
-  id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   payment_id              UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
   trip_id                 UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   driver_id               UUID NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
@@ -76,7 +78,7 @@ CREATE TABLE refunds (
 
 -- Audit log for payment operations
 CREATE TABLE payment_audit_log (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   payment_id  UUID REFERENCES payments(id) ON DELETE CASCADE,
   refund_id   UUID REFERENCES refunds(id) ON DELETE CASCADE,
   action      TEXT NOT NULL,  -- 'initiated', 'success', 'failed', 'refunded', etc.

@@ -11,14 +11,14 @@ ADD COLUMN IF NOT EXISTS fuel_type UUID;
 
 -- Create car_types table for reference
 CREATE TABLE IF NOT EXISTS car_types (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create car_models table (linked to car_type)
 CREATE TABLE IF NOT EXISTS car_models (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   car_type_id UUID NOT NULL REFERENCES car_types(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -26,14 +26,14 @@ CREATE TABLE IF NOT EXISTS car_models (
 
 -- Create seater_types table
 CREATE TABLE IF NOT EXISTS seater_types (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create fuel_types table
 CREATE TABLE IF NOT EXISTS fuel_types (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

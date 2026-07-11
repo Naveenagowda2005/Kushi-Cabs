@@ -5,7 +5,7 @@
 
 -- Create admin_trip_assignments table
 CREATE TABLE IF NOT EXISTS admin_trip_assignments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   driver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   assigned_at TIMESTAMPTZ DEFAULT NOW(),
