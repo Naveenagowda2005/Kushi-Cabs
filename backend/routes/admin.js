@@ -359,8 +359,16 @@ router.post('/create-dummy-driver', async (req, res) => {
       .eq('name', 'driver')
       .single();
 
-    if (roleError || !roleData) {
-      return res.status(500).json({ error: 'Driver role not found' });
+    console.log(`🔍 Role query result:`, { roleData, error: roleError?.message });
+
+    if (roleError) {
+      console.error('❌ Role query error:', roleError);
+      return res.status(500).json({ error: 'Driver role query failed: ' + roleError.message });
+    }
+
+    if (!roleData) {
+      console.error('❌ No role data returned');
+      return res.status(500).json({ error: 'Driver role not found in database' });
     }
 
     // 2. Create or reset auth account
@@ -664,8 +672,16 @@ router.post('/create-dummy-vendor', async (req, res) => {
       .eq('name', 'vendor')
       .single();
 
-    if (roleError || !roleData) {
-      return res.status(500).json({ error: 'Vendor role not found' });
+    console.log(`🔍 Role query result:`, { roleData, error: roleError?.message });
+
+    if (roleError) {
+      console.error('❌ Role query error:', roleError);
+      return res.status(500).json({ error: 'Vendor role query failed: ' + roleError.message });
+    }
+
+    if (!roleData) {
+      console.error('❌ No role data returned');
+      return res.status(500).json({ error: 'Vendor role not found in database' });
     }
 
     // 2. Create or reset auth account
