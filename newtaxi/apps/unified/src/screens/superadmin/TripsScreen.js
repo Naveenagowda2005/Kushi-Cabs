@@ -708,6 +708,28 @@ export default function SuperAdminTripsScreen() {
         return;
       }
 
+      // Get the driver profile ID from the drivers table
+      console.log('🔍 Fetching driver profile for user:', selectedDriver.id);
+      const { data: driverProfile, error: driverError } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', selectedDriver.id)
+        .maybeSingle();
+
+      if (driverError) {
+        console.error('❌ Error fetching driver profile:', driverError);
+        throw new Error('Could not fetch driver profile: ' + driverError.message);
+      }
+
+      if (!driverProfile) {
+        Alert.alert('Error', 'Driver profile not found. Driver may not be verified.');
+        setReassigningTrip(prev => ({ ...prev, reassigning: false }));
+        return;
+      }
+
+      const driverId = driverProfile.id;
+      console.log('✅ Driver profile found:', { user_id: selectedDriver.id, driver_id: driverId });
+
       // Prepare updated admin_assigned_drivers array
       // Add the selected driver's user ID to the array if not already there
       const currentDrivers = latestTrip.admin_assigned_drivers || [];
@@ -716,15 +738,20 @@ export default function SuperAdminTripsScreen() {
         : [selectedDriver.id];
 
       console.log('🔄 Assigning trip to driver:', selectedDriver.id);
+      console.log('   Driver ID (from drivers table):', driverId);
       console.log('   Current admin_assigned_drivers:', currentDrivers);
       console.log('   Updated admin_assigned_drivers:', updatedDrivers);
 
-      // Now perform the direct update to set both accepted_by AND admin_assigned_drivers
-      // This ensures the driver can see the trip via RLS policy
+      // Now perform the direct update to set:
+      // 1. driver_id - the actual driver record (simplest RLS path that already works)
+      // 2. accepted_by - the user ID (for legacy compatibility)
+      // 3. admin_assigned_drivers - for tracking all assigned drivers
+      // 4. status - keep pending until driver manually accepts
       const { error: updateError } = await supabase
         .from('trips')
         .update({ 
-          accepted_by: selectedDriver.id,
+          driver_id: driverId,  // Set the driver_id (already works with RLS)
+          accepted_by: selectedDriver.id,  // Keep for compatibility
           admin_assigned_drivers: updatedDrivers,  // Add driver to the array
           status: 'pending' // Explicitly set back to pending in case anything tries to change it
         })
