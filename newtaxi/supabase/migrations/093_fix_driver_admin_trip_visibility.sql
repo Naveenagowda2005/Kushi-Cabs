@@ -23,11 +23,12 @@ CREATE POLICY "Drivers see available and own trips"
         LIMIT 1
       )
       
-      -- Condition 3: Trips where accepted_by matches driver's user_id (vendor-assigned, any status)
+      -- Condition 3: Trips where accepted_by matches driver's user_id (any status, any trip type)
+      -- This covers both vendor-assigned trips AND admin-reassigned trips
       OR accepted_by = auth.uid()
       
       -- Condition 4: Admin-created trips where driver is in admin_assigned_drivers array (NEW)
-      -- This allows drivers to see admin-reassigned trips
+      -- This allows drivers to see admin trips they're assigned to (before they accept)
       OR (
         is_admin_trip = TRUE 
         AND auth.uid() = ANY(admin_assigned_drivers)
