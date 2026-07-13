@@ -198,6 +198,11 @@ export default function SuperAdminTripsScreen() {
     fuelTypes: [],
   });
   const [savingTrip, setSavingTrip] = useState(false);
+  const [reassignModalVisible, setReassignModalVisible] = useState(false);
+  const [dummyDrivers, setDummyDrivers] = useState([]);
+  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [reassigningTrip, setReassigningTrip] = useState(null);
+  const [loadingDummyDrivers, setLoadingDummyDrivers] = useState(false);
 
   const fetchTrips = useCallback(async () => {
     setLoading(true);
@@ -644,6 +649,105 @@ export default function SuperAdminTripsScreen() {
     return trip.creator.role_id === 5;
   }, []);
 
+  // Function to fetch dummy drivers
+  const fetchDummyDrivers = useCallback(async () => {
+    try {
+      setLoadingDummyDrivers(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, phone, avatar_base64')
+        .eq('role_id', 3) // Driver role
+        .order('full_name');
+
+      if (error) throw error;
+
+      // Filter for dummy drivers (those with "DUMMY" in their name or created as test drivers)
+      const dummyDriversList = (data || []).filter(driver =>
+        driver.full_name?.toUpperCase().includes('DUMMY')
+      );
+
+      setDummyDrivers(dummyDriversList);
+      console.log('✅ Fetched dummy drivers:', dummyDriversList.length);
+    } catch (err) {
+      console.error('Error fetching dummy drivers:', err);
+      Alert.alert('Error', 'Failed to load dummy drivers');
+    } finally {
+      setLoadingDummyDrivers(false);
+    }
+  }, []);
+
+  // Function to reassign trip to dummy driver
+  const handleReassignTrip = useCallback(async () => {
+    if (!reassigningTrip || !selectedDriver) {
+      Alert.alert('Error', 'Please select a driver');
+      return;
+    }
+
+    try {
+      setReassigningTrip(prev => ({ ...prev, reassigning: true }));
+
+      // First, fetch the latest trip data to ensure we have correct status and admin_assigned_drivers
+      console.log('🔍 Fetching latest trip data before reassignment:', reassigningTrip.id);
+      const { data: latestTrip, error: fetchError } = await supabase
+        .from('trips')
+        .select('id, status, accepted_by, created_by, admin_assigned_drivers')
+        .eq('id', reassigningTrip.id)
+        .single();
+
+      if (fetchError) {
+        console.error('❌ Error fetching latest trip data:', fetchError);
+        throw new Error('Could not fetch trip data: ' + fetchError.message);
+      }
+
+      console.log('✅ Latest trip data:', latestTrip);
+
+      // Check if trip status is still pending
+      if (latestTrip.status !== 'pending') {
+        Alert.alert('Cannot Reassign', `Trip status is now "${latestTrip.status}". Only pending trips can be reassigned.`);
+        setReassigningTrip(prev => ({ ...prev, reassigning: false }));
+        return;
+      }
+
+      // Prepare updated admin_assigned_drivers array
+      // Add the selected driver's user ID to the array if not already there
+      const currentDrivers = latestTrip.admin_assigned_drivers || [];
+      const updatedDrivers = Array.isArray(currentDrivers) 
+        ? Array.from(new Set([...currentDrivers, selectedDriver.id])) 
+        : [selectedDriver.id];
+
+      console.log('🔄 Assigning trip to driver:', selectedDriver.id);
+      console.log('   Current admin_assigned_drivers:', currentDrivers);
+      console.log('   Updated admin_assigned_drivers:', updatedDrivers);
+
+      // Now perform the direct update to set both accepted_by AND admin_assigned_drivers
+      // This ensures the driver can see the trip via RLS policy
+      const { error: updateError } = await supabase
+        .from('trips')
+        .update({ 
+          accepted_by: selectedDriver.id,
+          admin_assigned_drivers: updatedDrivers,  // Add driver to the array
+          status: 'pending' // Explicitly set back to pending in case anything tries to change it
+        })
+        .eq('id', reassigningTrip.id);
+
+      if (updateError) throw updateError;
+
+      // Force refresh the trips list from database
+      console.log('🔄 Refreshing trips list from database');
+      await fetchTrips();
+
+      console.log('✅ Trip successfully assigned to driver with PENDING status');
+      Alert.alert('✅ Success', `Trip assigned to ${selectedDriver.full_name}.\n\nStatus: PENDING\nDriver must manually accept the trip.`);
+      setReassignModalVisible(false);
+      setSelectedDriver(null);
+      setReassigningTrip(null);
+    } catch (err) {
+      console.error('❌ Error reassigning trip:', err);
+      Alert.alert('Error', 'Failed to reassign trip: ' + err.message);
+      setReassigningTrip(prev => ({ ...prev, reassigning: false }));
+    }
+  }, [reassigningTrip, selectedDriver]);
+
   const verifyImageUrl = useCallback(async (url) => {
     if (!url) return false;
     try {
@@ -799,8 +903,8 @@ export default function SuperAdminTripsScreen() {
           </View>
         )}
 
-        {/* Creator/Vendor Info */}
-        {item.creator && (
+        {/* Creator/Vendor Info - Only show if NOT created by super admin */}
+        {item.creator && !isSuperAdminCreatedTrip(item) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Created By (Vendor)</Text>
             <View style={styles.infoRow}>
@@ -915,14 +1019,30 @@ export default function SuperAdminTripsScreen() {
           <View style={styles.section}>
             <View style={styles.buttonRow}>
               <TouchableOpacity
-                style={[styles.editButton, { flex: 1, marginRight: 6 }]}
+                style={[styles.editButton, { flex: 1, marginRight: 3 }]}
                 onPress={() => openEditModal(item)}
               >
                 <Ionicons name="pencil-outline" size={16} color="#fff" />
                 <Text style={styles.editButtonText}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteButton, { flex: 1, marginLeft: 6 }]}
+                style={[styles.reassignButton, { flex: 1, marginHorizontal: 3 }]}
+                onPress={() => {
+                  if (item.status !== 'pending') {
+                    Alert.alert('Cannot Reassign', 'Trip can only be reassigned if it is pending');
+                    return;
+                  }
+                  fetchDummyDrivers();
+                  setReassigningTrip(item);
+                  setSelectedDriver(null);
+                  setReassignModalVisible(true);
+                }}
+              >
+                <Ionicons name="swap-horizontal-outline" size={16} color="#fff" />
+                <Text style={styles.reassignButtonText}>Reassign</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteButton, { flex: 1, marginLeft: 3 }]}
                 onPress={() => {
                   Alert.alert(
                     '⚠️ Delete Trip',
@@ -1582,6 +1702,97 @@ export default function SuperAdminTripsScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Reassign Trip Modal */}
+      <Modal
+        visible={reassignModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setReassignModalVisible(false);
+          setReassigningTrip(null);
+          setSelectedDriver(null);
+        }}
+      >
+        <View style={styles.reassignModalOverlay}>
+          <View style={styles.reassignModalContent}>
+            <Text style={styles.reassignModalTitle}>Reassign Trip to Dummy Driver</Text>
+            
+            {loadingDummyDrivers ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.warning} />
+                <Text style={{ marginTop: 12, color: COLORS.textSecondary }}>Loading dummy drivers...</Text>
+              </View>
+            ) : dummyDrivers.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={{ color: COLORS.textSecondary, marginBottom: 16 }}>No dummy drivers available</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.driversList} showsVerticalScrollIndicator={false}>
+                {dummyDrivers.map(driver => (
+                  <TouchableOpacity
+                    key={driver.id}
+                    style={[
+                      styles.driverCard,
+                      selectedDriver?.id === driver.id && styles.driverCardSelected
+                    ]}
+                    onPress={() => setSelectedDriver(driver)}
+                  >
+                    <View style={styles.driverCardContent}>
+                      <View style={styles.driverAvatar}>
+                        {driver.avatar_base64 ? (
+                          <Image
+                            source={{ uri: driver.avatar_base64.startsWith('data:') ? driver.avatar_base64 : `data:image/jpeg;base64,${driver.avatar_base64}` }}
+                            style={styles.driverAvatarImage}
+                          />
+                        ) : (
+                          <Ionicons name="person-circle" size={40} color={COLORS.textSecondary} />
+                        )}
+                      </View>
+                      <View style={styles.driverInfo}>
+                        <Text style={styles.driverName}>{driver.full_name}</Text>
+                        <Text style={styles.driverPhone}>{driver.phone}</Text>
+                      </View>
+                      {selectedDriver?.id === driver.id && (
+                        <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.reassignButtonContainer}>
+              <TouchableOpacity
+                style={styles.reassignCancelButton}
+                onPress={() => {
+                  setReassignModalVisible(false);
+                  setReassigningTrip(null);
+                  setSelectedDriver(null);
+                }}
+                disabled={reassigningTrip?.reassigning}
+              >
+                <Text style={styles.reassignCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.reassignConfirmButton, (!selectedDriver || reassigningTrip?.reassigning) && styles.buttonDisabled]}
+                onPress={handleReassignTrip}
+                disabled={!selectedDriver || reassigningTrip?.reassigning}
+              >
+                {reassigningTrip?.reassigning ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="swap-horizontal" size={18} color="#fff" />
+                    <Text style={styles.reassignConfirmButtonText}>Reassign Trip</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2103,5 +2314,153 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 14,
     marginLeft: 8,
+  },
+
+  // Reassign Modal Styles
+  reassignModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  reassignModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxHeight: '80%',
+  },
+  reassignModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 16,
+  },
+  driversList: {
+    maxHeight: 300,
+    marginBottom: 16,
+  },
+  driverCard: {
+    backgroundColor: COLORS.background,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  driverCardSelected: {
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.success + '10',
+  },
+  driverCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  driverAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  driverAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  driverInfo: {
+    flex: 1,
+  },
+  driverName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  driverPhone: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  reassignButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  reassignCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.border,
+    borderWidth: 1,
+    borderColor: COLORS.textSecondary,
+    alignItems: 'center',
+  },
+  reassignCancelButtonText: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  reassignConfirmButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.warning,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  reassignConfirmButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  reassignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: COLORS.warning,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+  reassignButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: COLORS.info,
+    borderWidth: 1,
+    borderColor: COLORS.info,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

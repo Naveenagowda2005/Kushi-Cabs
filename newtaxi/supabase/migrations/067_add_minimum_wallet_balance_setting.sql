@@ -12,11 +12,13 @@ WHERE id = 'global';
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Allow authenticated users to read app settings
-CREATE POLICY IF NOT EXISTS "Anyone can read app settings" ON public.app_settings
+DROP POLICY IF EXISTS "Anyone can read app settings" ON public.app_settings;
+CREATE POLICY "Anyone can read app settings" ON public.app_settings
   FOR SELECT USING (true);
 
 -- Allow only super admins to update app settings
-CREATE POLICY IF NOT EXISTS "Only super admins can update app settings" ON public.app_settings
+DROP POLICY IF EXISTS "Only super admins can update app settings" ON public.app_settings;
+CREATE POLICY "Only super admins can update app settings" ON public.app_settings
   FOR UPDATE
   USING (
     EXISTS (

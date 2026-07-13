@@ -557,18 +557,22 @@ export default function SuperAdminSettingsScreen({ navigation }) {
 
     setSavingWallet(true);
     try {
+      console.log('💾 Saving minimum wallet balance to database:', newBalance);
       const result = await updateMinimumWalletBalance(newBalance);
       
       if (result.success) {
+        console.log('✅ Database update successful');
+        
+        // Refetch settings from database
+        console.log('🔄 Refetching settings...');
+        const updatedSettings = await refetchSettings();
+        console.log('📊 Refetched settings:', updatedSettings);
+        
         Alert.alert(
           '✅ Success',
           `Minimum wallet balance updated to ₹${newBalance.toFixed(2)} for all drivers`
         );
-        // Wait for settings to refetch and update
-        await refetchSettings();
-        // Small delay to ensure state updates
-        await new Promise(r => setTimeout(r, 500));
-        setMinWalletBalance(newBalance.toString());
+        
         setIsEditingWallet(false);
       } else {
         throw new Error(result.error || 'Failed to update');

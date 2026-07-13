@@ -10,7 +10,6 @@ import { useAlert } from '../../context/AlertContext';
 import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import IDCard from '../../components/IDCard';
-import { playLoopingAlert } from '../../services/soundService';
 
 export default function SuperAdminVendorsScreen({ navigation }) {
   const { forceUpdate } = useTheme();
@@ -82,10 +81,6 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         })
       );
       setVendors(vendorsWithDetails);
-      
-      // 🔊 Play 3-time sound alert when vendors data is fetched (respects mute via ref)
-      console.log('🔊 Triggering 3-time vendor sound alert');
-      playLoopingAlert(3);
     } catch (error) {
       console.error('Error fetching vendors:', error);
       Alert.alert('Error', 'Failed to load vendors');
@@ -115,9 +110,6 @@ export default function SuperAdminVendorsScreen({ navigation }) {
             if (error) throw error;
             Alert.alert('Success', `Vendor ${action}d successfully`);
             
-            // 🔊 Play 3-time sound alert when vendor status changes (respects mute via ref)
-            console.log('🔊 Triggering 3-time vendor status change sound alert');
-            playLoopingAlert(3);
             
             fetchVendors();
           } catch (error) { Alert.alert('Error', `Failed to ${action} vendor`); }
@@ -230,7 +222,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
       <TouchableOpacity style={styles.card} onPress={() => { setSelectedVendor(vendor); setModalVisible(true); }}>
         <View style={styles.cardHeader}>
           <View style={styles.cardInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <View style={styles.badgesRow}>
               <Text style={styles.cardName}>{vendor.full_name || 'No Name'}</Text>
               {isDummyVendor && (
                 <View style={styles.dummyBadge}>
@@ -239,8 +231,6 @@ export default function SuperAdminVendorsScreen({ navigation }) {
                 </View>
               )}
             </View>
-            <Text style={styles.businessName}>{vendor.vendors?.[0]?.company_name || 'No Company'}</Text>
-            <Text style={styles.cardSub}>{vendor.phone || 'No Phone'}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: approval.color + '20' }]}>
             <Text style={[styles.statusText, { color: approval.color }]}>
@@ -248,10 +238,14 @@ export default function SuperAdminVendorsScreen({ navigation }) {
             </Text>
           </View>
         </View>
+        <View style={styles.cardInfoDetails}>
+          <Text style={styles.businessName}>{vendor.vendors?.[0]?.company_name || 'No Company'}</Text>
+          <Text style={styles.cardSub}>{vendor.phone || 'No Phone'}</Text>
+        </View>
         <View style={styles.cardDetails}>
           <View style={styles.detailItem}><Ionicons name="wallet-outline" size={16} color={COLORS.textSecondary} /><Text style={styles.detailText}>₹{vendor.wallets?.[0]?.balance || 0}</Text></View>
         </View>
-        <View style={styles.actionButtons}>
+        <View style={styles.actionButtonsRow}>
           <TouchableOpacity style={[styles.actionButton, { backgroundColor: (vendor.is_active ? COLORS.error : COLORS.success) + '20' }]} onPress={() => toggleVendorStatus(vendor.id, vendor.is_active)}>
             <Ionicons name={vendor.is_active ? 'ban-outline' : 'checkmark-circle-outline'} size={16} color={vendor.is_active ? COLORS.error : COLORS.success} />
             <Text style={[styles.actionButtonText, { color: vendor.is_active ? COLORS.error : COLORS.success }]}>{vendor.is_active ? 'Block' : 'Activate'}</Text>
@@ -261,7 +255,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
             <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Delete</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.actionButtons}>
+        <View style={styles.actionButtonsRow}>
           <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#9c27b020' }]} onPress={() => { setSelectedVendor(vendor); setShowIDCard(true); }}>
             <Ionicons name="card" size={16} color="#9c27b0" />
             <Text style={[styles.actionButtonText, { color: '#9c27b0' }]}>ID Card</Text>
@@ -436,9 +430,6 @@ export default function SuperAdminVendorsScreen({ navigation }) {
                     console.log('✅ Transaction created');
                     Alert.alert('✅ Success', `₹${numAmount} paid to vendor\nRemaining balance: ₹${newBalance}`);
                     
-                    // 🔊 Play 3-time sound alert when payment is marked (respects mute via ref)
-                    console.log('🔊 Triggering 3-time vendor payment sound alert');
-                    playLoopingAlert(3);
                     
                     setPaymentModalVisible(false);
                     fetchVendors();
@@ -588,19 +579,21 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: getResponsiveFontSize(11), color: COLORS.textSecondary, marginTop: 4 },
   listContainer: { paddingHorizontal: getResponsivePadding(24), paddingBottom: 100 },
   card: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 12, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  cardInfo: { flex: 1 },
-  cardName: { fontSize: getResponsiveFontSize(16), fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 12 },
+  cardInfo: { flex: 1, minWidth: 0 },
+  cardInfoDetails: { marginBottom: 8 },
+  badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' },
+  cardName: { fontSize: getResponsiveFontSize(16), fontWeight: '600', color: COLORS.text, marginBottom: 2, flexWrap: 'wrap' },
   businessName: { fontSize: getResponsiveFontSize(14), color: COLORS.superAdmin.primary, fontWeight: '500', marginBottom: 2 },
   cardSub: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, alignItems: 'center', flexShrink: 0 },
   statusText: { fontSize: getResponsiveFontSize(12), fontWeight: '500' },
-  dummyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff9800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  dummyBadgeText: { fontSize: getResponsiveFontSize(10), fontWeight: '700', color: '#fff' },
+  dummyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff9800', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, whiteSpace: 'nowrap' },
+  dummyBadgeText: { fontSize: getResponsiveFontSize(11), fontWeight: '700', color: '#fff' },
   cardDetails: { marginBottom: 12 },
   detailItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   detailText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginLeft: 8, flex: 1 },
-  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  actionButtonsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 8 },
   actionButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, flex: 1, justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
   actionButtonText: { fontSize: getResponsiveFontSize(12), fontWeight: '500', marginLeft: 4 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },

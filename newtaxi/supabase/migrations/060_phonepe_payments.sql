@@ -146,18 +146,22 @@ CREATE POLICY refunds_drivers_can_view ON refunds
 CREATE POLICY payments_admins_all ON payments
   FOR ALL USING (
     EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.role IN ('super_admin', 'admin')
+      SELECT 1 FROM users u
+      WHERE u.id = auth.uid() 
+      AND u.role_id IN (
+        SELECT id FROM roles WHERE name IN ('super_admin', 'admin')
+      )
     )
   );
 
 CREATE POLICY refunds_admins_all ON refunds
   FOR ALL USING (
     EXISTS (
-      SELECT 1 FROM users 
-      WHERE users.id = auth.uid() 
-      AND users.role IN ('super_admin', 'admin')
+      SELECT 1 FROM users u
+      WHERE u.id = auth.uid() 
+      AND u.role_id IN (
+        SELECT id FROM roles WHERE name IN ('super_admin', 'admin')
+      )
     )
   );
 

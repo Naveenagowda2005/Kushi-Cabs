@@ -24,8 +24,10 @@ export function useAvailableTrips() {
 
       if (vendorError) throw vendorError;
 
-      // Get admin-assigned trips for this driver
+      // Get admin-assigned trips for this driver (via admin_assigned_drivers array)
       let adminTrips = [];
+      // Get admin-reassigned trips for this driver (trip reassigned specifically to this driver)
+      let adminReassignedTrips = [];
       if (user?.id) {
         const { data: adminTripData, error: adminError } = await supabase
           .from('trips')
@@ -39,6 +41,21 @@ export function useAvailableTrips() {
           console.warn('⚠️ Could not fetch admin trips:', adminError.message);
         } else {
           adminTrips = adminTripData || [];
+        }
+
+        // Also fetch admin-reassigned trips (where admin reassigned to this driver specifically)
+        const { data: reassignedTripData, error: reassignError } = await supabase
+          .from('trips')
+          .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id, accepted_by')
+          .eq('status', TRIP_STATUS.PENDING)
+          .eq('is_admin_trip', true)
+          .eq('accepted_by', user.id) // Trip was reassigned to this user
+          .order('created_at', { ascending: false });
+
+        if (reassignError && reassignError.code !== 'PGRST116') {
+          console.warn('⚠️ Could not fetch admin-reassigned trips:', reassignError.message);
+        } else {
+          adminReassignedTrips = reassignedTripData || [];
         }
       }
 
@@ -72,7 +89,7 @@ export function useAvailableTrips() {
       }
 
       // Combine all trips
-      const allTrips = [...vendorTrips || [], ...adminTrips, ...vendorAssignedTrips];
+      const allTrips = [...vendorTrips || [], ...adminTrips, ...adminReassignedTrips, ...vendorAssignedTrips];
       
       const enrichedTrips = await Promise.all(
         allTrips.map(async (trip) => {
@@ -94,7 +111,7 @@ export function useAvailableTrips() {
       );
       
       setTrips(enrichedTrips);
-      console.log('✅ Available trips fetched:', enrichedTrips.length, '(', vendorTrips?.length || 0, 'vendor +', adminTrips.length, 'admin +', vendorAssignedTrips.length, 'assigned)');
+      console.log('✅ Available trips fetched:', enrichedTrips.length, '(', vendorTrips?.length || 0, 'vendor +', adminTrips.length, 'admin +', adminReassignedTrips.length, 'reassigned +', vendorAssignedTrips.length, 'assigned)');
     } catch (err) {
       console.error('Error fetching trips:', err);
       setError(err.message);

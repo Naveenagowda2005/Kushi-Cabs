@@ -13,7 +13,7 @@ import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 import SplashScreen from '../screens/auth/SplashScreen';
 
 export default function RootNavigator() {
-  const { loading, hasSession, hasUser, getUserRole, selectedRole, incompleteDriverDocuments } = useAuth();
+  const { loading, hasSession, hasUser, getUserRole, selectedRole, incompleteDriverDocuments, forceResetMode } = useAuth();
   const { forceUpdate } = useTheme();
   
   // Force re-render of all child navigators when theme changes
@@ -47,7 +47,14 @@ export default function RootNavigator() {
     selectedRole,
     incompleteDriverDocuments,
     showSplash,
+    forceResetMode, // NEW
   });
+
+  // If force reset mode is active, show role selection
+  if (forceResetMode) {
+    console.log('🔄 Force reset mode active - showing clean role selection');
+    return <RoleSelectionScreen />;
+  }
 
   // Show splash screen first
   if (showSplash) {

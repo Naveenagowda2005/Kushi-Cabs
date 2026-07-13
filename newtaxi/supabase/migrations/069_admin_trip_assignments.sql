@@ -16,14 +16,28 @@ CREATE TABLE IF NOT EXISTS admin_trip_assignments (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Add missing columns if the table already exists
+ALTER TABLE admin_trip_assignments 
+ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES users(id) ON DELETE CASCADE;
+
+ALTER TABLE admin_trip_assignments 
+ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id);
+
+ALTER TABLE admin_trip_assignments 
+ADD COLUMN IF NOT EXISTS viewed_at TIMESTAMPTZ;
+
+ALTER TABLE admin_trip_assignments 
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
 -- Enable RLS
 ALTER TABLE admin_trip_assignments ENABLE ROW LEVEL SECURITY;
 
--- Create indices for faster queries
-CREATE INDEX idx_admin_trip_assignments_trip_id ON admin_trip_assignments(trip_id);
-CREATE INDEX idx_admin_trip_assignments_driver_id ON admin_trip_assignments(driver_id);
+-- Create indices for faster queries (only if they don't exist)
+CREATE INDEX IF NOT EXISTS idx_admin_trip_assignments_trip_id ON admin_trip_assignments(trip_id);
+CREATE INDEX IF NOT EXISTS idx_admin_trip_assignments_driver_id ON admin_trip_assignments(driver_id);
 
 -- Policy: Allow super admin to view all assignments
+DROP POLICY IF EXISTS "super_admin_view_all_assignments" ON admin_trip_assignments;
 CREATE POLICY "super_admin_view_all_assignments"
   ON admin_trip_assignments
   FOR SELECT
@@ -34,6 +48,7 @@ CREATE POLICY "super_admin_view_all_assignments"
   ));
 
 -- Policy: Allow drivers to view their assigned trips
+DROP POLICY IF EXISTS "driver_view_own_assignments" ON admin_trip_assignments;
 CREATE POLICY "driver_view_own_assignments"
   ON admin_trip_assignments
   FOR SELECT
@@ -41,6 +56,7 @@ CREATE POLICY "driver_view_own_assignments"
   USING (driver_id = auth.uid());
 
 -- Policy: Allow admin to create assignments
+DROP POLICY IF EXISTS "admin_create_assignments" ON admin_trip_assignments;
 CREATE POLICY "admin_create_assignments"
   ON admin_trip_assignments
   FOR INSERT
@@ -53,6 +69,7 @@ CREATE POLICY "admin_create_assignments"
   );
 
 -- Policy: Allow admin to update assignments (e.g., mark as viewed)
+DROP POLICY IF EXISTS "admin_update_assignments" ON admin_trip_assignments;
 CREATE POLICY "admin_update_assignments"
   ON admin_trip_assignments
   FOR UPDATE

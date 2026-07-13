@@ -5,7 +5,9 @@
 --          "NEW" vs "RE-UPLOAD" badge on vendor cards.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION get_vendor_verifications(p_status TEXT)
+DROP FUNCTION IF EXISTS get_vendor_verifications(TEXT);
+
+CREATE FUNCTION get_vendor_verifications(p_status TEXT)
 RETURNS TABLE (
   id                    UUID,
   vendor_id             UUID,

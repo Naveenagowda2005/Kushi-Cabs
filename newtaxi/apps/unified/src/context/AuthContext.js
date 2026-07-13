@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   const [incompleteSignupUserId, setIncompleteSignupUserId] = useState(null);
   const [incompleteDriverDocuments, setIncompleteDriverDocuments] = useState(false);
   const [sessionListener, setSessionListener] = useState(null);
+  const [forceResetMode, setForceResetMode] = useState(false); // NEW: For fresh start
   const fetchingRef = React.useRef(false);
 
   console.log('AuthProvider: Initializing...');
@@ -702,6 +703,7 @@ export const AuthProvider = ({ children }) => {
   const signOut = async () => {
     try {
       setLoading(true);
+      console.log('🔄 signOut: Starting logout process');
       
       // Clear session validation interval
       if (sessionListener) {
@@ -747,10 +749,41 @@ export const AuthProvider = ({ children }) => {
       setSession(null);
       setUser(null);
       setSelectedRole(null);
+      setForceResetMode(true); // NEW: Enable force reset mode
       console.log('Unified: Successfully signed out and cleared state');
     } catch (error) {
       console.error('Unified Sign out error:', error);
+      setForceResetMode(true); // NEW: Enable force reset mode even on error
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // NEW: Force reset function for fresh start
+  const forceReset = async () => {
+    try {
+      console.log('🔄 forceReset: Performing complete reset');
+      
+      // Sign out
+      await supabase.auth.signOut().catch(e => console.log('SignOut error (expected):', e.message));
+      
+      // Clear all state
+      setSession(null);
+      setUser(null);
+      setSelectedRole(null);
+      setIncompleteSignupPhone(null);
+      setIncompleteSignupUserId(null);
+      setIncompleteDriverDocuments(false);
+      setForceResetMode(true);
+      
+      // Clear AsyncStorage
+      await AsyncStorage.clear();
+      
+      console.log('✅ forceReset: Complete reset finished');
+      setLoading(false);
+    } catch (error) {
+      console.error('❌ forceReset: Error:', error);
+      setForceResetMode(true);
       setLoading(false);
     }
   };
@@ -881,6 +914,8 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signUp,
     signOut,
+    forceReset, // NEW: For fresh start
+    disableForceResetMode: () => setForceResetMode(false), // NEW: Exit force reset mode
     createUserProfile,
     refreshUserProfile,
     getUserRole,
@@ -889,6 +924,7 @@ export const AuthProvider = ({ children }) => {
     isDriver,
     hasSession,
     hasUser,
+    forceResetMode, // NEW: For fresh start
   };
 
   return (

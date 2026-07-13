@@ -10,8 +10,10 @@ import {
   ScrollView,
   Image,
   Animated,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, ROLES } from '../../constants';
 import { useAnimatedBorder } from '../../hooks/useAnimatedBorder';
@@ -47,7 +49,7 @@ const roleOptions = [
 ];
 
 export default function RoleSelectionScreen() {
-  const { setSelectedRole, hasSession, hasUser } = useAuth();
+  const { setSelectedRole, hasSession, hasUser, disableForceResetMode } = useAuth();
   const [loading, setLoading] = useState(false);
   const colorAnim = React.useRef(new Animated.Value(0)).current;
   const heartbeat = React.useRef(new Animated.Value(0)).current;
@@ -111,6 +113,9 @@ export default function RoleSelectionScreen() {
       
       // Set the selected role in context
       setSelectedRole(role);
+      
+      // Disable force reset mode since we've selected a role
+      disableForceResetMode();
       
       // Small delay for better UX
       setTimeout(() => {
@@ -379,5 +384,22 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: 16,
     textAlign: 'center',
+  },
+  clearStorageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#ff6b6b',
+    gap: 8,
+  },
+  clearStorageText: {
+    fontSize: 12,
+    color: '#ff6b6b',
+    fontWeight: '500',
   },
 });

@@ -18,39 +18,44 @@ CREATE TABLE IF NOT EXISTS public.active_sessions (
 );
 
 -- Create indexes for fast lookups
-CREATE INDEX idx_active_sessions_user_id ON public.active_sessions(user_id);
-CREATE INDEX idx_active_sessions_device_id ON public.active_sessions(device_id);
-CREATE INDEX idx_active_sessions_is_active ON public.active_sessions(is_active);
-CREATE INDEX idx_active_sessions_user_device ON public.active_sessions(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_user_id ON public.active_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_device_id ON public.active_sessions(device_id);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_is_active ON public.active_sessions(is_active);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_user_device ON public.active_sessions(user_id, is_active);
 
 -- Enable RLS
 ALTER TABLE public.active_sessions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their own sessions
+DROP POLICY IF EXISTS "users_view_own_sessions" ON public.active_sessions;
 CREATE POLICY "users_view_own_sessions" 
 ON public.active_sessions 
 FOR SELECT 
 USING (auth.uid() = user_id);
 
 -- RLS Policy: Users can update their own sessions
+DROP POLICY IF EXISTS "users_update_own_sessions" ON public.active_sessions;
 CREATE POLICY "users_update_own_sessions" 
 ON public.active_sessions 
 FOR UPDATE 
 USING (auth.uid() = user_id);
 
 -- RLS Policy: Users can delete their own sessions (for logout)
+DROP POLICY IF EXISTS "users_delete_own_sessions" ON public.active_sessions;
 CREATE POLICY "users_delete_own_sessions" 
 ON public.active_sessions 
 FOR DELETE 
 USING (auth.uid() = user_id);
 
 -- RLS Policy: Users can insert their own sessions
+DROP POLICY IF EXISTS "users_insert_own_sessions" ON public.active_sessions;
 CREATE POLICY "users_insert_own_sessions" 
 ON public.active_sessions 
 FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policy: Super admin can view all sessions
+DROP POLICY IF EXISTS "superadmin_view_all_sessions" ON public.active_sessions;
 CREATE POLICY "superadmin_view_all_sessions" 
 ON public.active_sessions 
 FOR SELECT 

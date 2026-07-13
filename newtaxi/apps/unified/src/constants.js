@@ -271,10 +271,11 @@ export const COLORS = new Proxy({}, {
 
 // API Configuration
 const getApiUrl = () => {
-  // Use production backend on Render
-  const productionUrl = 'https://kushi-cabs.onrender.com';
-  console.log('Using production API URL:', productionUrl);
-  return productionUrl;
+  // Use local backend for development
+  // IP: 192.168.1.111 (your system's actual IP)
+  const localUrl = 'http://192.168.1.111:4000';
+  console.log('Using local API URL:', localUrl);
+  return localUrl;
 };
 
 export const API_CONFIG = {
