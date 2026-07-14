@@ -13,15 +13,25 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
   const [segmentName, setSegmentName] = useState(null);
   const [packageName, setPackageName] = useState(null);
   
+  // Generate formatted booking ID: KUSH-B-serialNumber
+  const getFormattedBookingId = (tripId, bookingIdSeq) => {
+    // Use the booking_id_seq from database, fallback to tripId if not available
+    const serial = (bookingIdSeq || 1).toString().padStart(6, '0');
+    return `KUSH-B-${serial}`;
+  };
+  
+  const bookingId = getFormattedBookingId(trip.id, trip.booking_id_seq);
+  
   // Debug logging
   useEffect(() => {
     console.log('🎫 TripCard received:', {
       trip_id: trip.id,
+      isNew: trip.isNew,
       has_notes: !!trip.notes,
       notes_value: trip.notes,
       notes_length: trip.notes?.length || 0,
     });
-  }, [trip.id, trip.notes]);
+  }, [trip.id, trip.notes, trip.isNew]);
   
   // Fetch car details
   useEffect(() => {
@@ -119,21 +129,23 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
 
   return (
     <Animated.View style={[styles.card]}>
-      {/* Header: Trip type and Payment method */}
+      {/* Header: Trip type and Booking ID */}
       <View style={styles.header}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={styles.tripType}>{(segmentName || trip.segment_name)?.toUpperCase() || 'ONE WAY TRIP'}</Text>
           {trip.isNew && (
             <View style={styles.newTripBadge}>
-              <Ionicons name="spark" size={12} color="#fff" />
-              <Text style={styles.newTripBadgeText}>New</Text>
+              <Text style={styles.newTripBadgeText}>🆕 NEW</Text>
             </View>
           )}
         </View>
-        <View style={styles.paymentBadge}>
-          <Text style={styles.paymentText}>Paid by Cash</Text>
+        <View style={styles.bookingIdBadge}>
+          <Text style={styles.bookingIdBadgeLabel}>Booking ID</Text>
+          <Text style={styles.bookingIdBadgeValue}>{bookingId}</Text>
         </View>
       </View>
+
+      {/* Booking ID Row - removed, now in header */}
 
       {/* Admin Badge - for super admin assigned trips */}
       {trip.is_admin_trip && (
@@ -351,8 +363,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 14,
-    padding: 10,
-    marginBottom: 8,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 2,
     borderColor: '#ff9800',
   },
@@ -360,7 +372,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   tripType: {
     color: '#000',
@@ -380,18 +392,63 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
+  bookingIdBadge: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 1,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1.5,
+    borderColor: '#2196f3',
+  },
+  bookingIdBadgeLabel: {
+    color: '#2196f3',
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  bookingIdBadgeValue: {
+    color: '#2196f3',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    fontFamily: 'monospace',
+  },
+  bookingIdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    marginBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  bookingIdLabel: {
+    color: '#666',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bookingIdValue: {
+    color: '#2196f3',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+    fontFamily: 'monospace',
+  },
   newTripBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#ff4081',
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   newTripBadgeText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -403,7 +460,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 6,
-    marginBottom: 4,
+    marginBottom: 8,
     alignSelf: 'flex-start',
   },
   adminBadgeText: {
@@ -419,7 +476,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 6,
-    marginBottom: 4,
+    marginBottom: 8,
     alignSelf: 'flex-start',
   },
   vendorBadgeText: {
@@ -431,7 +488,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 4,
+    marginBottom: 8,
     flexWrap: 'wrap',
   },
   fareKmBox: {
@@ -511,7 +568,7 @@ const styles = StyleSheet.create({
   locationsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
     paddingVertical: 12,
     backgroundColor: '#f5f5f5',
     borderRadius: 10,
@@ -567,7 +624,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    marginVertical: 4,
+    marginVertical: 8,
     alignSelf: 'flex-start',
   },
   packageText: {
@@ -599,7 +656,7 @@ const styles = StyleSheet.create({
   inclusionsRow: {
     flexDirection: 'row',
     gap: 4,
-    marginVertical: 6,
+    marginVertical: 10,
     flexWrap: 'nowrap',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
@@ -716,9 +773,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingTop: 2,
-    paddingBottom: 2,
-    marginBottom: 2,
+    paddingTop: 4,
+    paddingBottom: 4,
+    marginBottom: 8,
   },
   departureLabel: {
     color: '#000',
@@ -726,7 +783,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   departureTime: {
-    color: '#ff9800',
+    color: '#000',
     fontSize: 16,
     fontWeight: '700',
     flex: 1,
@@ -738,8 +795,8 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', alignItems: 'center' },
   footerText: { color: '#888', fontSize: 10, marginLeft: 4 },
   notesHeader: {
-    marginTop: 2,
-    paddingTop: 3,
+    marginTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#ff9800',
   },
@@ -753,7 +810,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 1,
+    marginBottom: 6,
   },
   noteText: {
     color: '#000',
@@ -853,8 +910,8 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 6,
-    paddingTop: 6,
+    marginTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#ff9800',
   },

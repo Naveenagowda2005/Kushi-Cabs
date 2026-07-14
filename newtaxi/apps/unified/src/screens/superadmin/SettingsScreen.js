@@ -59,6 +59,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     fareAmount: '',
     commissionAmount: '',
     customerPreAdvance: '',
+    extraChargesPerKm: '',
     scheduledAt: new Date(),
     carType: '',
     carModel: '',
@@ -151,23 +152,29 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     try {
       console.log('Fetching trip options for admin trip creation');
       
-      const [carTypesRes, seaterRes, fuelRes, segmentsRes] = await Promise.all([
+      const [carTypesRes, seaterRes, fuelRes, segmentsRes, packagesRes] = await Promise.all([
         supabase.from('car_types').select('id, name').order('name'),
         supabase.from('seater_types').select('id, name').order('name'),
         supabase.from('fuel_types').select('id, name').order('name'),
         supabase.from('trip_segments').select('id, name, display_order').order('display_order', { ascending: true }),
+        supabase.from('trip_packages').select('id, name, segment_id').order('name'),
       ]);
+
+      // Log the packages to verify they have segment_id
+      console.log('✅ Segments fetched:', segmentsRes.data?.length || 0);
+      console.log('✅ Packages fetched:', packagesRes.data?.length || 0, 'packages');
+      console.log('📦 Package data sample:', packagesRes.data?.[0]);
 
       setAdminTripOptions({
         carTypes: carTypesRes.data || [],
         seaterTypes: seaterRes.data || [],
         fuelTypes: fuelRes.data || [],
         segments: segmentsRes.data || [],
-        packages: [],
+        packages: packagesRes.data || [],
         carModels: [],
       });
 
-      console.log('✅ Trip options fetched');
+      console.log('✅ Trip options fetched for admin trip form');
     } catch (error) {
       console.error('Error fetching trip options:', error);
     }
@@ -183,12 +190,17 @@ export default function SuperAdminSettingsScreen({ navigation }) {
 
     // Handle segment changes
     if (field === 'segment' && value) {
+      console.log('🔄 Segment changed to:', value);
+      const selectedSegment = adminTripOptions.segments.find(s => s.id === value);
+      console.log('📍 Selected segment name:', selectedSegment?.name);
+      
+      // Fetch packages for this specific segment from database
       fetchPackagesForAdminTrip(value);
+      
       // Reset package selection
       setAdminTripForm((prev) => ({ ...prev, package: '' }));
       
       // If not Round trip, clear return fields
-      const selectedSegment = adminTripOptions.segments.find(s => s.id === value);
       if (selectedSegment?.name !== 'Round trips') {
         setAdminTripForm((prev) => ({ 
           ...prev, 
@@ -217,17 +229,29 @@ export default function SuperAdminSettingsScreen({ navigation }) {
 
   const fetchPackagesForAdminTrip = async (segmentId) => {
     try {
-      const { data } = await supabase
+      console.log('📦 Fetching packages for segment:', segmentId);
+      const { data, error } = await supabase
         .from('trip_packages')
-        .select('id, name')
+        .select('id, name, segment_id')
         .eq('segment_id', segmentId)
         .order('name');
       
+      if (error) {
+        console.error('❌ Error fetching packages:', error.message);
+        setAdminTripOptions((prev) => ({ ...prev, packages: [] }));
+        return;
+      }
+
+      console.log('✅ Packages fetched for segment:', data?.length || 0, 'packages');
+      console.log('📦 Package data:', data);
       if (data) {
         setAdminTripOptions((prev) => ({ ...prev, packages: data }));
+      } else {
+        setAdminTripOptions((prev) => ({ ...prev, packages: [] }));
       }
     } catch (error) {
-      console.error('Error fetching packages:', error);
+      console.error('❌ Exception fetching packages:', error);
+      setAdminTripOptions((prev) => ({ ...prev, packages: [] }));
     }
   };
 
@@ -646,6 +670,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         fareAmount: parseFloat(adminTripForm.fareAmount),
         commissionAmount: parseFloat(adminTripForm.commissionAmount),
         customerPreAdvance: parseFloat(adminTripForm.customerPreAdvance) || 0,
+        extraChargesPerKm: parseFloat(adminTripForm.extraChargesPerKm) || 0,
         scheduledAt: adminTripForm.scheduledAt ? adminTripForm.scheduledAt.toISOString() : new Date().toISOString(),
         passengerName: adminTripForm.passengerName.trim(),
         passengerPhone: adminTripForm.passengerPhone.trim(),
@@ -707,6 +732,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
               fareAmount: '',
               commissionAmount: '',
               customerPreAdvance: '',
+              extraChargesPerKm: '',
               scheduledAt: new Date(),
               carType: '',
               carModel: '',
@@ -1148,6 +1174,24 @@ export default function SuperAdminSettingsScreen({ navigation }) {
               </View>
             </View>
 
+            {/* Package - Show when segment is selected and packages exist */}
+            {adminTripForm.segment && adminTripOptions.packages.length > 0 && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Package</Text>
+                <View style={{ borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, overflow: 'hidden' }}>
+                  <Picker
+                    selectedValue={adminTripForm.package}
+                    onValueChange={(value) => updateAdminTripForm('package', value)}
+                  >
+                    <Picker.Item label="Select Package (Optional)" value="" />
+                    {adminTripOptions.packages.map((pkg) => (
+                      <Picker.Item key={pkg.id} label={pkg.name} value={pkg.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            )}
+
             {/* Pickup Location */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Pickup Location *</Text>
@@ -1268,6 +1312,20 @@ export default function SuperAdminSettingsScreen({ navigation }) {
                 placeholderTextColor={COLORS.textTertiary}
                 value={adminTripForm.customerPreAdvance}
                 onChangeText={(v) => updateAdminTripForm('customerPreAdvance', v)}
+                keyboardType="decimal-pad"
+                editable={!creatingAdminTrip}
+              />
+            </View>
+
+            {/* Extra Charges Per KM */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Extra Charges Per KM (₹)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 10 (optional)"
+                placeholderTextColor={COLORS.textTertiary}
+                value={adminTripForm.extraChargesPerKm}
+                onChangeText={(v) => updateAdminTripForm('extraChargesPerKm', v)}
                 keyboardType="decimal-pad"
                 editable={!creatingAdminTrip}
               />

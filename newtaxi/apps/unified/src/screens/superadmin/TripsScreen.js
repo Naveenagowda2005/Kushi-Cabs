@@ -154,6 +154,7 @@ export default function SuperAdminTripsScreen() {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterAdminCreated, setFilterAdminCreated] = useState('all'); // New filter
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [imageLoadErrors, setImageLoadErrors] = useState({});
@@ -251,6 +252,13 @@ export default function SuperAdminTripsScreen() {
         query = query.eq('status', filterStatus);
       }
 
+      // Filter by admin created trips
+      if (filterAdminCreated === 'admin') {
+        query = query.eq('is_admin_trip', true);
+      } else if (filterAdminCreated === 'vendor') {
+        query = query.eq('is_admin_trip', false);
+      }
+
       const { data: tripsData, error: tripsError } = await query.order('created_at', { ascending: false });
 
       if (tripsError) throw tripsError;
@@ -299,7 +307,7 @@ export default function SuperAdminTripsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus]);
+  }, [filterStatus, filterAdminCreated]);
 
   useFocusEffect(useCallback(() => { fetchTrips(); }, [fetchTrips]));
 
@@ -727,8 +735,7 @@ export default function SuperAdminTripsScreen() {
         return;
       }
 
-      const driverId = driverProfile.id;
-      console.log('✅ Driver profile found:', { user_id: selectedDriver.id, driver_id: driverId });
+      console.log('✅ Driver profile found');
 
       // Prepare updated admin_assigned_drivers array
       // Add the selected driver's user ID to the array if not already there
@@ -737,23 +744,22 @@ export default function SuperAdminTripsScreen() {
         ? Array.from(new Set([...currentDrivers, selectedDriver.id])) 
         : [selectedDriver.id];
 
-      console.log('🔄 Assigning trip to driver:', selectedDriver.id);
-      console.log('   Driver ID (from drivers table):', driverId);
+      console.log('🔄 Reassigning trip to driver:', selectedDriver.id);
       console.log('   Current admin_assigned_drivers:', currentDrivers);
       console.log('   Updated admin_assigned_drivers:', updatedDrivers);
 
       // Now perform the direct update to set:
-      // 1. driver_id - the actual driver record (simplest RLS path that already works)
-      // 2. accepted_by - the user ID (for legacy compatibility)
-      // 3. admin_assigned_drivers - for tracking all assigned drivers
-      // 4. status - keep pending until driver manually accepts
+      // 1. accepted_by - the user ID (this makes it show in Available Trips via useAvailableTrips())
+      // 2. admin_assigned_drivers - for tracking all assigned drivers
+      // 3. status - keep pending until driver manually accepts
+      // NOTE: We DO NOT set driver_id because that moves it to "My Trips" instead of "Available Trips"
+      //       The driver should see it in Available Trips and accept it first
       const { error: updateError } = await supabase
         .from('trips')
         .update({ 
-          driver_id: driverId,  // Set the driver_id (already works with RLS)
-          accepted_by: selectedDriver.id,  // Keep for compatibility
-          admin_assigned_drivers: updatedDrivers,  // Add driver to the array
-          status: 'pending' // Explicitly set back to pending in case anything tries to change it
+          accepted_by: selectedDriver.id,  // This allows driver to see it via useAvailableTrips()
+          admin_assigned_drivers: updatedDrivers,  // Add driver to the array for tracking
+          status: 'pending' // Keep pending until driver accepts
         })
         .eq('id', reassigningTrip.id);
 
@@ -848,9 +854,29 @@ export default function SuperAdminTripsScreen() {
     const distance = item.end_km && item.start_km
       ? `${(item.end_km - item.start_km).toFixed(1)} km`
       : 'N/A';
+    
+    // Format booking ID
+    const getFormattedBookingId = (bookingIdSeq) => {
+      const serial = (bookingIdSeq || 1).toString().padStart(6, '0');
+      return `KUSH-B-${serial}`;
+    };
+    const bookingId = getFormattedBookingId(item.booking_id_seq);
 
     return (
       <View style={styles.tripCard}>
+        {/* Top Info Box - Booking ID and Trip Type */}
+        <View style={styles.topInfoBox}>
+          <View style={styles.topInfoItem}>
+            <Text style={styles.topInfoLabel}>Booking ID</Text>
+            <Text style={styles.bookingIdValue}>{bookingId}</Text>
+          </View>
+          <View style={styles.topInfoDivider} />
+          <View style={styles.topInfoItem}>
+            <Text style={styles.topInfoLabel}>Trip Type</Text>
+            <Text style={styles.tripTypeValue}>{item.trip_segments?.name || 'Trip'}</Text>
+          </View>
+        </View>
+
         {/* Header */}
         <View style={styles.tripHeader}>
           <View style={styles.tripHeaderLeft}>
@@ -897,16 +923,6 @@ export default function SuperAdminTripsScreen() {
             </Text>
           </View>
         </View>
-
-        {/* Trip Type */}
-        {item.trip_segments && (
-          <View style={styles.section}>
-            <View style={styles.tripTypeRow}>
-              <Ionicons name="ticket-outline" size={14} color={COLORS.info} />
-              <Text style={styles.tripTypeText}>{item.trip_segments.name || 'Trip'}</Text>
-            </View>
-          </View>
-        )}
 
         {/* Return Location and Date - Only for Round Trips */}
         {item.trip_segments?.name === 'Round trips' && item.return_location && (
@@ -1188,6 +1204,12 @@ export default function SuperAdminTripsScreen() {
     { label: 'Cancelled', value: 'cancelled' },
   ];
 
+  const adminFilters = [
+    { label: 'All Trips', value: 'all' },
+    { label: 'Admin Created', value: 'admin' },
+    { label: 'Vendor Created', value: 'vendor' },
+  ];
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -1214,6 +1236,34 @@ export default function SuperAdminTripsScreen() {
                 style={[
                   styles.filterText,
                   filterStatus === item.value && styles.filterTextActive,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          )}
+          showsHorizontalScrollIndicator={false}
+        />
+      </View>
+
+      {/* Admin Created Filters */}
+      <View style={styles.filterContainer}>
+        <FlatList
+          horizontal
+          data={adminFilters}
+          keyExtractor={(item) => item.value}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                filterAdminCreated === item.value && styles.filterButtonActive,
+              ]}
+              onPress={() => setFilterAdminCreated(item.value)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  filterAdminCreated === item.value && styles.filterTextActive,
                 ]}
               >
                 {item.label}
@@ -1887,6 +1937,65 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: COLORS.warning,
+  },
+  bookingIdBox: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.warning,
+  },
+  topInfoBox: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.warning,
+    justifyContent: 'space-around',
+  },
+  topInfoItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  topInfoDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: COLORS.warning,
+    opacity: 0.3,
+    marginHorizontal: 8,
+  },
+  topInfoLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: COLORS.warning,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  bookingIdLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: COLORS.warning,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  bookingIdValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.warning,
+    letterSpacing: 0.8,
+  },
+  tripTypeValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   tripHeader: {
     flexDirection: 'row',

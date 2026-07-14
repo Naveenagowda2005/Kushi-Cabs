@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../constants';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
 import DocumentUploadCard from '../../components/DocumentUploadCard';
 import DocumentViewer from '../../components/DocumentViewer';
 import * as documentService from '../../services/documentService';
@@ -23,6 +24,7 @@ const REQUIRED_DOCUMENTS = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR
 
 const VendorDocumentUploadScreen = ({ navigation }) => {
   const { user, signOut } = useAuth();
+  const { theme } = useTheme();
   const [vendorId, setVendorId] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [uploading, setUploading] = useState({});
@@ -31,6 +33,29 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Add Sign Out button to header
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          style={{ marginRight: 16, padding: 8 }}
+          onPress={() => {
+            Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Sign Out',
+                style: 'destructive',
+                onPress: () => signOut(),
+              },
+            ]);
+          }}
+        >
+          <Ionicons name="log-out-outline" size={24} color="#f44336" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, signOut]);
 
   // Get vendor ID from vendors table
   useEffect(() => {
@@ -402,20 +427,20 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
   const allUploaded = uploadedCount === REQUIRED_DOCUMENTS.length;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: COLORS.background }]}>
       <ScrollView
         style={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: COLORS.border }]}>
           <Ionicons name="document-text-outline" size={40} color={COLORS.vendor.primary} />
-          <Text style={styles.title}>Verification Documents</Text>
-          <Text style={styles.subtitle}>Please upload all documents for verification</Text>
-          <View style={styles.progressBar}>
+          <Text style={[styles.title, { color: COLORS.text }]}>Verification Documents</Text>
+          <Text style={[styles.subtitle, { color: COLORS.textSecondary }]}>Please upload all documents for verification</Text>
+          <View style={[styles.progressBar, { backgroundColor: COLORS.surface }]}>
             <View style={[styles.progressFill, { width: `${(uploadedCount / REQUIRED_DOCUMENTS.length) * 100}%` }]} />
           </View>
-          <Text style={styles.progressText}>
+          <Text style={[styles.progressText, { color: COLORS.textSecondary }]}>
             {uploadedCount} of {REQUIRED_DOCUMENTS.length} documents uploaded
           </Text>
         </View>
@@ -437,18 +462,18 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
         </View>
 
         {/* Info section */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Required Documents</Text>
-          <Text style={styles.infoText}>• Aadhar Card (clear photo)</Text>
-          <Text style={styles.infoText}>• PAN Card (clear photo)</Text>
-          <Text style={styles.infoText}>• Bank Passbook Front Page</Text>
-          <Text style={styles.infoText}>• Your Selfie with Aadhar Card</Text>
+        <View style={[styles.infoSection, { backgroundColor: COLORS.surface }]}>
+          <Text style={[styles.infoTitle, { color: COLORS.text }]}>Required Documents</Text>
+          <Text style={[styles.infoText, { color: COLORS.textSecondary }]}>• Aadhar Card (clear photo)</Text>
+          <Text style={[styles.infoText, { color: COLORS.textSecondary }]}>• PAN Card (clear photo)</Text>
+          <Text style={[styles.infoText, { color: COLORS.textSecondary }]}>• Bank Passbook Front Page</Text>
+          <Text style={[styles.infoText, { color: COLORS.textSecondary }]}>• Your Selfie with Aadhar Card</Text>
         </View>
       </ScrollView>
 
       {/* Submit button */}
       {allUploaded && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: COLORS.background, borderTopColor: COLORS.border }]}>
           <TouchableOpacity
             style={[styles.submitBtn, submitting && styles.btnDisabled]}
             onPress={handleSubmitForVerification}
@@ -483,7 +508,6 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f3460',
   },
   scroll: {
     flex: 1,
@@ -493,25 +517,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#16213e',
     marginBottom: 24,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
     marginTop: 12,
   },
   subtitle: {
     fontSize: 14,
-    color: '#888',
     marginTop: 4,
     marginBottom: 16,
   },
   progressBar: {
     width: '100%',
     height: 6,
-    backgroundColor: '#16213e',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 8,
@@ -522,14 +542,12 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: '#888',
   },
   documentsContainer: {
     gap: 12,
     marginBottom: 24,
   },
   infoSection: {
-    backgroundColor: '#16213e',
     borderRadius: 12,
     padding: 16,
     marginBottom: 32,
@@ -537,20 +555,16 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#bbb',
     marginBottom: 8,
   },
   footer: {
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: '#0f3460',
     borderTopWidth: 1,
-    borderTopColor: '#16213e',
   },
   submitBtn: {
     backgroundColor: COLORS.vendor.primary,

@@ -87,7 +87,7 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
     const sorted = [...availableTrips]
       .map(trip => ({
         ...trip,
-        isNew: isNewTrip(trip.id),
+        isNew: trip.isNew || isNewTrip(trip.id), // Keep isNew from useTrips, fallback to isNewTrip
       }))
       .sort((a, b) => {
         // New trips first

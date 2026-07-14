@@ -1285,7 +1285,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: Math.max(24, screenHeight * 0.03),
+    bottom: Math.max(90, screenHeight * 0.12),
     right: Math.max(24, screenWidth * 0.06),
     backgroundColor: '#1a1a2e',
     width: Math.max(52, screenWidth * 0.14),

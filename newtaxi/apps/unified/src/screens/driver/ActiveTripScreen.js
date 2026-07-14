@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
+  View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
   TouchableOpacity, Alert, ActivityIndicator, Modal, Linking, TextInput, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,29 +84,107 @@ export default function DriverActiveTripScreen({ route, navigation }) {
 
   const captureOdometerImage = async (type) => {
     try {
+      console.log('📸 Starting camera capture for:', type);
+      
       // Request camera permissions
+      console.log('📸 Requesting camera permissions...');
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      console.log('📸 Camera permission status:', status);
+      
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Camera permission is required to capture odometer images');
+        console.warn('📸 Camera permission denied');
+        Alert.alert(
+          'Permission Required',
+          'Camera permission is needed to capture odometer images. Please enable it in your device settings.',
+          [
+            { text: 'OK', onPress: () => {} },
+            { text: 'Open Settings', onPress: () => Linking.openURL('app-settings:') }
+          ]
+        );
         return;
       }
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      console.log('📸 Launching camera...');
+      
+      // Try with timeout to catch hanging camera
+      const cameraPromise = ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
         allowsEditing: false,
         aspect: [16, 9],
         quality: 0.8,
       });
 
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Camera timeout - took too long to respond')), 15000)
+      );
+
+      const result = await Promise.race([cameraPromise, timeoutPromise]);
+
+      console.log('📸 Camera result:', { canceled: result.canceled, assetsCount: result.assets?.length });
+
       if (!result.canceled) {
-        if (type === 'start') {
-          setStartOdometerImage(result.assets[0]);
+        if (result.assets && result.assets.length > 0) {
+          console.log('📸 Image captured successfully:', {
+            uri: result.assets[0].uri?.substring(0, 50),
+            type: result.assets[0].type,
+            fileName: result.assets[0].fileName,
+          });
+          
+          if (type === 'start') {
+            setStartOdometerImage(result.assets[0]);
+          } else {
+            setEndOdometerImage(result.assets[0]);
+          }
         } else {
-          setEndOdometerImage(result.assets[0]);
+          console.warn('📸 No assets returned from camera');
+          Alert.alert('Error', 'Failed to capture image. Please try again.');
         }
+      } else {
+        console.log('📸 Camera capture cancelled by user');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to capture image: ' + error.message);
+      console.error('📸 Camera capture error:', {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+      });
+      
+      console.log('📸 Falling back to image library...');
+      
+      // Fallback: use image library instead
+      try {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Photo library permission is required');
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          aspect: [16, 9],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          console.log('📸 Image selected from library successfully');
+          if (type === 'start') {
+            setStartOdometerImage(result.assets[0]);
+          } else {
+            setEndOdometerImage(result.assets[0]);
+          }
+          Alert.alert('✅ Image Selected', 'Image from gallery has been selected (Note: Fresh odometer photo is recommended for accuracy)');
+        }
+      } catch (fallbackError) {
+        console.error('📸 Image library fallback also failed:', fallbackError.message);
+        Alert.alert(
+          'Camera Error',
+          `Failed to access camera or gallery:\n\n${error.message}\n\nPlease make sure:\n• Camera/Gallery permission is granted\n• Device has a working camera\n• No other app is using the camera`,
+          [
+            { text: 'OK', onPress: () => {} }
+          ]
+        );
+      }
     }
   };
 
@@ -441,10 +519,15 @@ export default function DriverActiveTripScreen({ route, navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-      <StepIndicator current={step} />
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={require('react-native').Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={100}
+    >
+      <View style={styles.container}>
+        <StepIndicator current={step} />
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={styles.scroll}>
         {/* Trip summary card */}
         <View style={styles.tripCard}>
           <Row icon="location" color="#4caf50" text={activeTrip.pickup_location} />
@@ -471,7 +554,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
           )}
 
           <View style={styles.farePill}>
-            <Text style={styles.fareText}>₹{activeTrip.fare_amount}</Text>
+            <Text style={styles.fareText}>₹{(activeTrip.fare_amount - (activeTrip.commission_amount || 0)).toFixed(2)}</Text>
           </View>
           {activeTrip.fixed_km && (
             <View style={[styles.farePill, { backgroundColor: '#1565c0', marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
@@ -830,6 +913,7 @@ export default function DriverActiveTripScreen({ route, navigation }) {
         />
       </Modal>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -860,7 +944,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   center: { flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { color: '#666', marginTop: 12, fontSize: 14 },
-  scroll: { padding: 16 },
+  scroll: { padding: 16, paddingBottom: 100 },
   stepBar: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#f5f5f5', paddingHorizontal: 16, paddingVertical: 12 },
   stepItem: { alignItems: 'center', flex: 1 },
   stepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ddd', marginBottom: 4 },
@@ -983,7 +1067,7 @@ const styles = StyleSheet.create({
   },
   infoBox: { backgroundColor: '#0a2a4a', borderRadius: 10, padding: 14, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#2196f3' },
   infoText: { color: '#2196f3', fontSize: 14, fontWeight: '600' },
-  doneContainer: { flexGrow: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', padding: 24, paddingBottom: 40 },
+  doneContainer: { flexGrow: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', padding: 24, paddingBottom: 80 },
   paymentQuestionCard: { backgroundColor: '#f9f9f9', borderRadius: 14, padding: 24, marginTop: 24, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#eee', width: '100%' },
   paymentQuestionText: { color: '#333', fontSize: 18, fontWeight: '600', textAlign: 'center', marginTop: 12 },
   paymentButtonsContainer: { width: '100%', gap: 12, marginTop: 20 },

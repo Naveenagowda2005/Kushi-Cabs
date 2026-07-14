@@ -271,11 +271,10 @@ export const COLORS = new Proxy({}, {
 
 // API Configuration
 const getApiUrl = () => {
-  // Use local backend for development
-  // IP: 192.168.1.111 (your system's actual IP)
-  const localUrl = 'http://192.168.1.111:4000';
-  console.log('Using local API URL:', localUrl);
-  return localUrl;
+  // Use production backend on Railway
+  const productionUrl = 'https://kushi-cabs-production.up.railway.app';
+  console.log('Using production API URL:', productionUrl);
+  return productionUrl;
 };
 
 export const API_CONFIG = {

@@ -732,7 +732,7 @@ router.post('/create-dummy-vendor', async (req, res) => {
 
     if (vendorError) return res.status(500).json({ error: 'Failed to create vendor record: ' + vendorError.message });
 
-    // 5. Upsert vendor_verification_status as approved (skip document check)
+    // 5. Upsert vendor_verification_status as approved (skip document check for dummy)
     const { error: vvsError } = await supabaseAdmin
       .from('vendor_verification_status')
       .upsert({
@@ -902,6 +902,7 @@ router.post('/create-admin-trip', async (req, res) => {
       fareAmount,
       commissionAmount,
       customerPreAdvance,
+      extraChargesPerKm,
       scheduledAt,
       passengerName,
       passengerPhone,
@@ -949,6 +950,7 @@ router.post('/create-admin-trip', async (req, res) => {
       fare_amount: parseFloat(fareAmount),
       commission_amount: parseFloat(commissionAmount),
       customer_pre_advance: parseFloat(customerPreAdvance) || 0,
+      extra_km_charge: parseFloat(extraChargesPerKm) || 0,
       scheduled_at: scheduledAt || new Date().toISOString(),
       passenger_name: passengerName.trim(),
       passenger_phone: passengerPhone.trim(),

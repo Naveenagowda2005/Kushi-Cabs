@@ -15,9 +15,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../constants';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
 
 const VendorWaitingForApprovalScreen = ({ navigation }) => {
   const { user, signOut } = useAuth();
+  const { theme } = useTheme();
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -232,7 +234,7 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: COLORS.background }]}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -240,18 +242,18 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
         {/* Status Icon */}
         <View style={styles.iconContainer}>
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <View style={styles.iconBg}>
+            <View style={[styles.iconBg, { backgroundColor: COLORS.surface, borderColor: COLORS.border }]}>
               <Ionicons name="hourglass-outline" size={64} color={COLORS.vendor.primary} />
             </View>
           </Animated.View>
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>Verification in Progress</Text>
+        <Text style={[styles.title, { color: COLORS.text }]}>Verification in Progress</Text>
 
         {/* Description */}
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText}>
+        <View style={[styles.descriptionContainer, { backgroundColor: COLORS.surface }]}>
+          <Text style={[styles.descriptionText, { color: COLORS.textSecondary }]}>
             Your documents have been successfully submitted for verification. Our admin team will review your application and get back to you within 24-48 hours.
           </Text>
         </View>
@@ -264,8 +266,8 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
               <Ionicons name="checkmark" size={24} color="#fff" />
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Documents Submitted</Text>
-              <Text style={styles.stepDate}>
+              <Text style={[styles.stepTitle, { color: COLORS.text }]}>Documents Submitted</Text>
+              <Text style={[styles.stepDate, { color: COLORS.textTertiary }]}>
                 {verificationStatus?.submitted_at
                   ? new Date(verificationStatus.submitted_at).toLocaleString()
                   : 'Just now'}
@@ -274,7 +276,7 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
           </View>
 
           {/* Connector */}
-          <View style={styles.connector} />
+          <View style={[styles.connector, { backgroundColor: COLORS.border }]} />
 
           {/* Step 2: Under Review */}
           <View style={styles.timelineStep}>
@@ -284,49 +286,49 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
               </Animated.View>
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Under Review</Text>
-              <Text style={styles.stepDate}>Our team is reviewing your documents</Text>
+              <Text style={[styles.stepTitle, { color: COLORS.text }]}>Under Review</Text>
+              <Text style={[styles.stepDate, { color: COLORS.textTertiary }]}>Our team is reviewing your documents</Text>
             </View>
           </View>
 
           {/* Connector */}
-          <View style={styles.connector} />
+          <View style={[styles.connector, { backgroundColor: COLORS.border }]} />
 
           {/* Step 3: Approval */}
           <View style={styles.timelineStep}>
-            <View style={[styles.stepCircle, styles.stepPending]}>
+            <View style={[styles.stepCircle, styles.stepPending, { backgroundColor: COLORS.surface }]}>
               <Ionicons name="checkmark" size={24} color={COLORS.vendor.primary} />
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Verification Complete</Text>
-              <Text style={styles.stepDate}>You'll be notified when approved</Text>
+              <Text style={[styles.stepTitle, { color: COLORS.text }]}>Verification Complete</Text>
+              <Text style={[styles.stepDate, { color: COLORS.textTertiary }]}>You'll be notified when approved</Text>
             </View>
           </View>
         </View>
 
         {/* Info Box */}
-        <View style={styles.infoBox}>
+        <View style={[styles.infoBox, { backgroundColor: COLORS.surface }]}>
           <Ionicons name="information-circle-outline" size={24} color={COLORS.vendor.primary} />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.infoTitle}>What happens next?</Text>
-            <Text style={styles.infoText}>
+            <Text style={[styles.infoTitle, { color: COLORS.text }]}>What happens next?</Text>
+            <Text style={[styles.infoText, { color: COLORS.textSecondary }]}>
               Our admin team will carefully review all your submitted documents. You'll receive an email notification once your account is approved or if we need any additional information.
             </Text>
           </View>
         </View>
 
         {/* Tips Box */}
-        <View style={styles.tipsBox}>
-          <Text style={styles.tipsTitle}>Helpful Tips</Text>
-          <Text style={styles.tipItem}>• Keep your documents clear and legible</Text>
-          <Text style={styles.tipItem}>• Ensure proper lighting in your selfie</Text>
-          <Text style={styles.tipItem}>• Have all document information visible</Text>
-          <Text style={styles.tipItem}>• Response time: Usually 24-48 hours</Text>
+        <View style={[styles.tipsBox, { backgroundColor: COLORS.surface }]}>
+          <Text style={[styles.tipsTitle, { color: COLORS.text }]}>Helpful Tips</Text>
+          <Text style={[styles.tipItem, { color: COLORS.textSecondary }]}>• Keep your documents clear and legible</Text>
+          <Text style={[styles.tipItem, { color: COLORS.textSecondary }]}>• Ensure proper lighting in your selfie</Text>
+          <Text style={[styles.tipItem, { color: COLORS.textSecondary }]}>• Have all document information visible</Text>
+          <Text style={[styles.tipItem, { color: COLORS.textSecondary }]}>• Response time: Usually 24-48 hours</Text>
         </View>
       </ScrollView>
 
       {/* Action Buttons */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { backgroundColor: COLORS.background, borderTopColor: COLORS.border }]}>
         <TouchableOpacity
           style={styles.uploadBtn}
           onPress={() => navigation.navigate('UploadDocuments')}
@@ -336,7 +338,7 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.refreshBtn, checkingStatus && styles.refreshBtnDisabled]}
+          style={[styles.refreshBtn, checkingStatus && styles.refreshBtnDisabled, { borderColor: COLORS.vendor.primary, backgroundColor: COLORS.surface }]}
           onPress={async () => {
             console.log('🔄 Manual refresh button pressed');
             setCheckingStatus(true);
@@ -351,18 +353,18 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
           {checkingStatus ? (
             <>
               <ActivityIndicator size="small" color={COLORS.vendor.primary} />
-              <Text style={styles.refreshBtnText}>Checking...</Text>
+              <Text style={[styles.refreshBtnText, { color: COLORS.vendor.primary }]}>Checking...</Text>
             </>
           ) : (
             <>
               <Ionicons name="refresh" size={20} color={COLORS.vendor.primary} />
-              <Text style={styles.refreshBtnText}>Check Status</Text>
+              <Text style={[styles.refreshBtnText, { color: COLORS.vendor.primary }]}>Check Status</Text>
             </>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.contactBtn}
+          style={[styles.contactBtn, { backgroundColor: COLORS.surface }]}
           onPress={() => {
             Alert.alert(
               'Contact Support',
@@ -371,11 +373,11 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
           }}
         >
           <Ionicons name="help-circle-outline" size={20} color={COLORS.vendor.primary} />
-          <Text style={styles.contactBtnText}>Contact Support</Text>
+          <Text style={[styles.contactBtnText, { color: COLORS.vendor.primary }]}>Contact Support</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.signOutBtn}
+          style={[styles.signOutBtn, { backgroundColor: COLORS.surface }]}
           onPress={() => {
             Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
               { text: 'Cancel', style: 'cancel' },
@@ -398,7 +400,6 @@ const VendorWaitingForApprovalScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f3460',
   },
   scroll: {
     flexGrow: 1,
@@ -413,26 +414,23 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#16213e',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
     textAlign: 'center',
     marginBottom: 12,
   },
   descriptionContainer: {
-    backgroundColor: '#16213e',
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
   },
   descriptionText: {
     fontSize: 14,
-    color: '#bbb',
     lineHeight: 20,
     textAlign: 'center',
   },
@@ -458,7 +456,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.vendor.primary,
   },
   stepPending: {
-    backgroundColor: '#16213e',
+    borderWidth: 1,
   },
   spinnerDot: {
     width: 8,
@@ -469,7 +467,6 @@ const styles = StyleSheet.create({
   connector: {
     width: 2,
     height: 20,
-    backgroundColor: '#16213e',
     marginLeft: 24,
     marginBottom: 0,
   },
@@ -480,15 +477,12 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 4,
   },
   stepDate: {
     fontSize: 12,
-    color: '#888',
   },
   infoBox: {
-    backgroundColor: '#16213e',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -497,16 +491,13 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 4,
   },
   infoText: {
     fontSize: 12,
-    color: '#bbb',
     lineHeight: 18,
   },
   tipsBox: {
-    backgroundColor: '#16213e',
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -514,12 +505,10 @@ const styles = StyleSheet.create({
   tipsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 12,
   },
   tipItem: {
     fontSize: 12,
-    color: '#bbb',
     marginBottom: 8,
   },
   footer: {
@@ -527,7 +516,6 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 12,
     borderTopWidth: 1,
-    borderTopColor: '#16213e',
   },
   uploadBtn: {
     backgroundColor: COLORS.vendor.primary,
@@ -544,7 +532,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   refreshBtn: {
-    backgroundColor: '#16213e',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -552,19 +539,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: COLORS.vendor.primary,
   },
   refreshBtnDisabled: {
     opacity: 0.6,
-    borderColor: '#666',
   },
   refreshBtnText: {
-    color: COLORS.vendor.primary,
     fontSize: 16,
     fontWeight: '600',
   },
   contactBtn: {
-    backgroundColor: '#16213e',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -573,12 +556,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   contactBtnText: {
-    color: COLORS.vendor.primary,
     fontSize: 16,
     fontWeight: '600',
   },
   signOutBtn: {
-    backgroundColor: '#16213e',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',

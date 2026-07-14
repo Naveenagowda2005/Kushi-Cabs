@@ -34,7 +34,7 @@ export function useAvailableTrips() {
           .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id')
           .eq('status', TRIP_STATUS.PENDING)
           .eq('is_admin_trip', true)
-          .contains('admin_assigned_drivers', [user.id]) // Check if current driver is in the assigned array
+          .contains('admin_assigned_drivers', [user.id])
           .order('created_at', { ascending: false });
 
         if (adminError && adminError.code !== 'PGRST116') {
@@ -49,7 +49,7 @@ export function useAvailableTrips() {
           .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id, accepted_by')
           .eq('status', TRIP_STATUS.PENDING)
           .eq('is_admin_trip', true)
-          .eq('accepted_by', user.id) // Trip was reassigned to this user
+          .eq('accepted_by', user.id)
           .order('created_at', { ascending: false });
 
         if (reassignError && reassignError.code !== 'PGRST116') {
@@ -61,8 +61,6 @@ export function useAvailableTrips() {
 
       // Get vendor-assigned trips for this driver (driver_id set, status = accepted)
       let vendorAssignedTrips = [];
-      // Get admin-reassigned trips for this driver (driver_id set, status = pending, is_admin_trip = true)
-      let adminReassignedByDriverId = [];
       if (user?.id) {
         try {
           const { data: driverProfile } = await supabase
@@ -84,29 +82,31 @@ export function useAvailableTrips() {
             } else {
               vendorAssignedTrips = assignedTripData || [];
             }
-
-            // Also fetch admin-reassigned trips (driver_id set, status = pending, is_admin_trip = true)
-            const { data: adminReassignedData, error: adminReassignError } = await supabase
-              .from('trips')
-              .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, driver_id')
-              .eq('driver_id', driverProfile.id)
-              .eq('status', TRIP_STATUS.PENDING)
-              .eq('is_admin_trip', true)
-              .order('created_at', { ascending: false });
-
-            if (adminReassignError && adminReassignError.code !== 'PGRST116') {
-              console.warn('⚠️ Could not fetch admin-reassigned trips:', adminReassignError.message);
-            } else {
-              adminReassignedByDriverId = adminReassignedData || [];
-            }
           }
         } catch (err) {
           console.error('Error fetching vendor-assigned trips:', err);
         }
       }
 
-      // Combine all trips
-      const allTrips = [...vendorTrips || [], ...adminTrips, ...adminReassignedTrips, ...adminReassignedByDriverId, ...vendorAssignedTrips];
+      // Combine all trips and DEDUPLICATE by trip ID
+      const allTripsArray = [...vendorTrips || [], ...adminTrips, ...adminReassignedTrips, ...vendorAssignedTrips];
+      
+      console.log('📊 Trip sources:', {
+        vendorTrips: vendorTrips?.length || 0,
+        adminTrips: adminTrips.length,
+        adminReassignedTrips: adminReassignedTrips.length,
+        vendorAssignedTrips: vendorAssignedTrips.length,
+        total: allTripsArray.length,
+      });
+      
+      // Use a Map to deduplicate by ID
+      const tripMap = new Map();
+      allTripsArray.forEach(trip => {
+        if (!tripMap.has(trip.id)) {
+          tripMap.set(trip.id, trip);
+        }
+      });
+      const allTrips = Array.from(tripMap.values());
       
       const enrichedTrips = await Promise.all(
         allTrips.map(async (trip) => {
@@ -127,8 +127,48 @@ export function useAvailableTrips() {
         })
       );
       
-      setTrips(enrichedTrips);
-      console.log('✅ Available trips fetched:', enrichedTrips.length, '(', vendorTrips?.length || 0, 'vendor +', adminTrips.length, 'admin +', adminReassignedTrips.length, 'reassigned-accepted +', adminReassignedByDriverId.length, 'reassigned-pending +', vendorAssignedTrips.length, 'vendor-assigned)');
+      // Mark only the first (most recent) trip as NEW
+      const tripsWithNewBadge = enrichedTrips.map((trip, index) => ({
+        ...trip,
+        isNew: index === 0, // Only the first trip is "New"
+      }));
+      
+      console.log('🎫 Trips with NEW badge:', tripsWithNewBadge.map(t => ({ id: t.id, isNew: t.isNew, created_at: t.created_at })));
+      
+      setTrips(tripsWithNewBadge);
+      console.log('✅ Available trips fetched:', tripsWithNewBadge.length, 'trips');
+      console.log('   Breakdown: ', vendorTrips?.length || 0, 'vendor +', adminTrips.length, 'admin-assigned +', adminReassignedTrips.length, 'admin-reassigned +', vendorAssignedTrips.length, 'vendor-assigned');
+
+      // Set up real-time listener for new trips
+      const channelName = `available-trips-${Date.now()}`;
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'trips',
+            filter: 'is_published=eq.true,is_admin_trip=eq.false,status=eq.pending',
+          },
+          (payload) => {
+            console.log('🔔 New trip added via real-time:', payload.new.id);
+            setTrips(prevTrips => {
+              // Add new trip to front with isNew=true
+              const newTrip = { ...payload.new, isNew: true };
+              // Remove isNew from all other trips
+              const updatedPrevTrips = prevTrips.map(t => ({ ...t, isNew: false }));
+              return [newTrip, ...updatedPrevTrips];
+            });
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Real-time subscription status:', status);
+        });
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } catch (err) {
       console.error('Error fetching trips:', err);
       setError(err.message);
@@ -175,7 +215,7 @@ export function useActiveTrip(userId) {
       const { data, error } = await supabase
         .from('trips')
         .select('*')
-        .eq('status', TRIP_STATUS.IN_PROGRESS) // Only show trips that are IN_PROGRESS (driver manually accepted)
+        .in('status', [TRIP_STATUS.ACCEPTED, TRIP_STATUS.IN_PROGRESS]) // Show trips that are ACCEPTED or IN_PROGRESS
         .or(`driver_id.eq.${driverId},accepted_by.eq.${userId}`) // Check BOTH driver_id and accepted_by
         .maybeSingle();
 
@@ -183,22 +223,7 @@ export function useActiveTrip(userId) {
         console.error('❌ useActiveTrip query error:', error);
       }
 
-      console.log(`✅ useActiveTrip result: ${data ? `Trip ${data.id} (${data.status})` : 'No active trip - checking for ACCEPTED trips assigned to driver'}`);
-      
-      // If no IN_PROGRESS trip found, check if driver has ACCEPTED trip assigned by vendor
-      if (!data) {
-        const { data: acceptedTrip, error: acceptedError } = await supabase
-          .from('trips')
-          .select('*')
-          .eq('driver_id', driverId)
-          .eq('status', TRIP_STATUS.ACCEPTED)
-          .eq('accepted_by', userId)
-          .maybeSingle();
-        
-        if (acceptedTrip) {
-          console.log(`✅ useActiveTrip found ACCEPTED trip: ${acceptedTrip.id} (status: accepted, driver accepted it)`);
-        }
-      }
+      console.log(`✅ useActiveTrip result: ${data ? `Trip ${data.id} (${data.status})` : 'No active trip found'}`);
       
       setTrip(data);
     } catch (err) {

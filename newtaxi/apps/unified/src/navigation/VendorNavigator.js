@@ -153,6 +153,18 @@ export default function VendorNavigator() {
         }
 
         if (error?.code === 'PGRST116') {
+          // No vendor_verification_status record found — check fallback users.verification_status
+          console.log('VendorNavigator: No vendor_verification_status record found - checking users.verification_status fallback');
+          
+          // For dummy vendors, check if users.verification_status is 'approved'
+          if (user?.verification_status === 'approved') {
+            console.log('VendorNavigator: ✅ Dummy vendor detected via users.verification_status=approved');
+            setVerificationStatus('approved');
+            setLoading(false);
+            return;
+          }
+          
+          // Otherwise, user needs to upload documents
           console.log('VendorNavigator: No verification record found - setting to not_started');
           setVerificationStatus('not_started');
           setLoading(false);
@@ -166,12 +178,19 @@ export default function VendorNavigator() {
             setTimeout(() => checkVerificationStatus(true), 1000);
             return;
           }
-          setVerificationStatus('not_started');
+          
+          // If all retries failed, check fallback
+          if (user?.verification_status === 'approved') {
+            console.log('VendorNavigator: Retries failed - checking fallback users.verification_status');
+            setVerificationStatus('approved');
+          } else {
+            setVerificationStatus('not_started');
+          }
           setLoading(false);
           return;
         }
 
-        const newStatus = data?.overall_status || 'not_started';
+        let newStatus = data?.overall_status || 'not_started';
         const isReVerification = data?.is_re_verification === true;
         console.log('VendorNavigator: ✅ Status from DB:', newStatus, '| re-verification:', isReVerification);
 
@@ -297,29 +316,32 @@ export default function VendorNavigator() {
   }
 
   if (verificationStatus === 'pending' || verificationStatus === 'rejected' || verificationStatus === 'not_started') {
-    console.log('VendorNavigator: Vendor not approved (status:', verificationStatus, ') - showing waiting screen');
+    console.log('VendorNavigator: Vendor not approved (status:', verificationStatus, ') - showing upload documents screen');
+    
     return (
       <Stack.Navigator
         screenOptions={{
           headerShown: true,
-          headerStyle: { backgroundColor: '#001a33' },
-          headerTintColor: COLORS.textLight,
+          headerStyle: { backgroundColor: COLORS.surface },
+          headerTintColor: COLORS.text,
+          headerTitleStyle: { color: COLORS.text },
         }}
+        initialRouteName="UploadDocuments"
       >
-        <Stack.Screen
-          name="WaitingForApproval"
-          component={VendorWaitingForApprovalScreen}
-          options={{
-            title: 'Waiting for Approval',
-            headerBackVisible: false,
-            headerLeft: () => null,
-          }}
-        />
         <Stack.Screen
           name="UploadDocuments"
           component={VendorDocumentUploadScreen}
           options={{
             title: 'Upload Documents',
+            headerBackVisible: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="WaitingForApproval"
+          component={VendorWaitingForApprovalScreen}
+          options={{
+            title: 'Waiting for Approval',
             headerBackVisible: true,
           }}
         />
