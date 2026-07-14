@@ -8,7 +8,7 @@ LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
 const { width: screenWidth } = Dimensions.get('window');
 
-export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
+export default function EnquiryCard({ trip, onPress, onAccept, onCancel, isNewest }) {
   const [carType, setCarType] = useState(null);
   const [seaterType, setSeaterType] = useState(null);
   const [fuelType, setFuelType] = useState(null);
@@ -18,6 +18,22 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
   const segmentName = trip.segment_name || 'ONE WAY';
 
   const commissionAmount = trip.commission_amount || 0;
+
+  // Generate formatted booking ID: KUSH-B-1, KUSH-B-2, etc (no padding)
+  const getFormattedBookingId = (bookingIdSeq) => {
+    return `KUSH-B-${bookingIdSeq || 1}`;
+  };
+  
+  const bookingId = getFormattedBookingId(trip.booking_id_seq);
+
+  useEffect(() => {
+    console.log('🎫 EnquiryCard received trip:', {
+      trip_id: trip.id,
+      booking_id_seq: trip.booking_id_seq,
+      formatted_booking_id: bookingId,
+      has_booking_id: !!trip.booking_id_seq,
+    });
+  }, [trip.id, trip.booking_id_seq, bookingId]);
 
   useEffect(() => {
     const fetchCarDetails = async () => {
@@ -63,7 +79,7 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
     };
 
     fetchCarDetails();
-  }, [trip.car_type, trip.seater_type, trip.fuel_type, trip.package_id, trip.created_by]);
+  }, [trip.car_type, trip.seater_type, trip.fuel_type, trip.package_id]);
 
   return (
     <Animated.View
@@ -79,15 +95,16 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel }) {
             <View style={styles.tripTypeContainer}>
               <Ionicons name="car-outline" size={16} color="#ff9800" />
               <Text style={styles.tripType}>{segmentName ? segmentName.toUpperCase() : 'TRIP'}</Text>
-              {/* ✅ NEW Badge - shows if trip hasn't been read yet */}
-              {!trip.vendor_read_at && (
+              {/* ✅ NEW Badge - shows only for newest trip */}
+              {isNewest && (
                 <View style={styles.newBadge}>
                   <Text style={styles.newBadgeText}>NEW</Text>
                 </View>
               )}
             </View>
-            <View style={styles.paymentBadge}>
-              <Text style={styles.paymentText}>Paid by Cash</Text>
+            <View style={styles.bookingIdBadge}>
+              <Text style={styles.bookingIdBadgeLabel}>Booking ID</Text>
+              <Text style={styles.bookingIdBadgeValue}>{bookingId}</Text>
             </View>
           </View>
 
@@ -310,6 +327,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  bookingIdBadge: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 1,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1.5,
+    borderColor: '#2196f3',
+  },
+  bookingIdBadgeLabel: {
+    color: '#2196f3',
+    fontSize: Math.max(8, screenWidth * 0.021),
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  bookingIdBadgeValue: {
+    color: '#2196f3',
+    fontSize: Math.max(10, screenWidth * 0.026),
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    fontFamily: 'monospace',
   },
   newBadge: {
     backgroundColor: '#e94560',
@@ -554,8 +595,8 @@ const styles = StyleSheet.create({
   },
   enquiryLocationText: {
     color: '#333',
-    fontSize: Math.max(13, screenWidth * 0.036),
-    fontWeight: '600',
+    fontSize: Math.max(16, screenWidth * 0.048),
+    fontWeight: '700',
     textAlign: 'center',
     flexWrap: 'wrap',
     maxWidth: screenWidth * 0.25,

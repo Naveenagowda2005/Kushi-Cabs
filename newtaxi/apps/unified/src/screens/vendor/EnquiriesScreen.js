@@ -25,6 +25,12 @@ import TripStatusBadge from '../../components/TripStatusBadge';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const TABS = ['Available', 'My Trips'];
 
+// Global refs to persist across component mounts
+const globalSoundAlertStateRef = {
+  lastConfirmedCount: null,
+  soundTriggeredForCount: null, // Track which count we played sound for
+};
+
 // Separate component for My Trip Card
 function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
   const { user } = useAuth();
@@ -103,6 +109,14 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
       onPress={() => navigation.navigate('EnquiryDetail', { trip: item, readOnly: true })}
       activeOpacity={0.8}
     >
+      {/* Booking ID Badge - Top Right */}
+      <View style={styles.bookingIdBadgeRow}>
+        <View style={styles.bookingIdBadge}>
+          <Text style={styles.bookingIdLabel}>Booking ID</Text>
+          <Text style={styles.bookingIdValue}>{`KUSH-B-${item.booking_id_seq || 1}`}</Text>
+        </View>
+      </View>
+
       {/* Trip Type Badge */}
       <View style={styles.tripTypeBadgeRow}>
         <View style={styles.tripTypeBadge}>
@@ -319,8 +333,8 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         </TouchableOpacity>
       )}
 
-      {/* Cancel/Release button — for accepted/in_progress trips (even with driver assigned) */}
-      {canCancel && (
+      {/* Cancel/Release button — for accepted/in_progress trips OR pending trips with driver assigned */}
+      {(canCancel || (item.status === 'pending' && item.driver_id)) && (
         <TouchableOpacity
           style={styles.cancelBtn}
           onPress={() => onCancel?.(item.id)}
@@ -342,8 +356,12 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
             <Text style={styles.viewDetailsArrowBtnText}>View Details</Text>
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
-          
-          {/* Assign Trip button - show "Reassign" if driver already assigned */}
+        </>
+      )}
+
+      {/* Assign/Reassign button — show for pending with driver assigned OR accepted/in_progress trips */}
+      {(item.driver_id || (item.status === 'accepted' || item.status === 'in_progress')) && (
+        <>
           {item.driver_id ? (
             <>
               <View style={styles.buttonRow}>
@@ -359,7 +377,7 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
                         .maybeSingle();
 
                       if (driver) {
-                        const statusText = item.status === 'accepted' ? 'Accepted' : item.status === 'in_progress' ? 'In Progress' : item.status?.charAt(0).toUpperCase() + item.status?.slice(1);
+                        const statusText = item.status === 'accepted' ? 'Accepted' : item.status === 'in_progress' ? 'In Progress' : item.status === 'pending' ? 'Pending' : item.status?.charAt(0).toUpperCase() + item.status?.slice(1);
                         Alert.alert(
                           'Assigned Driver',
                           `Name: ${driver.users?.full_name || 'Unknown'}\nPhone: ${driver.users?.phone || 'N/A'}\nVehicle: ${driver.vehicle_number || 'N/A'}\nStatus: ${statusText}`,
@@ -419,6 +437,7 @@ export default function VendorEnquiriesScreen({ navigation }) {
   const { trips, loading: loadingTrips, refetch: refetchTrips } = useVendorTrips(user?.id);
   const [activeTab, setActiveTab] = useState(0);
   const [activeStatusFilter, setActiveStatusFilter] = useState('all'); // 'all', 'pending', 'accepted', 'completed'
+  const [prevEnquiriesCount, setPrevEnquiriesCount] = useState(0);
 
   // Reset filter to 'all' when switching to My Trips tab, but show only active trips
   useEffect(() => {
@@ -469,8 +488,12 @@ export default function VendorEnquiriesScreen({ navigation }) {
     userId: user?.id,
     onNewEnquiry: (trip) => {
       setLiveEnquiries((prev) => {
-        if (prev.find((t) => t.id === trip.id)) return prev;
-        // Continuous alert will handle sound playing
+        // Only add if this trip doesn't already exist
+        if (prev.find((t) => t.id === trip.id)) {
+          console.log(`⏭️ Trip ${trip.id} already in list, skipping notification`);
+          return prev;
+        }
+        // New trip - notify and add to list
         console.log('🔔 New enquiry received');
         notifyNewEnquiry(trip);
         return [trip, ...prev];
@@ -501,13 +524,44 @@ export default function VendorEnquiriesScreen({ navigation }) {
     }
   }, [activeTab, refetchEnq]);
 
-  // 🔊 Play 3-time sound alert when enquiries are loaded
+  // 🔊 Play sound alert ONLY when available trip count increases (new enquiry)
+  // Uses GLOBAL state so sound doesn't play again when switching tabs
   useEffect(() => {
-    if (!loadingEnq && liveEnquiries.length > 0 && activeTab === 0) {
-      console.log('🔊 Triggering 3-time enquiry sound alert');
-      playLoopingAlert(3);
+    const confirmedCount = globalSoundAlertStateRef.lastConfirmedCount;
+    
+    // On first load, just initialize the global state
+    if (confirmedCount === null) {
+      globalSoundAlertStateRef.lastConfirmedCount = liveEnquiries.length;
+      console.log(`📊 Initial trip count set globally: ${liveEnquiries.length}`);
+      return;
     }
-  }, [liveEnquiries.length, loadingEnq, activeTab]);
+    
+    const tripCountIncreased = liveEnquiries.length > confirmedCount;
+    const alreadySoundedForThisCount = globalSoundAlertStateRef.soundTriggeredForCount === liveEnquiries.length;
+    
+    console.log(`📊 Trip count change: ${confirmedCount} → ${liveEnquiries.length}`, {
+      tripCountIncreased,
+      activeTab,
+      loadingEnq,
+      alreadySoundedForThisCount,
+      shouldPlay: tripCountIncreased && activeTab === 0 && !loadingEnq && !alreadySoundedForThisCount
+    });
+    
+    // Only play sound if:
+    // 1. Count genuinely increased 
+    // 2. We're on Available tab 
+    // 3. Not currently loading
+    // 4. Haven't already sounded for this trip count
+    if (tripCountIncreased && activeTab === 0 && !loadingEnq && !alreadySoundedForThisCount) {
+      console.log(`🔊 PLAYING ALERT! New trips arrived: ${confirmedCount} → ${liveEnquiries.length}`);
+      globalSoundAlertStateRef.soundTriggeredForCount = liveEnquiries.length;
+      playLoopingAlert(3);
+      globalSoundAlertStateRef.lastConfirmedCount = liveEnquiries.length;
+    } else if (tripCountIncreased) {
+      // Count increased but conditions not met for sound - still update confirmed count
+      globalSoundAlertStateRef.lastConfirmedCount = liveEnquiries.length;
+    }
+  }, [liveEnquiries.length, activeTab, loadingEnq]);
 
   const isLoading = activeTab === 0 ? loadingEnq : loadingTrips;
 
@@ -662,7 +716,7 @@ export default function VendorEnquiriesScreen({ navigation }) {
     );
   }
 
-  function renderEnquiry({ item }) {
+  function renderEnquiry({ item, index }) {
     // ✅ Mark trip as read when vendor views it (if not already read)
     const markTripAsRead = async () => {
       if (!item.vendor_read_at) {
@@ -683,6 +737,7 @@ export default function VendorEnquiriesScreen({ navigation }) {
     return (
       <EnquiryCard
         trip={item}
+        isNewest={index === 0}
         onPress={() => {
           markTripAsRead();
           navigation.navigate('EnquiryDetail', { trip: item });
@@ -878,8 +933,34 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#4caf50',
   },
+  bookingIdBadgeRow: {
+    position: 'absolute',
+    top: screenWidth * 0.02,
+    right: screenWidth * 0.02,
+    zIndex: 10,
+  },
+  bookingIdBadge: {
+    backgroundColor: '#2196f3',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'flex-end',
+  },
+  bookingIdLabel: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  bookingIdValue: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
   tripTypeBadgeRow: {
     marginBottom: 6,
+    marginTop: 20,
   },
   tripTypeBadge: {
     flexDirection: 'row',

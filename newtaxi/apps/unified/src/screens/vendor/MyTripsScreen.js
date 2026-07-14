@@ -24,7 +24,7 @@ export default function VendorMyTripsScreen({ navigation }) {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*')
+        .select('*, booking_id_seq')
         .eq('created_by', user.id)
         .in('status', ['pending', 'accepted', 'in_progress'])
         .order('created_at', { ascending: false });
@@ -58,7 +58,7 @@ export default function VendorMyTripsScreen({ navigation }) {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*')
+        .select('*, booking_id_seq')
         .eq('created_by', user.id)
         .in('status', ['pending', 'accepted', 'in_progress'])
         .order('created_at', { ascending: false });
@@ -187,6 +187,13 @@ export default function VendorMyTripsScreen({ navigation }) {
       fetchSegment();
     }, [item.segment_id]);
 
+    // Format booking ID
+    const getFormattedBookingId = (bookingIdSeq) => {
+      const serial = (bookingIdSeq || 1).toString();
+      return `KUSH-B-${serial}`;
+    };
+    const bookingId = getFormattedBookingId(item.booking_id_seq);
+
     return (
     <TouchableOpacity
       style={styles.tripCard}
@@ -196,10 +203,16 @@ export default function VendorMyTripsScreen({ navigation }) {
       }}
       activeOpacity={0.8}
     >
-      {/* Trip Type Badge */}
-      <View style={styles.tripTypeBadge}>
-        <Ionicons name="tag-outline" size={14} color="#2196f3" />
-        <Text style={styles.tripTypeBadgeText}>{segmentName || 'ONE WAY'}</Text>
+      {/* Booking ID and Trip Type Badge */}
+      <View style={styles.headerBadgeRow}>
+        <View style={styles.bookingIdBadge}>
+          <Text style={styles.bookingIdLabel}>Booking ID</Text>
+          <Text style={styles.bookingIdValue}>{bookingId}</Text>
+        </View>
+        <View style={styles.tripTypeBadge}>
+          <Ionicons name="tag-outline" size={14} color="#2196f3" />
+          <Text style={styles.tripTypeBadgeText}>{segmentName || 'ONE WAY'}</Text>
+        </View>
       </View>
 
       <View style={styles.tripHeader}>
@@ -399,6 +412,22 @@ export default function VendorMyTripsScreen({ navigation }) {
 
             {selectedTrip && (
               <ScrollView style={styles.modalBody} contentContainerStyle={styles.modalBodyContent}>
+                <View style={styles.detailSection}>
+                  <Text style={styles.sectionLabel}>Booking Details</Text>
+                  <View style={styles.infoBox}>
+                    <View style={styles.pricingRow}>
+                      <Text style={styles.infoLabel}>Booking ID</Text>
+                      <Text style={styles.infoValue}>{`KUSH-B-${selectedTrip.booking_id_seq || 1}`}</Text>
+                    </View>
+                    <View style={styles.pricingRow}>
+                      <Text style={styles.infoLabel}>Status</Text>
+                      <Text style={[styles.infoValue, { textTransform: 'capitalize' }]}>
+                        {selectedTrip.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
                 <View style={styles.detailSection}>
                   <Text style={styles.sectionLabel}>Locations</Text>
                   <View style={styles.locationBox}>
@@ -645,6 +674,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  headerBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+    gap: 8,
+  },
+  bookingIdBadge: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flex: 1,
+  },
+  bookingIdLabel: {
+    color: '#856404',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  bookingIdValue: {
+    color: '#856404',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
   tripHeader: {
     flexDirection: 'row',

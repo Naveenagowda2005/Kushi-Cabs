@@ -747,7 +747,7 @@ export default function LoginScreen({ navigation }) {
             style={styles.backButton} 
             onPress={handleBackToRoleSelection}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.textSecondary} />
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
           </TouchableOpacity>
           
           {hasSession() && (

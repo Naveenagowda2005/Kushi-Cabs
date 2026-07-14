@@ -13,16 +13,32 @@ export function useAvailableTrips() {
     try {
       setError(null);
       
-      // Get vendor-published trips
+      // Get vendor-published trips (pending only - not yet accepted)
       const { data: vendorTrips, error: vendorError } = await supabase
         .from('trips')
-        .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, driver_id')
+        .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, extra_km_charge, notes, is_admin_trip, driver_id, accepted_at, accepted_by, booking_id_seq')
         .eq('status', TRIP_STATUS.PENDING)
         .eq('is_published', true)
         .eq('is_admin_trip', false)
         .order('created_at', { ascending: false });
 
       if (vendorError) throw vendorError;
+      
+      // Filter vendor trips: include all pending trips PLUS in_progress trips within 5-minute window
+      const now = new Date();
+      const FIVE_MIN_MS = 5 * 60 * 1000;
+      const filteredVendorTrips = (vendorTrips || []).filter(trip => {
+        if (trip.status === TRIP_STATUS.PENDING) {
+          return true; // All pending trips are visible
+        }
+        if (trip.status === TRIP_STATUS.IN_PROGRESS && trip.accepted_at) {
+          // Include in_progress trips that were accepted within last 5 minutes
+          const acceptedTime = new Date(trip.accepted_at).getTime();
+          const elapsedMs = now.getTime() - acceptedTime;
+          return elapsedMs < FIVE_MIN_MS;
+        }
+        return false;
+      });
 
       // Get admin-assigned trips for this driver (via admin_assigned_drivers array)
       let adminTrips = [];
@@ -31,7 +47,7 @@ export function useAvailableTrips() {
       if (user?.id) {
         const { data: adminTripData, error: adminError } = await supabase
           .from('trips')
-          .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id')
+          .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id, booking_id_seq')
           .eq('status', TRIP_STATUS.PENDING)
           .eq('is_admin_trip', true)
           .contains('admin_assigned_drivers', [user.id])
@@ -40,13 +56,20 @@ export function useAvailableTrips() {
         if (adminError && adminError.code !== 'PGRST116') {
           console.warn('⚠️ Could not fetch admin trips:', adminError.message);
         } else {
-          adminTrips = adminTripData || [];
+          // Filter to only show trips where this driver is the LAST (current) assignment
+          adminTrips = (adminTripData || []).filter(trip => {
+            if (!trip.admin_assigned_drivers || !Array.isArray(trip.admin_assigned_drivers) || trip.admin_assigned_drivers.length === 0) {
+              return false;
+            }
+            // Only include if user.id is the LAST element (most recent assignment)
+            return trip.admin_assigned_drivers[trip.admin_assigned_drivers.length - 1] === user.id;
+          });
         }
 
         // Also fetch admin-reassigned trips (where admin reassigned to this driver specifically)
         const { data: reassignedTripData, error: reassignError } = await supabase
           .from('trips')
-          .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id, accepted_by')
+          .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id, accepted_by, booking_id_seq')
           .eq('status', TRIP_STATUS.PENDING)
           .eq('is_admin_trip', true)
           .eq('accepted_by', user.id)
@@ -72,9 +95,9 @@ export function useAvailableTrips() {
           if (driverProfile) {
             const { data: assignedTripData, error: assignedError } = await supabase
               .from('trips')
-              .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, driver_id')
+              .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, driver_id, booking_id_seq')
               .eq('driver_id', driverProfile.id)
-              .eq('status', TRIP_STATUS.ACCEPTED) // Vendor assigned trips have status = accepted
+              .in('status', [TRIP_STATUS.PENDING, TRIP_STATUS.ACCEPTED])
               .order('created_at', { ascending: false });
 
             if (assignedError && assignedError.code !== 'PGRST116') {
@@ -89,10 +112,10 @@ export function useAvailableTrips() {
       }
 
       // Combine all trips and DEDUPLICATE by trip ID
-      const allTripsArray = [...vendorTrips || [], ...adminTrips, ...adminReassignedTrips, ...vendorAssignedTrips];
+      const allTripsArray = [...filteredVendorTrips, ...adminTrips, ...adminReassignedTrips, ...vendorAssignedTrips];
       
       console.log('📊 Trip sources:', {
-        vendorTrips: vendorTrips?.length || 0,
+        vendorTrips: filteredVendorTrips.length || 0,
         adminTrips: adminTrips.length,
         adminReassignedTrips: adminReassignedTrips.length,
         vendorAssignedTrips: vendorAssignedTrips.length,
@@ -137,7 +160,7 @@ export function useAvailableTrips() {
       
       setTrips(tripsWithNewBadge);
       console.log('✅ Available trips fetched:', tripsWithNewBadge.length, 'trips');
-      console.log('   Breakdown: ', vendorTrips?.length || 0, 'vendor +', adminTrips.length, 'admin-assigned +', adminReassignedTrips.length, 'admin-reassigned +', vendorAssignedTrips.length, 'vendor-assigned');
+      console.log('   Breakdown: ', filteredVendorTrips.length || 0, 'vendor +', adminTrips.length, 'admin-assigned +', adminReassignedTrips.length, 'admin-reassigned +', vendorAssignedTrips.length, 'vendor-assigned');
 
       // Set up real-time listener for new trips
       const channelName = `available-trips-${Date.now()}`;
@@ -179,6 +202,14 @@ export function useAvailableTrips() {
 
   useEffect(() => {
     fetchTrips();
+    
+    // Auto-refetch every 30 seconds to keep the 5-minute seal stamp window accurate
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refetching trips to update 5-minute seal window');
+      fetchTrips();
+    }, 30000); // Refetch every 30 seconds
+    
+    return () => clearInterval(interval);
   }, [fetchTrips]);
 
   return { trips, loading, error, refetch: fetchTrips };

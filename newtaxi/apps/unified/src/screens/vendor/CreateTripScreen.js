@@ -150,7 +150,7 @@ export default function VendorCreateTripScreen({ navigation, route }) {
   }
 
   function validate() {
-    if (!form.segment)                  return 'Please select a trip segment.';
+    if (!form.segment || form.segment.trim() === '')                  return 'Please select a trip segment.';
     if (!form.pickupLocation.trim())    return 'Pickup location is required.';
     if (!form.dropoffLocation.trim())   return 'Drop-off location is required.';
     if (form.segment === 'Round trips' && !form.returnLocation.trim()) return 'Return location is required for round trips.';
@@ -163,9 +163,9 @@ export default function VendorCreateTripScreen({ navigation, route }) {
     if (!fare || fare <= 0)             return 'Enter a valid fare amount.';
     const commission = parseFloat(form.commissionAmount);
     if (!commission || commission <= 0) return 'Enter a valid commission amount for the driver.';
-    if (!form.carType)                  return 'Please select a car type.';
-    if (!form.seaterType)               return 'Please select seater type.';
-    if (!form.fuelType)                 return 'Please select fuel type.';
+    if (!form.carType || form.carType.trim() === '')                  return 'Please select a car type.';
+    if (!form.seaterType || form.seaterType.trim() === '')               return 'Please select seater type.';
+    if (!form.fuelType || form.fuelType.trim() === '')                 return 'Please select fuel type.';
     return null;
   }
 
@@ -192,12 +192,12 @@ export default function VendorCreateTripScreen({ navigation, route }) {
         scheduled_at:         form.scheduledAt ? form.scheduledAt.toISOString() : new Date().toISOString(),
         passenger_name:       form.passengerName.trim(),
         passenger_phone:      form.passengerPhone.trim(),
-        car_type:             form.carType,
-        car_model:            form.carModel,
-        seater_type:          form.seaterType,
-        fuel_type:            form.fuelType,
-        segment_id:           form.segment,
-        package_id:           form.package || null,
+        car_type:             form.carType && form.carType.trim() ? form.carType : null,
+        car_model:            form.carModel && form.carModel.trim() ? form.carModel : null,
+        seater_type:          form.seaterType && form.seaterType.trim() ? form.seaterType : null,
+        fuel_type:            form.fuelType && form.fuelType.trim() ? form.fuelType : null,
+        segment_id:           form.segment && form.segment.trim() ? form.segment : null,
+        package_id:           form.package && form.package.trim() ? form.package : null,
         toll_included:        form.tollIncluded,
         state_tax_included:   form.stateTaxIncluded,
         pet_travelling:       form.petTravelling,

@@ -51,51 +51,10 @@ export function useDriverStatus(userId) {
   // Play 3 beeps in background
   const playGoOnlineSound = useCallback(async () => {
     try {
-      // Check if muted - if yes, don't play
-      if (isMutedRef) {
-        console.log('🔇 Sound muted - skipping beeps');
-        return;
-      }
-      
-      console.log(`🔊 Playing online confirmation - 3 BEEPS (volume: ${currentVolumeRef})`);
-      soundPlayingRef = true;
-      
-      const audioSource = require('../../assets/ring.mp3');
-      
-      // Background task
-      (async () => {
-        for (let i = 0; i < 3; i++) {
-          // ✅ Check both flags: mute or stopped
-          if (!soundPlayingRef || isMutedRef) {
-            console.log('🛑 Sound stopped or muted');
-            break;
-          }
-          
-          try {
-            console.log(`▶️ Beep ${i + 1}/3`);
-            let sound = new Audio.Sound();
-            currentSoundRef = sound;
-            
-            await sound.loadAsync(audioSource);
-            await sound.setVolumeAsync(currentVolumeRef);
-            await sound.playAsync();
-            
-            console.log(`🔊 Beep volume: ${currentVolumeRef}`);
-            
-            // Wait for beep to finish
-            await new Promise(resolve => setTimeout(resolve, 6500));
-            
-            await sound.stopAsync();
-            await sound.unloadAsync();
-            currentSoundRef = null;
-          } catch (err) {
-            console.warn(`⚠️ Beep ${i + 1} error:`, err.message);
-          }
-        }
-        soundPlayingRef = false;
-        console.log('✅ Beeps done');
-      })();
-      
+      // DISABLED: Don't play sound when driver goes online
+      // Sound should only play when NEW trips arrive, not on status changes
+      console.log('🔇 Online confirmation sound disabled - only new trips trigger alerts');
+      return;
     } catch (err) {
       console.warn('❌ Error:', err.message);
       soundPlayingRef = false;

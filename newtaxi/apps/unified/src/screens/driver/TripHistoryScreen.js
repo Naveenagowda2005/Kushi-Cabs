@@ -23,7 +23,7 @@ export default function DriverTripHistoryScreen({ navigation }) {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*, creator:created_by(full_name, phone, roles(name)), segment:segment_id(name)')
+        .select('*, booking_id_seq, creator:created_by(full_name, phone, roles(name)), segment:segment_id(name)')
         .or(`accepted_by.eq.${user.id},driver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
@@ -82,7 +82,12 @@ export default function DriverTripHistoryScreen({ navigation }) {
     const isCompleted = item.status === 'completed';
     const hasIssue = item.status === 'completed'; // show contact option for completed trips
 
-    console.log('🎫 TripCard rendering:', { id: item.id, status: item.status, isCompleted });
+    const getFormattedBookingId = (bookingIdSeq) => {
+      return `KUSH-B-${bookingIdSeq || 1}`;
+    };
+    const bookingId = getFormattedBookingId(item.booking_id_seq);
+
+    console.log('🎫 TripCard rendering:', { id: item.id, status: item.status, isCompleted, bookingId });
 
     return (
       <TouchableOpacity 
@@ -96,6 +101,10 @@ export default function DriverTripHistoryScreen({ navigation }) {
       >
         <View style={styles.cardHeader}>
           <TripStatusBadge status={item.status} />
+          <View style={styles.bookingIdBadge}>
+            <Text style={styles.bookingIdLabel}>Booking ID</Text>
+            <Text style={styles.bookingIdValue}>{bookingId}</Text>
+          </View>
           <View style={styles.tripTypeBadge}>
             <Text style={styles.tripTypeText}>
               {item.segment?.name?.toUpperCase() || 'ONE WAY'}
@@ -247,6 +256,30 @@ const styles = StyleSheet.create({
   fare: { color: '#4caf50', fontWeight: 'bold', fontSize: 16 },
   tripTypeBadge: { backgroundColor: '#f5f5f5', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, flex: 1 },
   tripTypeText: { color: '#ff9800', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  bookingIdBadge: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 1,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1.5,
+    borderColor: '#2196f3',
+  },
+  bookingIdLabel: {
+    color: '#2196f3',
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  bookingIdValue: {
+    color: '#2196f3',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    fontFamily: 'monospace',
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   location: { color: '#333', fontSize: 13, flex: 1 },
   meta: { color: '#666', fontSize: 12, flex: 1 },

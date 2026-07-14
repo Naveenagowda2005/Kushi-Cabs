@@ -31,7 +31,7 @@ export default function VendorTripHistoryScreen({ navigation }) {
 
       let query = supabase
         .from('trips')
-        .select('*, accepted_by_user:accepted_by(full_name, phone), driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
+        .select('*, booking_id_seq, accepted_by_user:accepted_by(full_name, phone), driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
         .order('created_at', { ascending: false });
 
       if (vendorRow?.id) {
@@ -68,10 +68,19 @@ export default function VendorTripHistoryScreen({ navigation }) {
   };
 
   function TripCard({ item, navigation }) {
+    const getFormattedBookingId = (bookingIdSeq) => {
+      return `KUSH-B-${bookingIdSeq || 1}`;
+    };
+    const bookingId = getFormattedBookingId(item.booking_id_seq);
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <TripStatusBadge status={item.status} />
+          <View style={styles.bookingIdBadge}>
+            <Text style={styles.bookingIdLabel}>Booking ID</Text>
+            <Text style={styles.bookingIdValue}>{bookingId}</Text>
+          </View>
           <Text style={styles.fare}>₹{item.fare_amount}</Text>
         </View>
 
@@ -213,6 +222,31 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   date: { color: '#888', fontSize: 12, marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
+  bookingIdBadge: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 1,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1.5,
+    borderColor: '#2196f3',
+    marginHorizontal: 8,
+  },
+  bookingIdLabel: {
+    color: '#2196f3',
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  bookingIdValue: {
+    color: '#2196f3',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    fontFamily: 'monospace',
+  },
   viewDetailsBtn: {
     backgroundColor: '#2196f3',
     borderRadius: 8,

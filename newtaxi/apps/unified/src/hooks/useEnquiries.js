@@ -18,7 +18,7 @@ export function useAvailableEnquiries() {
       // But exclude trips that have already been accepted (accepted_by IS NULL means not yet accepted)
       const { data, error } = await supabase
         .from('trips')
-        .select('*')
+        .select('*, booking_id_seq')
         .eq('status', TRIP_STATUS.PENDING)
         .is('accepted_by', null)
         .order('created_at', { ascending: false });

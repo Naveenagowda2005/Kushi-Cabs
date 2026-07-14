@@ -13,7 +13,7 @@ import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 import SplashScreen from '../screens/auth/SplashScreen';
 
 export default function RootNavigator() {
-  const { loading, hasSession, hasUser, getUserRole, selectedRole, incompleteDriverDocuments, forceResetMode } = useAuth();
+  const { loading, hasSession, hasUser, getUserRole, selectedRole, incompleteDriverDocuments, forceResetMode, user } = useAuth();
   const { forceUpdate } = useTheme();
   
   // Force re-render of all child navigators when theme changes
@@ -47,7 +47,8 @@ export default function RootNavigator() {
     selectedRole,
     incompleteDriverDocuments,
     showSplash,
-    forceResetMode, // NEW
+    forceResetMode,
+    isDummyVendor: user?.full_name?.includes('DUMMY'),
   });
 
   // If force reset mode is active, show role selection
@@ -86,7 +87,8 @@ export default function RootNavigator() {
       case ROLES.SUPER_ADMIN:
         return <SuperAdminNavigator />;
       case ROLES.VENDOR:
-        return <VendorNavigator />;
+        // For vendors, pass user so VendorNavigator can make immediate decision
+        return <VendorNavigator key={`vendor-${user?.id}`} />;
       case ROLES.DRIVER:
         return <DriverNavigator />;
       default:

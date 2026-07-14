@@ -9,7 +9,6 @@ export const AlertProvider = ({ children }) => {
   const [isMuted, setIsMuted] = useState(false); // ✅ Default to false (unmuted)
   const [trips, setTrips] = useState(0);
   const [enquiries, setEnquiries] = useState(0);
-  const [isDriverOnline, setIsDriverOnline] = useState(false);
   const [vendorTrips, setVendorTrips] = useState(0);
   const [hasActiveTrip, setHasActiveTrip] = useState(false);
   
@@ -19,7 +18,7 @@ export const AlertProvider = ({ children }) => {
 
   // Check if driver has an active/in-progress trip
   const checkActiveTrip = useCallback(async () => {
-    if (!user?.id || !isDriverOnline) {
+    if (!user?.id) {
       setHasActiveTrip(false);
       return;
     }
@@ -39,7 +38,7 @@ export const AlertProvider = ({ children }) => {
     } catch (err) {
       console.warn('Error checking active trip:', err.message);
     }
-  }, [user?.id, isDriverOnline]);
+  }, [user?.id]);
 
   // Background check: periodically verify trips/enquiries exist
   const startBackgroundCheck = useCallback(() => {
@@ -53,7 +52,7 @@ export const AlertProvider = ({ children }) => {
         await checkActiveTrip();
         
         // For drivers: check if they have available trips
-        if (isDriverOnline) {
+        if (trips > 0) {
           const { data: tripsData, error: tripsError } = await supabase
             .from('trips')
             .select('id', { count: 'exact' })
@@ -94,7 +93,7 @@ export const AlertProvider = ({ children }) => {
         console.warn('Background check error:', err.message);
       }
     }, 5000);
-  }, [user?.id, isDriverOnline, checkActiveTrip]);
+  }, [user?.id, trips, checkActiveTrip]);
 
   const stopBackgroundCheck = useCallback(() => {
     if (backgroundCheckRef.current) {
@@ -103,14 +102,14 @@ export const AlertProvider = ({ children }) => {
     }
   }, []);
 
-  // Main effect - NO SOUND, just track alert data
+  // Main effect - track alert data
   useEffect(() => {
     const hasTripsOrEnquiries = trips > 0 || enquiries > 0 || vendorTrips > 0;
-    const isDriver = trips > 0;
-    const shouldCheckStatus = hasTripsOrEnquiries && !isMuted && (!isDriver || isDriverOnline) && !hasActiveTrip;
+    // Track alerts - driver is always online now
+    const shouldCheckStatus = hasTripsOrEnquiries && !isMuted && !hasActiveTrip;
 
     if (shouldCheckStatus && !hasPlayedInitialRef.current) {
-      console.log('📱 Alert data available (NO SOUND):', {
+      console.log('📱 Alert data available:', {
         trips,
         enquiries,
         vendorTrips
@@ -127,35 +126,25 @@ export const AlertProvider = ({ children }) => {
         clearInterval(continuousAlertRef.current);
       }
     };
-  }, [trips, enquiries, isMuted, vendorTrips, isDriverOnline, hasActiveTrip, startBackgroundCheck, stopBackgroundCheck]);
+  }, [trips, enquiries, isMuted, vendorTrips, hasActiveTrip, startBackgroundCheck, stopBackgroundCheck]);
 
   // Memoized update function
   const updateAlertData = useCallback((data) => {
     if (data.trips !== undefined) setTrips(data.trips);
     if (data.enquiries !== undefined) setEnquiries(data.enquiries);
-    if (data.isDriverOnline !== undefined) setIsDriverOnline(data.isDriverOnline);
     if (data.vendorTrips !== undefined) setVendorTrips(data.vendorTrips);
     
     console.log('🔔 AlertContext updated:', {
       trips: data.trips,
       enquiries: data.enquiries,
-      vendorTrips: data.vendorTrips,
-      isDriverOnline: data.isDriverOnline
+      vendorTrips: data.vendorTrips
     });
   }, []);
-
-  // Handle driver going offline
-  useEffect(() => {
-    if (!isDriverOnline && trips > 0) {
-      console.log('📴 Driver went offline');
-      stopBackgroundCheck();
-    }
-  }, [isDriverOnline, trips, stopBackgroundCheck]);
 
   const value = {
     isMuted,
     setIsMuted,
-    alertData: { trips, enquiries, isDriverOnline, vendorTrips },
+    alertData: { trips, enquiries, vendorTrips },
     updateAlertData,
   };
 

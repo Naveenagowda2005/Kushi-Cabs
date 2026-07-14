@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,13 +102,94 @@ export default function VendorNavigator() {
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Enquiries');
-  const [soundPlayed, setSoundPlayed] = useState(false);
+  const soundPlayedRef = useRef(false); // Use ref instead of state to persist across reconnections
 
-  // Play welcome sound when vendor app fully loads
+  // IMMEDIATE CHECK: If user verification_status is already approved, skip to dashboard immediately
+  // This handles dummy vendors and any pre-approved vendors
+  if (user?.verification_status === 'approved') {
+    console.log('VendorNavigator: ✅ User verification_status is APPROVED - going straight to dashboard (bypassing all checks)');
+    return (
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: true,
+          headerStyle: { backgroundColor: '#001a33' },
+          headerTintColor: '#FF9800',
+        }}
+      >
+        <Stack.Screen
+          name="Dashboard"
+          component={DashboardWithTabs}
+          initialParams={{ activeTab: 'Enquiries' }}
+          options={{
+            title: '',
+            headerTitleStyle: { color: '#FF9800', fontWeight: '700' }
+          }}
+        />
+        <Stack.Screen 
+          name="EnquiryDetail" 
+          component={VendorEnquiryDetailScreen} 
+          options={{ title: 'Enquiry Details', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
+        />
+        <Stack.Screen 
+          name="AssignDriver"
+          component={AssignDriverScreen}
+          options={{ title: 'Assign Driver', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }}
+        />
+        <Stack.Screen 
+          name="CreateTrip"    
+          component={VendorCreateTripScreen}    
+          options={{ 
+            title: 'Create Trip',
+            headerTitleStyle: { color: '#FF9800', fontWeight: '700' }
+          }} 
+        />
+        <Stack.Screen 
+          name="CompletedTripDetail" 
+          component={CompletedTripDetailScreen} 
+          options={{ title: 'Trip Details', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
+        />
+        <Stack.Screen 
+          name="Earnings"    
+          component={VendorEarningsScreen} 
+          options={{ title: 'Earnings & Reports', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
+        />
+        <Stack.Screen 
+          name="Settings"    
+          component={VendorSettingsScreen} 
+          options={{ title: 'Business Settings', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }} 
+        />
+        <Stack.Screen
+          name="Terms"
+          component={PolicyScreen}
+          options={{ title: 'Terms & Conditions', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }}
+        />
+        <Stack.Screen
+          name="CancellationPolicy"
+          component={PolicyScreen}
+          options={{ title: 'Cancellation Policy', headerTitleStyle: { color: '#FF9800', fontWeight: '700' } }}
+        />
+        <Stack.Screen
+          name="ViewPolicy"
+          component={ViewPolicyScreen}
+          options={({ route }) => ({
+            title: route.params?.policyType === 'privacy_policy' ? 'Privacy Policy'
+              : route.params?.policyType === 'terms_conditions' ? 'Terms & Conditions'
+              : route.params?.policyType === 'cancellation_policy' ? 'Cancellation Policy'
+              : route.params?.policyType === 'refund_policy' ? 'Refund Policy'
+              : route.params?.policyType === 'safety_guidelines' ? 'Safety Guidelines'
+              : 'Policy',
+            headerTitleStyle: { color: '#FF9800', fontWeight: '700' }
+          })}
+        />
+      </Stack.Navigator>
+    );
+  }
+
+  // Play welcome sound when vendor app fully loads (only once per app load)
   useEffect(() => {
-    if (verificationStatus === 'approved' && !soundPlayed && user?.id) {
+    if (verificationStatus === 'approved' && !soundPlayedRef.current && user?.id) {
       console.log('🎵 Vendor app loaded - Playing welcome sound (3 rings)');
-      setSoundPlayed(true);
+      soundPlayedRef.current = true; // Set ref so it never plays again during this session
       
       // Initialize audio and play welcome sound
       (async () => {
@@ -120,138 +201,114 @@ export default function VendorNavigator() {
         }
       })();
     }
-  }, [verificationStatus, soundPlayed, user?.id]);
+  }, [verificationStatus, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
 
     let isMounted = true;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
 
-    const checkVerificationStatus = async (isRetry = false) => {
+    const checkVerificationStatus = async () => {
       try {
-        if (!isRetry) {
-          console.log('VendorNavigator: ✅ Starting verification check for user:', user.id);
-        } else {
-          console.log(`VendorNavigator: 🔄 Retry ${retryCount}/${MAX_RETRIES}`);
-        }
-        
-        const { data, error } = await supabase
+        console.log('VendorNavigator: ✅ Starting verification check for user:', user.id);
+
+        // FIRST: Check vendor_verification_status table
+        const { data: verificationStatus, error } = await supabase
           .from('vendor_verification_status')
-          .select('overall_status, approved_at, rejected_at, submitted_at, all_documents_submitted, is_re_verification')
+          .select('overall_status, is_re_verification')
           .eq('user_id', user.id)
           .single();
 
         if (!isMounted) return;
 
-        if (error?.code === 'PGRST205') {
-          console.log('VendorNavigator: vendor_verification_status table not created yet - setting to not_started');
-          setVerificationStatus('not_started');
-          setLoading(false);
-          return;
-        }
+        console.log('VendorNavigator: vendor_verification_status query result:', { 
+          hasData: !!verificationStatus, 
+          error: error?.code,
+          status: verificationStatus?.overall_status
+        });
 
-        if (error?.code === 'PGRST116') {
-          // No vendor_verification_status record found — check fallback users.verification_status
-          console.log('VendorNavigator: No vendor_verification_status record found - checking users.verification_status fallback');
+        // If found, use it
+        if (verificationStatus) {
+          const newStatus = verificationStatus?.overall_status || 'not_started';
+          const isReVerification = verificationStatus?.is_re_verification === true;
           
-          // For dummy vendors, check if users.verification_status is 'approved'
-          if (user?.verification_status === 'approved') {
-            console.log('VendorNavigator: ✅ Dummy vendor detected via users.verification_status=approved');
+          console.log('VendorNavigator: ✅ Status from vendor_verification_status table:', newStatus, '| re-verification:', isReVerification);
+          
+          if (newStatus === 'pending' && isReVerification) {
+            console.log('VendorNavigator: Re-verification pending — keeping dashboard access');
             setVerificationStatus('approved');
             setLoading(false);
             return;
           }
           
-          // Otherwise, user needs to upload documents
-          console.log('VendorNavigator: No verification record found - setting to not_started');
-          setVerificationStatus('not_started');
+          setVerificationStatus(newStatus);
           setLoading(false);
           return;
+        }
+
+        // If no vendor_verification_status record, check users.verification_status (for dummy vendors)
+        // This is the key fallback for dummy vendors — they're created with verification_status='approved'
+        if (error?.code === 'PGRST116') {
+          console.log('VendorNavigator: No vendor_verification_status record found, checking users.verification_status...');
+          
+          const { data: userData } = await supabase
+            .from('users')
+            .select('verification_status')
+            .eq('id', user.id)
+            .single();
+
+          console.log('VendorNavigator: users.verification_status:', userData?.verification_status);
+
+          if (userData?.verification_status === 'approved') {
+            // Approved at user level — create the missing vendor_verification_status record
+            // so future checks work properly (same pattern as DriverNavigator)
+            console.log('VendorNavigator: ✅ User approved at users table level, creating vendor_verification_status record...');
+            
+            try {
+              await supabase
+                .from('vendor_verification_status')
+                .upsert({
+                  user_id: user.id,
+                  overall_status: 'approved',
+                  all_documents_submitted: true,
+                  submitted_at: new Date().toISOString(),
+                  approved_at: new Date().toISOString(),
+                }, { onConflict: 'user_id' });
+
+              console.log('VendorNavigator: ✅ vendor_verification_status record created');
+            } catch (upsertError) {
+              console.warn('VendorNavigator: Could not create vendor_verification_status record (non-fatal):', upsertError.message);
+              // Non-fatal — we can still approve the user
+            }
+            
+            if (isMounted) {
+              setVerificationStatus('approved');
+              setLoading(false);
+            }
+            return;
+          } else {
+            // Not approved at user level — needs documents
+            console.log('VendorNavigator: Not approved, user needs to upload documents');
+            if (isMounted) {
+              setVerificationStatus('not_started');
+              setLoading(false);
+            }
+            return;
+          }
         }
 
         if (error) {
           console.error('VendorNavigator: Error checking vendor verification status:', error);
-          if (retryCount < MAX_RETRIES) {
-            retryCount++;
-            setTimeout(() => checkVerificationStatus(true), 1000);
-            return;
-          }
-          
-          // If all retries failed, check fallback
-          if (user?.verification_status === 'approved') {
-            console.log('VendorNavigator: Retries failed - checking fallback users.verification_status');
-            setVerificationStatus('approved');
-          } else {
+          if (isMounted) {
             setVerificationStatus('not_started');
+            setLoading(false);
           }
-          setLoading(false);
           return;
         }
-
-        let newStatus = data?.overall_status || 'not_started';
-        const isReVerification = data?.is_re_verification === true;
-        console.log('VendorNavigator: ✅ Status from DB:', newStatus, '| re-verification:', isReVerification);
-
-        if (newStatus === 'pending' && isReVerification) {
-          console.log('VendorNavigator: Re-verification pending — keeping dashboard access');
-          setVerificationStatus('approved');
-          if (isMounted) setLoading(false);
-          return;
-        }
-
-        if (newStatus === 'pending' && isMounted) {
-          try {
-            const { data: docsData, error: docsError } = await supabase
-              .from('vendor_documents')
-              .select('documents')
-              .eq('user_id', user.id)
-              .single();
-
-            if (!docsError && docsData?.documents) {
-              const REQUIRED = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
-              const allApproved = REQUIRED.every(dt => docsData.documents[dt]?.status === 'approved');
-              if (allApproved) {
-                console.log('VendorNavigator: All docs approved but status is pending — auto-approving');
-                const { data: vendorData } = await supabase
-                  .from('vendors')
-                  .select('id')
-                  .eq('user_id', user.id)
-                  .single();
-                if (vendorData?.id) {
-                  await supabase.rpc('update_vendor_verification', {
-                    p_vendor_id: vendorData.id,
-                    p_overall_status: 'approved',
-                  });
-                  await supabase.rpc('update_user_verification_status', {
-                    p_user_id: user.id,
-                    p_status: 'approved',
-                  });
-                  if (isMounted) {
-                    setVerificationStatus('approved');
-                    setLoading(false);
-                  }
-                  return;
-                }
-              }
-            }
-          } catch (autoApproveError) {
-            console.warn('VendorNavigator: Auto-approve check failed (non-fatal):', autoApproveError.message);
-          }
-        }
-
-        setVerificationStatus(newStatus);
       } catch (error) {
         console.error('VendorNavigator: Exception in verification check:', error);
-        if (retryCount < MAX_RETRIES) {
-          retryCount++;
-          setTimeout(() => checkVerificationStatus(true), 1000);
-        } else {
-          setVerificationStatus('not_started');
-        }
-      } finally {
         if (isMounted) {
+          setVerificationStatus('not_started');
           setLoading(false);
         }
       }
@@ -259,12 +316,7 @@ export default function VendorNavigator() {
 
     checkVerificationStatus();
 
-    const pollInterval = setInterval(() => {
-      if (isMounted) {
-        checkVerificationStatus();
-      }
-    }, 3000);
-
+    // Setup real-time subscriptions for updates (not polling)
     let channel;
     const setupSubscription = () => {
       try {
@@ -300,7 +352,6 @@ export default function VendorNavigator() {
 
     return () => {
       isMounted = false;
-      clearInterval(pollInterval);
       if (channel) {
         supabase.removeChannel(channel);
       }

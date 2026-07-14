@@ -16,6 +16,7 @@ import { supabase } from '../../lib/supabase';
 import TripCard from '../../components/TripCard';
 import WalletBanner from '../../components/WalletBanner';
 import { COLORS } from '../../constants';
+import { playLoopingAlert } from '../../services/soundService';
 
 export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const { user, signOut } = useAuth();
@@ -30,6 +31,11 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const [completedTrips, setCompletedTrips] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [displayTrips, setDisplayTrips] = useState([]);
+  
+  // Track previous trip count to detect when count increases
+  const prevTripCountRef = useRef(0);
+  const hasPlayedInitialSoundRef = useRef(false);
+  const isScreenFocusRef = useRef(false);  // Track if we just focused the screen
 
   // Sync available trips and online status to AlertContext
   useEffect(() => {
@@ -64,6 +70,7 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   useFocusEffect(
     useCallback(() => {
       console.log('DashboardScreen focused - refetching active trip');
+      isScreenFocusRef.current = true;  // Mark that we're doing a screen focus refetch
       refetchActiveTrip();
       // Also fetch completed trips for history tab
       fetchCompletedTrips();
@@ -112,7 +119,53 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
         return new Date(b.created_at) - new Date(a.created_at);
       });
     setDisplayTrips(sorted);
+
+    // Initialize prevTripCountRef only on first load or significant changes
+    // (avoid resetting on every navigation)
+    if (prevTripCountRef.current === 0 && sorted.length > 0) {
+      prevTripCountRef.current = sorted.length;
+      console.log(`✅ Initialized trip count: ${sorted.length}`);
+    }
   }, [availableTrips, isNewTrip]);
+
+  // 🔊 Play sound alert only when trip count INCREASES (not on initial load or decrease)
+  useEffect(() => {
+    const currentTripCount = displayTrips.length;
+    const previousTripCount = prevTripCountRef.current;
+
+    console.log(`📊 Trip count change: ${previousTripCount} → ${currentTripCount}`);
+
+    // Only play sound if:
+    // 1. Trips increased (new trips available)
+    // 2. Driver is online
+    // 3. Not the initial load (hasPlayedInitialSoundRef prevents first load sound)
+    // 4. Not a screen focus refetch (isScreenFocusRef prevents sound on tab switch)
+    if (
+      currentTripCount > previousTripCount &&
+      isOnline &&
+      hasPlayedInitialSoundRef.current &&
+      !isScreenFocusRef.current  // Don't play on screen focus
+    ) {
+      const newTripsCount = currentTripCount - previousTripCount;
+      console.log(`🔊 Playing sound alert: ${newTripsCount} new trip(s) available`);
+      playLoopingAlert(3); // Play 3 times
+    }
+
+    // Mark that we've processed at least one count change
+    if (!hasPlayedInitialSoundRef.current && currentTripCount >= 0) {
+      hasPlayedInitialSoundRef.current = true;
+      console.log('✅ Initial trip count loaded, sound alerts now enabled');
+    }
+
+    // Update previous count for next comparison
+    prevTripCountRef.current = currentTripCount;
+
+    // Reset screen focus flag after processing
+    if (isScreenFocusRef.current) {
+      console.log('🔄 Screen focus refetch completed, resetting flag');
+      isScreenFocusRef.current = false;
+    }
+  }, [displayTrips.length, isOnline]);
 
   // If driver already has an active/in-progress trip, redirect to ActiveTrip screen
   // BUT only if they're on the Available tab (tab 0), not on Trip History tab

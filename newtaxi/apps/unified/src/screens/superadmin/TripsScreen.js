@@ -213,6 +213,7 @@ export default function SuperAdminTripsScreen() {
         .from('trips')
         .select(`
           id,
+          booking_id_seq,
           status,
           fare_amount,
           pickup_location,
@@ -245,6 +246,7 @@ export default function SuperAdminTripsScreen() {
           completed_at,
           created_by,
           accepted_by,
+          admin_assigned_drivers,
           trip_segments(id, name)
         `);
 
@@ -269,6 +271,10 @@ export default function SuperAdminTripsScreen() {
         tripsData.forEach(trip => {
           if (trip.created_by) userIds.add(trip.created_by);
           if (trip.accepted_by) userIds.add(trip.accepted_by);
+          // Also add admin_assigned_drivers
+          if (trip.admin_assigned_drivers && Array.isArray(trip.admin_assigned_drivers)) {
+            trip.admin_assigned_drivers.forEach(driverId => userIds.add(driverId));
+          }
         });
 
         if (userIds.size > 0) {
@@ -291,7 +297,11 @@ export default function SuperAdminTripsScreen() {
             const enrichedTrips = tripsData.map(trip => ({
               ...trip,
               creator: trip.created_by ? userMap[trip.created_by] : null,
-              driver: trip.accepted_by ? userMap[trip.accepted_by] : null
+              driver: trip.accepted_by ? userMap[trip.accepted_by] : null,
+              // Only show the most recent admin assigned driver (last one in array)
+              latestAdminAssignedDriver: (trip.admin_assigned_drivers && Array.isArray(trip.admin_assigned_drivers) && trip.admin_assigned_drivers.length > 0)
+                ? userMap[trip.admin_assigned_drivers[trip.admin_assigned_drivers.length - 1]]
+                : null
             }));
 
             setTrips(enrichedTrips);
@@ -436,6 +446,7 @@ export default function SuperAdminTripsScreen() {
         .from('trips')
         .select(`
           id,
+          booking_id_seq,
           status,
           fare_amount,
           pickup_location,
@@ -857,7 +868,7 @@ export default function SuperAdminTripsScreen() {
     
     // Format booking ID
     const getFormattedBookingId = (bookingIdSeq) => {
-      const serial = (bookingIdSeq || 1).toString().padStart(6, '0');
+      const serial = (bookingIdSeq || 1).toString();
       return `KUSH-B-${serial}`;
     };
     const bookingId = getFormattedBookingId(item.booking_id_seq);
@@ -885,7 +896,6 @@ export default function SuperAdminTripsScreen() {
               <Text style={[styles.status, { color }]}>
                 {item.status.toUpperCase()}
               </Text>
-              <Text style={styles.tripId}>ID: {item.id.slice(0, 8)}</Text>
             </View>
           </View>
           <View style={styles.tripHeaderRight}>
@@ -966,23 +976,41 @@ export default function SuperAdminTripsScreen() {
           </View>
         )}
 
-        {/* Driver Info */}
-        {item.driver && (
+        {/* Assigned Driver - Show only current/most recent assignment */}
+        {(item.latestAdminAssignedDriver || item.driver) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Accepted By (Driver)</Text>
-            <View style={styles.infoRow}>
-              <Ionicons name="person-circle-outline" size={16} color="#2196f3" />
-              <Text style={styles.infoText}>{item.driver.full_name}</Text>
-            </View>
-            {item.driver.phone && (
-              <TouchableOpacity
-                style={styles.phoneButton}
-                onPress={() => Linking.openURL(`tel:${item.driver.phone}`)}
-              >
-                <Ionicons name="call-outline" size={14} color="#2196f3" />
-                <Text style={styles.phoneText}>{item.driver.phone}</Text>
-              </TouchableOpacity>
-            )}
+            <Text style={styles.sectionTitle}>Assigned Driver</Text>
+            
+            {/* Priority: Show accepted driver if exists, otherwise show latest admin assigned driver */}
+            {item.driver ? (
+              <View style={styles.infoRow}>
+                <Ionicons name="person-circle-outline" size={16} color="#2196f3" />
+                <Text style={styles.infoText}>{item.driver.full_name}</Text>
+                {item.driver.phone && (
+                  <TouchableOpacity
+                    style={styles.phoneButton}
+                    onPress={() => Linking.openURL(`tel:${item.driver.phone}`)}
+                  >
+                    <Ionicons name="call-outline" size={14} color="#2196f3" />
+                    <Text style={styles.phoneText}>{item.driver.phone}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : item.latestAdminAssignedDriver ? (
+              <View style={styles.infoRow}>
+                <Ionicons name="person-circle-outline" size={16} color="#ff9800" />
+                <Text style={styles.infoText}>{item.latestAdminAssignedDriver.full_name}</Text>
+                {item.latestAdminAssignedDriver.phone && (
+                  <TouchableOpacity
+                    style={styles.phoneButton}
+                    onPress={() => Linking.openURL(`tel:${item.latestAdminAssignedDriver.phone}`)}
+                  >
+                    <Ionicons name="call-outline" size={14} color="#ff9800" />
+                    <Text style={styles.phoneText}>{item.latestAdminAssignedDriver.phone}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
           </View>
         )}
 

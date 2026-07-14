@@ -12,12 +12,51 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
   const [fuelType, setFuelType] = useState(null);
   const [segmentName, setSegmentName] = useState(null);
   const [packageName, setPackageName] = useState(null);
+  const [isAcceptedRecently, setIsAcceptedRecently] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(0);
   
-  // Generate formatted booking ID: KUSH-B-serialNumber
+  // Check if trip was accepted in the last 5 minutes
+  useEffect(() => {
+    if (!trip.accepted_at) {
+      setIsAcceptedRecently(false);
+      return;
+    }
+
+    const acceptedTime = new Date(trip.accepted_at).getTime();
+    const now = new Date().getTime();
+    const elapsedMs = now - acceptedTime;
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+    if (elapsedMs < FIVE_MINUTES_MS) {
+      setIsAcceptedRecently(true);
+      setTimeRemaining(Math.ceil((FIVE_MINUTES_MS - elapsedMs) / 1000));
+    } else {
+      setIsAcceptedRecently(false);
+      setTimeRemaining(0);
+    }
+  }, [trip.accepted_at]);
+
+  // Update timer every second
+  useEffect(() => {
+    if (!isAcceptedRecently || timeRemaining <= 0) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          setIsAcceptedRecently(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isAcceptedRecently, timeRemaining]);
+  
+  // Generate formatted booking ID: KUSH-B-1, KUSH-B-2, etc (no padding)
   const getFormattedBookingId = (tripId, bookingIdSeq) => {
-    // Use the booking_id_seq from database, fallback to tripId if not available
-    const serial = (bookingIdSeq || 1).toString().padStart(6, '0');
-    return `KUSH-B-${serial}`;
+    // Use the booking_id_seq from database, fallback to 1 if not available
+    return `KUSH-B-${bookingIdSeq || 1}`;
   };
   
   const bookingId = getFormattedBookingId(trip.id, trip.booking_id_seq);
@@ -129,6 +168,29 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
 
   return (
     <Animated.View style={[styles.card]}>
+      {/* SEAL STAMP for Recently Accepted Trips - Visible for 5 minutes */}
+      {isAcceptedRecently && (
+        <View style={styles.sealStampContainer}>
+          <View style={styles.sealStamp}>
+            {/* Outer ring */}
+            <View style={styles.sealRingOuter}>
+              <Text style={styles.sealTextTop}>TAXIBAZAAR</Text>
+            </View>
+            
+            {/* Center circle */}
+            <View style={styles.sealCenter}>
+              <Text style={styles.sealMainText}>TRIP</Text>
+              <Text style={styles.sealMainText}>ACCEPTED</Text>
+              <Text style={styles.sealTimerText}>{timeRemaining}s</Text>
+            </View>
+            
+            {/* Star decorations */}
+            <Text style={styles.sealStar}>✦</Text>
+            <Text style={[styles.sealStar, { bottom: 8, top: 'auto' }]}>✦</Text>
+          </View>
+        </View>
+      )}
+
       {/* Header: Trip type and Booking ID */}
       <View style={styles.header}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -190,7 +252,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
           )}
           {trip.extra_km_charge && trip.extra_km_charge > 0 && (
             <>
-              <Text style={styles.separatorText}>/</Text>
+              <Text style={styles.separatorText}>|</Text>
               <Text style={[styles.kmText, { marginLeft: 2 }]}>Ex ₹{trip.extra_km_charge}/km</Text>
             </>
           )}
@@ -499,6 +561,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    flexShrink: 1,
+    maxWidth: '100%',
   },
   fareBadge: {
     flexDirection: 'row',
@@ -510,6 +574,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    justifyContent: 'center',
+  },
+  kmBadgeText: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 18,
   },
   separatorText: {
     color: '#333',
@@ -517,7 +587,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginHorizontal: 4,
   },
-  kmText: { color: '#000', fontWeight: 'bold', fontSize: 22 },
+  kmText: { 
+    color: '#000', 
+    fontWeight: 'bold', 
+    fontSize: 18,
+    flexShrink: 1,
+  },
   extraKmChargeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -948,5 +1023,71 @@ const styles = StyleSheet.create({
     color: '#f44336',
     fontSize: 13,
     fontWeight: '600',
+  },
+  // SEAL STAMP STYLES
+  sealStampContainer: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 200,
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+    pointerEvents: 'none',
+  },
+  sealStamp: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 3,
+    borderColor: '#d32f2f',
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ rotate: '-45deg' }],
+    borderStyle: 'solid',
+    position: 'relative',
+  },
+  sealRingOuter: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sealTextTop: {
+    color: '#d32f2f',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    position: 'absolute',
+    top: 12,
+  },
+  sealCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  sealMainText: {
+    color: '#d32f2f',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    lineHeight: 18,
+  },
+  sealTimerText: {
+    color: '#d32f2f',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  sealStar: {
+    position: 'absolute',
+    fontSize: 12,
+    color: '#d32f2f',
+    top: 8,
+    right: 8,
   },
 });

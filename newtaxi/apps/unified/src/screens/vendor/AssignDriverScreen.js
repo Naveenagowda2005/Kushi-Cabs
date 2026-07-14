@@ -173,13 +173,13 @@ export default function AssignDriverScreen({ route, navigation }) {
               console.log('  Driver User ID (auth.uid):', selectedDriver.user_id);
               console.log('  Previous Driver ID:', trip.driver_id || 'None');
               console.log('  Status before:', trip.status);
-              console.log('  Status after:', TRIP_STATUS.ACCEPTED);
+              console.log('  Status after:', TRIP_STATUS.PENDING);
 
               const { data, error } = await supabase
                 .from('trips')
                 .update({
                   driver_id: selectedDriver.id, // Assign to this driver
-                  status: TRIP_STATUS.ACCEPTED,
+                  status: TRIP_STATUS.PENDING, // Keep as PENDING until driver accepts
                 })
                 .eq('id', trip.id)
                 .select();
@@ -192,7 +192,13 @@ export default function AssignDriverScreen({ route, navigation }) {
               console.log('✅ Trip updated in database:', data);
 
               Alert.alert('Success', `Trip ${actionText.toLowerCase()}ed to driver successfully!`, [
-                { text: 'OK', onPress: () => navigation.goBack() },
+                { 
+                  text: 'OK', 
+                  onPress: () => {
+                    // Force refresh by navigating back and letting parent refresh
+                    navigation.goBack();
+                  }
+                },
               ]);
             } catch (err) {
               console.error(`❌ Error ${actionText.toLowerCase()}ing trip:`, err);
@@ -493,7 +499,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 12,
-    paddingBottom: 100,
+    paddingBottom: 300,
   },
   driverCard: {
     backgroundColor: '#ffffff',
@@ -586,7 +592,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 60,
     left: 0,
     right: 0,
     backgroundColor: '#ffffff',
