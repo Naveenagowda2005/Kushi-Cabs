@@ -111,7 +111,7 @@ export default function SuperAdminCommissionScreen({ navigation }) {
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View>
-          <Text style={styles.tripId}>Trip #{commission.id.slice(-8)}</Text>
+          <Text style={styles.tripId}>Booking {commission.booking_id_seq ? `KUSH-B-${commission.booking_id_seq}` : commission.id.slice(-8)}</Text>
           <Text style={styles.tripDate}>{new Date(commission.created_at).toLocaleDateString()}</Text>
         </View>
         <View style={styles.commissionAmount}>

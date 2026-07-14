@@ -271,10 +271,12 @@ export const COLORS = new Proxy({}, {
 
 // API Configuration
 const getApiUrl = () => {
-  // Use production backend on Railway
+  // Use environment variable from .env, fallback to production Railway URL
+  const envUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
   const productionUrl = 'https://kushi-cabs-production.up.railway.app';
-  console.log('Using production API URL:', productionUrl);
-  return productionUrl;
+  const url = envUrl || productionUrl;
+  console.log('Using API URL:', url);
+  return url;
 };
 
 export const API_CONFIG = {

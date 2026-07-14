@@ -20,9 +20,11 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 /**
  * POST /admin/create-driver-account
  * Atomically handles driver/vendor signup:
- * - Deletes any stale auth account for this email
+ * - Checks if auth user already exists
  * - Creates a fresh auth account with a fixed password
- * - Returns the new user ID
+ * - Returns the new user ID and signals if profile needs creation
+ * 
+ * IMPROVED: Better handling for stuck registrations
  */
 router.post('/create-driver-account', async (req, res) => {
   try {
@@ -37,23 +39,76 @@ router.post('/create-driver-account', async (req, res) => {
 
     // 1. Check if auth user already exists
     const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) return res.status(500).json({ error: listError.message });
+    if (listError) {
+      console.error('Error listing users:', listError);
+      return res.status(500).json({ error: listError.message });
+    }
 
     const existing = users.find(u => u.email === email);
 
     if (existing) {
-      console.log(`Found existing auth user: ${existing.id} - updating password`);
-      // Update the password to our known value so client can sign in
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
-        password: password,
-        email_confirm: true
-      });
-      if (updateError) return res.status(500).json({ error: updateError.message });
-      console.log(`✅ Password updated for existing user`);
+      console.log(`Found existing auth user: ${existing.id}`);
+      
+      // Check if this user has a profile already
+      // This helps detect stuck registrations
+      try {
+        const { data: userProfile, error: profileError } = await supabaseAdmin
+          .from('users')
+          .select('id, phone')
+          .eq('id', existing.id)
+          .maybeSingle();
+        
+        if (!profileError && userProfile) {
+          // User has both auth and profile - full registration exists
+          console.log(`✅ User has complete profile already`);
+          
+          // Still update password to latest (in case of re-attempts)
+          const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+            password: password,
+            email_confirm: true
+          });
+          if (updateError) console.warn('Warning updating password:', updateError.message);
+          
+          return res.json({ 
+            success: true, 
+            userId: existing.id, 
+            email, 
+            isNew: false,
+            hasProfile: true,
+            message: 'User already fully registered'
+          });
+        } else {
+          // Auth user exists but NO profile - STUCK registration!
+          console.log(`⚠️ STUCK REGISTRATION DETECTED: Auth user exists but profile missing`);
+          console.log(`   Auth ID: ${existing.id}, Phone: ${phone}`);
+          
+          // Update password anyway
+          const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+            password: password,
+            email_confirm: true
+          });
+          if (updateError) console.warn('Warning updating password:', updateError.message);
+          
+          return res.json({ 
+            success: true, 
+            userId: existing.id, 
+            email, 
+            isNew: false,
+            hasProfile: false,
+            message: 'Auth user exists but profile needs creation (recovering stuck registration)',
+            warning: 'STUCK_REGISTRATION_RECOVERED'
+          });
+        }
+      } catch (profileCheckError) {
+        console.error('Error checking profile:', profileCheckError);
+        // Continue anyway - let profile creation handle it
+      }
+      
       return res.json({ success: true, userId: existing.id, email, isNew: false });
     }
 
     // 2. Create fresh auth user
+    console.log(`Creating new auth user for: ${email}`);
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -61,10 +116,13 @@ router.post('/create-driver-account', async (req, res) => {
       user_metadata: { phone }
     });
 
-    if (createError) return res.status(500).json({ error: createError.message });
+    if (createError) {
+      console.error('Error creating auth user:', createError);
+      return res.status(500).json({ error: createError.message });
+    }
 
     console.log(`✅ New auth user created: ${newUser.user.id}`);
-    res.json({ success: true, userId: newUser.user.id, email, isNew: true });
+    res.json({ success: true, userId: newUser.user.id, email, isNew: true, hasProfile: false });
 
   } catch (error) {
     console.error('create-driver-account error:', error);

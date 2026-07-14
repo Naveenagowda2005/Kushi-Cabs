@@ -218,6 +218,7 @@ export const AuthProvider = ({ children }) => {
           role_id,
           is_active,
           push_token,
+          verification_status,
           created_at,
           roles (
             name
@@ -528,6 +529,18 @@ export const AuthProvider = ({ children }) => {
 
       console.log('User found in database:', userData);
 
+      // ✅ CRITICAL: Validate that the requested role matches the user's actual role
+      // This prevents vendors from logging in via driver login (and vice versa)
+      if (userData.roles?.name !== role) {
+        const actualRole = userData.roles?.name || 'unknown';
+        console.error(`❌ Role mismatch: User is a ${actualRole} but trying to login as ${role}`);
+        throw new Error(
+          `This account is registered as a ${actualRole}. Please use the ${actualRole} login instead.`
+        );
+      }
+
+      console.log('✅ Role validation passed:', role);
+
       // For drivers, check if documents are approved before allowing login
       if (userData.roles?.name === 'driver') {
         try {
@@ -668,6 +681,12 @@ export const AuthProvider = ({ children }) => {
           throw new Error(result.error || 'Failed to create account');
         }
 
+        // Check for stuck registration recovery
+        if (result.warning === 'STUCK_REGISTRATION_RECOVERED') {
+          console.log('⚠️ Recovered stuck registration for:', phoneDigits);
+          console.log('User will need to complete profile creation');
+        }
+
         console.log('✅ Auth account ready. userId:', result.userId);
 
         // Now sign in with the known password the backend set
@@ -742,6 +761,15 @@ export const AuthProvider = ({ children }) => {
       } catch (e) {
         console.warn('Could not clear OTP user session from AsyncStorage:', e.message);
       }
+
+      // Clear incomplete signup data
+      try {
+        setIncompleteSignupUserId(null);
+        setIncompleteSignupPhone(null);
+        console.log('Incomplete signup data cleared');
+      } catch (e) {
+        console.warn('Could not clear incomplete signup data:', e.message);
+      }
       
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -756,6 +784,32 @@ export const AuthProvider = ({ children }) => {
       setForceResetMode(true); // NEW: Enable force reset mode even on error
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Clear stuck registration for current session
+  const clearStuckRegistration = async () => {
+    try {
+      console.log('🔄 clearStuckRegistration: Clearing stuck registration session');
+      
+      // Clear incomplete signup data
+      setIncompleteSignupUserId(null);
+      setIncompleteSignupPhone(null);
+      
+      // Clear current session
+      setSession(null);
+      setUser(null);
+      setSelectedRole(null);
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) console.warn('Warning during signOut:', error.message);
+      
+      console.log('✅ Stuck registration cleared - user can start fresh');
+      return { success: true };
+    } catch (error) {
+      console.error('Error clearing stuck registration:', error);
+      return { success: false, error };
     }
   };
 
@@ -805,6 +859,11 @@ export const AuthProvider = ({ children }) => {
 
       console.log('Unified createUserProfile: userId:', userId, 'phone:', phone);
 
+      // Verify we have a valid session/user context
+      if (!session?.user) {
+        throw new Error('No valid session. Please try signing up again.');
+      }
+
       const { data: roleData, error: roleError } = await supabase
         .from('roles')
         .select('id')
@@ -822,7 +881,16 @@ export const AuthProvider = ({ children }) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a foreign key constraint error
+        if (error.code === '23503' && error.message.includes('users_id_fkey')) {
+          console.error('Unified createUserProfile: Foreign key error - auth user may not exist');
+          throw new Error(
+            'User authentication failed. The auth account was not properly created. Please try registering again.'
+          );
+        }
+        throw error;
+      }
       console.log('Unified createUserProfile: User profile upserted:', data);
 
       if (role === ROLES.VENDOR) {
@@ -916,6 +984,7 @@ export const AuthProvider = ({ children }) => {
     signOut,
     forceReset, // NEW: For fresh start
     disableForceResetMode: () => setForceResetMode(false), // NEW: Exit force reset mode
+    clearStuckRegistration, // NEW: Clear stuck registration
     createUserProfile,
     refreshUserProfile,
     getUserRole,

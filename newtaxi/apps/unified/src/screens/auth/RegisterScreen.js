@@ -10,7 +10,7 @@ import { COLORS, ROLES } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 
 export default function RegisterScreen({ route, navigation }) {
-  const { createUserProfile, loading, selectedRole, session, incompleteSignupPhone } = useAuth();
+  const { createUserProfile, loading, selectedRole, session, incompleteSignupPhone, clearStuckRegistration } = useAuth();
 
   const role = route.params?.role || selectedRole;
   // Phone can come from: route params -> context state -> extracted from auth email
@@ -86,6 +86,48 @@ export default function RegisterScreen({ route, navigation }) {
         ]);
       }
     }
+  };
+
+  const handleResetRegistration = async () => {
+    Alert.alert(
+      'Reset Registration',
+      'This will clear your current registration session and allow you to start over. Continue?',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => console.log('Reset cancelled'),
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          onPress: async () => {
+            try {
+              const { success, error } = await clearStuckRegistration();
+              if (success) {
+                Alert.alert('Success', 'Registration cleared. You can now sign up again.', [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Reset navigation stack to Login screen
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Login' }],
+                      });
+                    },
+                  }
+                ]);
+              } else {
+                Alert.alert('Error', error?.message || 'Failed to reset registration');
+              }
+            } catch (err) {
+              console.error('Reset error:', err);
+              Alert.alert('Error', 'Failed to reset registration');
+            }
+          },
+          style: 'destructive',
+        },
+      ]
+    );
   };
 
   const getRoleTitle = () => {
@@ -212,6 +254,15 @@ export default function RegisterScreen({ route, navigation }) {
               <Text style={styles.registerButtonText}>{getButtonText()}</Text>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.resetButton}
+            onPress={handleResetRegistration}
+            disabled={loading}
+          >
+            <Ionicons name="refresh-outline" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.resetButtonText}>Clear Registration & Start Over</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -302,5 +353,18 @@ const styles = StyleSheet.create({
     fontSize: getResponsiveFontSize(18),
     fontWeight: '600',
     color: COLORS.textLight,
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  resetButtonText: {
+    fontSize: getResponsiveFontSize(12),
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
   },
 });
