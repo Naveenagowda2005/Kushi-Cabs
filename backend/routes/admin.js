@@ -3,7 +3,7 @@ const router = express.Router();
 
 let supabaseAdmin = null;
 
-// Try to initialize Supabase Admin Client - but don't fail if it can't
+// Try to initialize Supabase Admin Client - disable Realtime since we don't need it
 try {
   const { createClient } = require('@supabase/supabase-js');
   
@@ -12,7 +12,8 @@ try {
   
   if (supabaseUrl && supabaseServiceKey) {
     supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+      auth: { autoRefreshToken: false, persistSession: false },
+      realtime: { enabled: false }
     });
     console.log('✅ Supabase Admin client initialized');
   } else {
