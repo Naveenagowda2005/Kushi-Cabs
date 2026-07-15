@@ -271,17 +271,24 @@ export const COLORS = new Proxy({}, {
 
 // API Configuration
 const getApiUrl = () => {
-  // Use environment variable from .env, fallback to production Railway URL
+  // Use environment variable from .env, fallback to production Render URL
   const envUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
-  const productionUrl = 'https://kushi-cabs-production.up.railway.app';
+  const productionUrl = 'https://kushi-cabs.onrender.com';
   const url = envUrl || productionUrl;
-  console.log('Using API URL:', url);
+  console.log('🔌 Using SMS API URL:', url);
   return url;
 };
 
 export const API_CONFIG = {
   SMS_API_URL: getApiUrl(),
   ADMIN_API_URL: getApiUrl(),
+};
+
+// Network retry configuration for reliability
+export const NETWORK_CONFIG = {
+  RETRY_COUNT: 3,
+  RETRY_DELAY_MS: 1000,
+  TIMEOUT_MS: 15000,
 };
 
 export const ROLES = {
