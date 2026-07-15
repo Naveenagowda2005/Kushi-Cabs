@@ -18,7 +18,7 @@ const app = express();
 const port = process.env.PORT || 8080;
 console.log(`🔧 Configured port: ${port}`);
 
-// Enable CORS for all origins during development
+// Enable CORS for all origins
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -93,4 +93,6 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
+
+// REMOVED SIGTERM HANDLER - Let Railway handle graceful shutdown
 
