@@ -7,8 +7,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn('⚠️  WARNING: Supabase credentials not set in .env');
-  console.warn('Admin endpoints will not work');
+  console.log('ℹ️  Supabase credentials not set - admin endpoints will be limited');
 }
 
 const supabaseAdmin = supabaseUrl && supabaseServiceKey 
