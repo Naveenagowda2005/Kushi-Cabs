@@ -15,7 +15,7 @@ console.log('📦 Admin router loaded');
 
 const app = express();
 // Railway uses dynamic PORT - must use it
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 8080;
 console.log(`🔧 Configured port: ${port}`);
 
 // Enable CORS for all origins during development
@@ -51,7 +51,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
+  console.error('❌ Error:', err.stack);
   res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
@@ -75,10 +75,9 @@ const server = app.listen(port, '0.0.0.0', () => {
 });
 
 server.on('error', (err) => {
+  console.error('❌ Server error:', err.message);
   if (err.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${port} is already in use!`);
-  } else {
-    console.error('❌ Server error:', err.message);
+    console.error(`Port ${port} is already in use!`);
   }
   process.exit(1);
 });
@@ -87,5 +86,20 @@ server.on('error', (err) => {
 process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught exception:', err);
   process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('⚠️ SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 });
 
