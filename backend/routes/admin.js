@@ -1,20 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
 
-// Initialize Supabase Admin Client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let supabaseAdmin = null;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.log('ℹ️  Supabase credentials not set - admin endpoints will be limited');
-}
-
-const supabaseAdmin = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey, {
+// Try to initialize Supabase Admin Client - but don't fail if it can't
+try {
+  const { createClient } = require('@supabase/supabase-js');
+  
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (supabaseUrl && supabaseServiceKey) {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false }
-    })
-  : null;
+    });
+    console.log('✅ Supabase Admin client initialized');
+  } else {
+    console.log('ℹ️  Supabase credentials not set - admin features limited');
+  }
+} catch (error) {
+  console.warn('⚠️  Could not initialize Supabase client:', error.message);
+  console.log('ℹ️  Admin endpoints will be limited');
+}
 
 /**
  * POST /admin/create-driver-account
