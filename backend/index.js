@@ -14,7 +14,6 @@ const adminRouter = require('./routes/admin');
 console.log('📦 Admin router loaded');
 
 const app = express();
-// Railway uses dynamic PORT - must use it
 const port = process.env.PORT || 8080;
 console.log(`🔧 Configured port: ${port}`);
 
@@ -28,9 +27,15 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Health check endpoint
+// Health check endpoint - MUST be first
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'taxi-sms-backend', timestamp: new Date().toISOString() });
+  console.log('📊 Health check ping received');
+  res.status(200).json({ 
+    status: 'ok', 
+    service: 'taxi-sms-backend', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
 // API Routes with request logging
@@ -55,6 +60,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
+// Start server
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`✅ Taxi SMS backend listening on http://127.0.0.1:${port}`);
   console.log(`✅ Access from phone at: http://192.168.1.110:${port}`);
@@ -72,6 +78,7 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`   - GET /admin/vendor-debug/:userId - Debug vendor setup`);
   console.log(`   - POST /admin/create-admin-trip - Create admin trip`);
   console.log(`   - GET /health - Health check`);
+  console.log(`🟢 SERVICE READY FOR REQUESTS`);
 });
 
 server.on('error', (err) => {
@@ -79,20 +86,15 @@ server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${port} is already in use!`);
   }
-  process.exit(1);
 });
 
-// Handle uncaught exceptions
+// Handle uncaught exceptions but don't exit immediately
 process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught exception:', err);
-  process.exit(1);
 });
 
-// Handle unhandled promise rejections
+// Handle unhandled promise rejections but don't exit immediately
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
 });
-
-// REMOVED SIGTERM HANDLER - Let Railway handle graceful shutdown
 
