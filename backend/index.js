@@ -94,12 +94,3 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('⚠️ SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    console.log('✅ Server closed');
-    process.exit(0);
-  });
-});
-
