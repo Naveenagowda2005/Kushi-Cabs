@@ -266,65 +266,59 @@ export const submitDocumentsForVerification = async (driverId) => {
 };
 
 /**
- * Get all pending verifications (admin only)
- * @returns {Promise<array>} - Array of pending verifications
- */
 export const getPendingVerifications = async () => {
   try {
     console.log('getPendingVerifications: Loading pending verifications');
     
-    // For super_admin users (who use OTP auth), we need to bypass normal RLS
-    // by querying with ignoreRLS option or fetching without auth context
+    // Query driver_verification_status for pending_review drivers
+    // Then fetch their user info separately
     const { data, error } = await supabase
       .from('driver_verification_status')
-      .select(`
-        *,
-        driver:driver_id(
-          id,
-          phone,
-          full_name,
-          email
-        )
-      `)
+      .select('*')
       .eq('overall_status', 'pending_review')
       .order('submitted_at', { ascending: true });
 
     if (error) {
       console.error('getPendingVerifications: Query error:', error);
-      // If RLS blocks the query, try fetching all and filtering client-side
-      console.log('getPendingVerifications: RLS blocked query, fetching with service role');
-      
-      // Fallback: fetch without strict RLS by using a different approach
-      try {
-        // Try to get all verification statuses (some RLS might allow this)
-        const { data: allData, error: allError } = await supabase
-          .from('driver_verification_status')
-          .select(`
-            *,
-            driver:driver_id(
-              id,
-              phone,
-              full_name,
-              email
-            )
-          `);
-        
-        if (allError) {
-          throw allError;
-        }
-        
-        // Filter to pending_review on client side
-        const pending = allData ? allData.filter(d => d.overall_status === 'pending_review') : [];
-        console.log('getPendingVerifications: Retrieved', pending.length, 'pending verifications (via fallback)');
-        return pending;
-      } catch (fallbackError) {
-        console.error('getPendingVerifications: Fallback also failed:', fallbackError);
-        throw fallbackError;
-      }
+      throw error;
     }
 
-    console.log('getPendingVerifications: Retrieved', data?.length || 0, 'pending verifications');
-    return data || [];
+    // Now fetch driver and user info for each verification
+    if (data && data.length > 0) {
+      const verificationsWithUser = await Promise.all(
+        data.map(async (verification) => {
+          // Get driver info
+          const { data: driverData } = await supabase
+            .from('drivers')
+            .select('*')
+            .eq('user_id', verification.driver_id)
+            .single();
+
+          // Get user info
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id, email, phone, full_name')
+            .eq('id', verification.driver_id)
+            .single();
+
+          return {
+            ...verification,
+            driver: {
+              id: userData?.id,
+              phone: userData?.phone,
+              full_name: userData?.full_name,
+              email: userData?.email,
+            },
+          };
+        })
+      );
+
+      console.log('getPendingVerifications: Retrieved', verificationsWithUser.length, 'pending verifications');
+      return verificationsWithUser;
+    }
+
+    console.log('getPendingVerifications: No pending verifications found');
+    return [];
   } catch (error) {
     console.error('Error getting pending verifications:', error);
     throw error;
