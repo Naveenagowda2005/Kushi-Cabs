@@ -29,6 +29,7 @@ const TABS = ['Available', 'My Trips'];
 const globalSoundAlertStateRef = {
   lastConfirmedCount: null,
   soundTriggeredForCount: null, // Track which count we played sound for
+  lastActiveTab: null, // Track which tab we were on
 };
 
 // Separate component for My Trip Card
@@ -100,7 +101,10 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
   const commissionAmount = item.commission_amount || 0;
   const customerPreAdvance = item.customer_pre_advance || 0;
   
-  // Commission to pay by driver = Commission - Customer Pre-Advance (minimum 0)
+  // Driver earning = Fare - Commission (for display to accepting vendor)
+  const driverEarning = Math.max(0, item.fare_amount - commissionAmount);
+  
+  // Commission to pay by driver = Commission - Customer Pre-Advance (minimum 0) (for admin/creator reference)
   const commissionToPay = Math.max(0, commissionAmount - customerPreAdvance);
 
   return (
@@ -128,7 +132,9 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
       <View style={styles.myTripHeader}>
         <TripStatusBadge status={item.status} />
         <View style={styles.fareKmContainer}>
-          <Text style={styles.myTripFare}>₹{item.fare_amount}</Text>
+          <Text style={styles.myTripFare}>
+            ₹{item.created_by === user?.id ? item.fare_amount : driverEarning}
+          </Text>
           {item.fixed_km && (
             <>
               <Text style={styles.fareKmSeparator}>|</Text>
@@ -144,28 +150,41 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         </View>
       </View>
 
-      {/* Locations in one row */}
-      <View style={styles.locationsRow}>
-        <View style={styles.locationItem}>
-          <Ionicons name="location" size={12} color="#4caf50" />
-          <Text style={styles.locationItemLabel}>Pickup</Text>
-          <Text style={styles.locationItemText} numberOfLines={1}>{item.pickup_location}</Text>
-        </View>
-        <Text style={styles.locationDivider}>→</Text>
-        <View style={styles.locationItem}>
-          <Ionicons name="flag" size={12} color="#e94560" />
-          <Text style={styles.locationItemLabel}>Drop</Text>
-          <Text style={styles.locationItemText} numberOfLines={1}>{item.dropoff_location}</Text>
-        </View>
-        {item.return_location && (
-          <>
-            <Text style={styles.locationDivider}>→</Text>
-            <View style={styles.locationItem}>
-              <Ionicons name="location-outline" size={12} color="#2196f3" />
-              <Text style={styles.locationItemLabel}>Return</Text>
-              <Text style={[styles.locationItemText, { color: '#2196f3' }]} numberOfLines={1}>{item.return_location}</Text>
+      {/* Locations in separate rows (vertical layout) */}
+      <View style={styles.locationsColumn}>
+        {/* Pickup Row */}
+        <View style={styles.locationRowItem}>
+          <View style={styles.locationRowContent}>
+            <Ionicons name="location" size={12} color="#4caf50" />
+            <View style={styles.locationItemContent}>
+              <Text style={styles.locationItemLabel}>Pickup</Text>
+              <Text style={styles.locationItemText} numberOfLines={2}>{item.pickup_location}</Text>
             </View>
-          </>
+          </View>
+        </View>
+        
+        {/* Dropoff Row */}
+        <View style={styles.locationRowItem}>
+          <View style={styles.locationRowContent}>
+            <Ionicons name="flag" size={12} color="#e94560" />
+            <View style={styles.locationItemContent}>
+              <Text style={styles.locationItemLabel}>Drop</Text>
+              <Text style={styles.locationItemText} numberOfLines={2}>{item.dropoff_location}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Return Location Row */}
+        {item.return_location && (
+          <View style={styles.locationRowItem}>
+            <View style={styles.locationRowContent}>
+              <Ionicons name="location-outline" size={12} color="#2196f3" />
+              <View style={styles.locationItemContent}>
+                <Text style={styles.locationItemLabel}>Return</Text>
+                <Text style={[styles.locationItemText, { color: '#2196f3' }]} numberOfLines={2}>{item.return_location}</Text>
+              </View>
+            </View>
+          </View>
         )}
       </View>
       <View style={styles.row}>
@@ -183,31 +202,44 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         </View>
       )}
 
-      {/* Fare Breakdown */}
-      {(commissionAmount > 0 || customerPreAdvance > 0) && (
-        <View style={styles.breakdownBox}>
-          <Text style={styles.breakdownTitle}>Fare Breakdown</Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Total Fare</Text>
-            <Text style={styles.breakdownValue}>₹{item.fare_amount.toFixed(2)}</Text>
-          </View>
-          {commissionAmount > 0 && (
+      {/* Fare Breakdown - Full for trip creator, customer pre-advance only for accepting vendors */}
+      {item.created_by === user?.id ? (
+        // Trip creator - show full breakdown
+        (commissionAmount > 0 || customerPreAdvance > 0) && (
+          <View style={styles.breakdownBox}>
+            <Text style={styles.breakdownTitle}>Fare Breakdown</Text>
             <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Commission Charged</Text>
-              <Text style={[styles.breakdownValue, { color: '#ff6b6b' }]}>-₹{Math.abs(commissionAmount).toFixed(2)}</Text>
+              <Text style={styles.breakdownLabel}>Total Fare</Text>
+              <Text style={styles.breakdownValue}>₹{item.fare_amount.toFixed(2)}</Text>
             </View>
-          )}
-          {customerPreAdvance > 0 && (
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Customer Pre-Advance</Text>
-              <Text style={[styles.breakdownValue, { color: '#2196f3' }]}>₹{Math.abs(customerPreAdvance).toFixed(2)}</Text>
+            {commissionAmount > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Commission Charged</Text>
+                <Text style={[styles.breakdownValue, { color: '#ff6b6b' }]}>-₹{Math.abs(commissionAmount).toFixed(2)}</Text>
+              </View>
+            )}
+            {customerPreAdvance > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Customer Pre-Advance</Text>
+                <Text style={[styles.breakdownValue, { color: '#2196f3' }]}>₹{Math.abs(customerPreAdvance).toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={[styles.breakdownRow, styles.breakdownTotal]}>
+              <Text style={styles.breakdownTotalLabel}>Driver Earning</Text>
+              <Text style={styles.breakdownTotalValue}>₹{(item.fare_amount - Math.abs(commissionAmount)).toFixed(2)}</Text>
             </View>
-          )}
-          <View style={[styles.breakdownRow, styles.breakdownTotal]}>
-            <Text style={styles.breakdownTotalLabel}>Driver Earning</Text>
-            <Text style={styles.breakdownTotalValue}>₹{(item.fare_amount - Math.abs(commissionAmount)).toFixed(2)}</Text>
           </View>
-        </View>
+        )
+      ) : (
+        // Accepting vendor - show only customer pre-advance if exists
+        customerPreAdvance > 0 && (
+          <View style={styles.breakdownBox}>
+            <View style={styles.breakdownRow}>
+              <Text style={[styles.breakdownLabel, { color: '#fff' }]}>Customer Pre-Advance</Text>
+              <Text style={[styles.breakdownValue, { color: '#fff' }]}>₹{Math.abs(customerPreAdvance).toFixed(2)}</Text>
+            </View>
+          </View>
+        )
       )}
 
       {/* Car Details Row */}
@@ -461,7 +493,21 @@ export default function VendorEnquiriesScreen({ navigation }) {
 
   // Live-patched enquiry list
   const [liveEnquiries, setLiveEnquiries] = useState([]);
-  useEffect(() => { setLiveEnquiries(enquiries); }, [enquiries]);
+  
+  useEffect(() => {
+    // Only update liveEnquiries if enquiries has actual data
+    // This prevents resetting when switching tabs or during loading
+    if (enquiries.length > 0) {
+      setLiveEnquiries(enquiries);
+    } else if (liveEnquiries.length === 0 && globalSoundAlertStateRef.lastConfirmedCount === null) {
+      // Only reset to empty on true initial load (when global state is null)
+      setLiveEnquiries(enquiries);
+    } else {
+      // If enquiries is empty but we have data, keep the previous data
+      // (prevents false count resets when navigating away and back)
+      console.log(`⏭️ Skipping enquiries sync - keeping previous ${liveEnquiries.length} enquiries`);
+    }
+  }, [enquiries]);
 
   // Sync enquiries AND vendor trips to AlertContext
   useEffect(() => {
@@ -529,39 +575,49 @@ export default function VendorEnquiriesScreen({ navigation }) {
   useEffect(() => {
     const confirmedCount = globalSoundAlertStateRef.lastConfirmedCount;
     
-    // On first load, just initialize the global state
+    // FIRST EVER initialization - skip sound
     if (confirmedCount === null) {
       globalSoundAlertStateRef.lastConfirmedCount = liveEnquiries.length;
-      console.log(`📊 Initial trip count set globally: ${liveEnquiries.length}`);
+      globalSoundAlertStateRef.soundTriggeredForCount = liveEnquiries.length;
+      globalSoundAlertStateRef.lastActiveTab = activeTab;
+      console.log(`📊 Initial load - set to ${liveEnquiries.length}, sound prevention active`);
       return;
     }
     
     const tripCountIncreased = liveEnquiries.length > confirmedCount;
     const alreadySoundedForThisCount = globalSoundAlertStateRef.soundTriggeredForCount === liveEnquiries.length;
+    const tabChanged = activeTab !== globalSoundAlertStateRef.lastActiveTab;
     
     console.log(`📊 Trip count change: ${confirmedCount} → ${liveEnquiries.length}`, {
       tripCountIncreased,
       activeTab,
-      loadingEnq,
+      tabChanged,
       alreadySoundedForThisCount,
-      shouldPlay: tripCountIncreased && activeTab === 0 && !loadingEnq && !alreadySoundedForThisCount
+      shouldPlay: tripCountIncreased && activeTab === 0 && !alreadySoundedForThisCount
     });
     
-    // Only play sound if:
-    // 1. Count genuinely increased 
-    // 2. We're on Available tab 
-    // 3. Not currently loading
-    // 4. Haven't already sounded for this trip count
-    if (tripCountIncreased && activeTab === 0 && !loadingEnq && !alreadySoundedForThisCount) {
-      console.log(`🔊 PLAYING ALERT! New trips arrived: ${confirmedCount} → ${liveEnquiries.length}`);
-      globalSoundAlertStateRef.soundTriggeredForCount = liveEnquiries.length;
-      playLoopingAlert(3);
-      globalSoundAlertStateRef.lastConfirmedCount = liveEnquiries.length;
-    } else if (tripCountIncreased) {
-      // Count increased but conditions not met for sound - still update confirmed count
+    // Update last active tab
+    if (tabChanged) {
+      globalSoundAlertStateRef.lastActiveTab = activeTab;
+      console.log(`📑 Tab changed to ${activeTab}`);
+    }
+    
+    // ONLY on Available tab (activeTab === 0) do we track and play sound
+    if (activeTab === 0) {
+      // Only play sound if count increased AND we haven't sounded for this count yet
+      if (tripCountIncreased && !alreadySoundedForThisCount) {
+        console.log(`🔊 PLAYING ALERT! New trips arrived: ${confirmedCount} → ${liveEnquiries.length}`);
+        globalSoundAlertStateRef.soundTriggeredForCount = liveEnquiries.length;
+        playLoopingAlert(3);
+      }
+      // Always update confirmed count on Available tab
       globalSoundAlertStateRef.lastConfirmedCount = liveEnquiries.length;
     }
-  }, [liveEnquiries.length, activeTab, loadingEnq]);
+    // On other tabs: only update confirmed count, NEVER touch soundTriggeredForCount
+    else {
+      globalSoundAlertStateRef.lastConfirmedCount = liveEnquiries.length;
+    }
+  }, [liveEnquiries.length, activeTab]);
 
   const isLoading = activeTab === 0 ? loadingEnq : loadingTrips;
 
@@ -1006,16 +1062,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: Math.max(12, screenWidth * 0.032),
   },
-  locationsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  locationsColumn: {
+    flexDirection: 'column',
     marginVertical: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
     backgroundColor: '#0f1c2e',
     borderRadius: 8,
-    flexWrap: 'wrap',
+    overflow: 'visible',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  locationRowItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  locationRowContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    flex: 1,
+  },
+  locationItemContent: {
+    flex: 1,
+    minWidth: 0,
   },
   locationItem: {
     flex: 1,
@@ -1025,14 +1097,15 @@ const styles = StyleSheet.create({
   },
   locationItemLabel: {
     color: '#888',
-    fontSize: Math.max(8, screenWidth * 0.02),
-    fontWeight: '600',
+    fontSize: Math.max(12, screenWidth * 0.03),
+    fontWeight: '700',
+    marginBottom: 2,
   },
   locationItemText: {
     color: '#fff',
-    fontSize: Math.max(9, screenWidth * 0.024),
-    fontWeight: '600',
-    textAlign: 'center',
+    fontSize: Math.max(14, screenWidth * 0.036),
+    fontWeight: '700',
+    lineHeight: 18,
   },
   locationDivider: {
     color: '#555',

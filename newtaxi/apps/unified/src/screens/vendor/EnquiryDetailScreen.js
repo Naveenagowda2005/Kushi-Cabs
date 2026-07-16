@@ -21,10 +21,14 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
   const isCreator = trip.created_by === user?.id;
   const isSuperAdmin = user?.role === 'super_admin';
 
+  // Calculate driver earnings (fare minus commission)
+  const commissionAmount = trip.commission_amount || 0;
+  const driverEarning = Math.max(0, trip.fare_amount - commissionAmount);
+
   async function handleAccept() {
     Alert.alert(
       'Accept Enquiry',
-      `Pickup: ${trip.pickup_location}\nDrop: ${trip.dropoff_location}\nFare: ₹${trip.fare_amount}\n\nAccept this trip?`,
+      `Pickup: ${trip.pickup_location}\nDrop: ${trip.dropoff_location}\nDriver Earning: ₹${driverEarning.toFixed(2)}\n\nAccept this trip?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -112,10 +116,10 @@ export default function VendorEnquiryDetailScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Status + fare */}
+        {/* Status + driver earning */}
         <View style={styles.header}>
           <TripStatusBadge status={trip.status} />
-          <Text style={styles.fare}>₹{trip.fare_amount}</Text>
+          <Text style={styles.fare}>₹{driverEarning.toFixed(2)}</Text>
         </View>
 
         {/* Trip details */}

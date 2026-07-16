@@ -91,6 +91,12 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel, isNewes
         style={{ flex: 1 }}
       >
         <View style={{ flex: 1 }}>
+          {/* Booking ID Badge - Positioned at top right */}
+          <View style={styles.bookingIdBadgePositionTop}>
+            <Text style={styles.bookingIdBadgeLabel}>Booking ID</Text>
+            <Text style={styles.bookingIdBadgeValue}>{bookingId}</Text>
+          </View>
+
           <View style={styles.header}>
             <View style={styles.tripTypeContainer}>
               <Ionicons name="car-outline" size={16} color="#ff9800" />
@@ -101,10 +107,6 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel, isNewes
                   <Text style={styles.newBadgeText}>NEW</Text>
                 </View>
               )}
-            </View>
-            <View style={styles.bookingIdBadge}>
-              <Text style={styles.bookingIdBadgeLabel}>Booking ID</Text>
-              <Text style={styles.bookingIdBadgeValue}>{bookingId}</Text>
             </View>
           </View>
 
@@ -129,32 +131,41 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel, isNewes
             </View>
           </View>
 
-          {/* Locations in one row */}
-          <View style={styles.enquiryLocationsRow}>
-            <View style={styles.enquiryLocationItem}>
-              <Ionicons name="location" size={12} color="#4caf50" />
-              <Text style={styles.enquiryLocationLabel}>Pickup</Text>
-              <Text style={styles.enquiryLocationText} numberOfLines={0}>{trip.pickup_location}</Text>
+          {/* Locations on separate rows */}
+          <View style={styles.locationsColumn}>
+            {/* Pickup Row */}
+            <View style={styles.locationRow}>
+              <View style={styles.locationRowContent}>
+                <Ionicons name="location" size={14} color="#4caf50" />
+                <View style={styles.locationContent}>
+                  <Text style={styles.locationLabel}>Pickup</Text>
+                  <Text style={styles.location} numberOfLines={2}>{trip.pickup_location}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.enquiryLocationDividerContainer}>
-              <Text style={styles.enquiryLocationDivider}>→</Text>
+            
+            {/* Dropoff Row */}
+            <View style={styles.locationRow}>
+              <View style={styles.locationRowContent}>
+                <Ionicons name="flag" size={14} color="#e94560" />
+                <View style={styles.locationContent}>
+                  <Text style={styles.locationLabel}>Dropoff</Text>
+                  <Text style={styles.location} numberOfLines={2}>{trip.dropoff_location}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.enquiryLocationItem}>
-              <Ionicons name="flag" size={12} color="#e94560" />
-              <Text style={styles.enquiryLocationLabel}>Drop</Text>
-              <Text style={styles.enquiryLocationText} numberOfLines={0}>{trip.dropoff_location}</Text>
-            </View>
+
+            {/* Return Location - for Round trips */}
             {trip.return_location && (
-              <>
-                <View style={styles.enquiryLocationDividerContainer}>
-                  <Text style={styles.enquiryLocationDivider}>→</Text>
+              <View style={styles.locationRow}>
+                <View style={styles.locationRowContent}>
+                  <Ionicons name="location-outline" size={14} color="#2196f3" />
+                  <View style={styles.locationContent}>
+                    <Text style={styles.locationLabel}>Return</Text>
+                    <Text style={[styles.location, { color: '#2196f3' }]} numberOfLines={2}>{trip.return_location}</Text>
+                  </View>
                 </View>
-                <View style={styles.enquiryLocationItem}>
-                  <Ionicons name="location-outline" size={12} color="#2196f3" />
-                  <Text style={styles.enquiryLocationLabel}>Return</Text>
-                  <Text style={[styles.enquiryLocationText, { color: '#2196f3' }]} numberOfLines={0}>{trip.return_location}</Text>
-                </View>
-              </>
+              </View>
             )}
           </View>
 
@@ -319,7 +330,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     marginBottom: 6,
   },
@@ -338,6 +349,21 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderWidth: 1.5,
     borderColor: '#2196f3',
+  },
+  bookingIdBadgePositionTop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 1,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1.5,
+    borderColor: '#2196f3',
+    zIndex: 10,
   },
   bookingIdBadgeLabel: {
     color: '#2196f3',
@@ -460,15 +486,41 @@ const styles = StyleSheet.create({
   },
   locationContent: {
     flex: 1,
+    minWidth: 0,
   },
   locationLabel: {
-    color: '#888',
-    fontSize: Math.max(11, screenWidth * 0.028),
-    marginBottom: 2,
+    color: '#000',
+    fontSize: 12,
+    marginBottom: 3,
+    fontWeight: '600',
   },
-  location: {
-    color: '#333',
-    fontSize: Math.max(15, screenWidth * 0.042),
+  location: { 
+    color: '#000', 
+    fontSize: 17,
+    fontWeight: '600',
+    lineHeight: 21,
+  },
+  locationsColumn: {
+    flexDirection: 'column',
+    marginBottom: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'visible',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  locationRowContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
     flex: 1,
   },
   packageBadge: {
@@ -568,43 +620,44 @@ const styles = StyleSheet.create({
     color: '#555',
     marginHorizontal: 4,
   },
-  enquiryLocationsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginVertical: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+  locationsColumn: {
+    flexDirection: 'column',
+    marginBottom: 12,
     backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    flexWrap: 'wrap',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'visible',
   },
-  enquiryLocationItem: {
-    alignItems: 'center',
-    gap: 3,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  enquiryLocationDividerContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
+  locationRowContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    flex: 1,
   },
-  enquiryLocationLabel: {
-    color: '#888',
-    fontSize: Math.max(10, screenWidth * 0.026),
+  locationContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  locationLabel: {
+    color: '#000',
+    fontSize: 12,
+    marginBottom: 3,
     fontWeight: '600',
   },
-  enquiryLocationText: {
-    color: '#333',
-    fontSize: Math.max(16, screenWidth * 0.048),
-    fontWeight: '700',
-    textAlign: 'center',
-    flexWrap: 'wrap',
-    maxWidth: screenWidth * 0.25,
-  },
-  enquiryLocationDivider: {
-    color: '#555',
-    fontSize: Math.max(16, screenWidth * 0.038),
-    marginHorizontal: 4,
+  location: { 
+    color: '#000', 
+    fontSize: 17,
+    fontWeight: '600',
+    lineHeight: 21,
   },
   includedText: {
     color: '#4caf50',
@@ -629,7 +682,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scheduledText: {
-    color: '#ff9800',
+    color: '#000',
     fontSize: Math.max(14, screenWidth * 0.038),
     fontWeight: '700',
   },
