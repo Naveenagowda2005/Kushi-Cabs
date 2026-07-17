@@ -13,7 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { COLORS } from '../../constants';
 
 // Zoomable Image Component with simple zoom controls
-function ZoomableImage({ imageUrl, title }) {
+function ZoomableImage({ imageUrl, title, onClose }) {
   const [scale, setScale] = useState(1);
   const maxScale = 3;
   const minScale = 1;
@@ -44,32 +44,43 @@ function ZoomableImage({ imageUrl, title }) {
         />
       </View>
       
-      {/* Zoom Controls */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, backgroundColor: 'rgba(0, 0, 0, 0.7)' }}>
+      {/* Zoom Controls + Back Button Footer - Positioned with bottom padding to avoid system buttons */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, paddingBottom: 80, backgroundColor: 'rgba(0, 0, 0, 0.7)', gap: 8 }}>
+        {/* Back Button */}
         <TouchableOpacity
-          style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#555' }}
-          onPress={handleZoomOut}
-          disabled={scale === minScale}
+          style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#555' }}
+          onPress={onClose}
         >
-          <Ionicons name="remove" size={20} color={scale === minScale ? '#666' : '#fff'} />
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-        
-        <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', minWidth: 50, textAlign: 'center' }}>{Math.round(scale * 100)}%</Text>
-        
-        <TouchableOpacity
-          style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#555' }}
-          onPress={handleZoomIn}
-          disabled={scale === maxScale}
-        >
-          <Ionicons name="add" size={20} color={scale === maxScale ? '#666' : '#fff'} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#555', marginLeft: 8 }}
-          onPress={handleReset}
-        >
-          <Ionicons name="refresh" size={20} color="#fff" />
-        </TouchableOpacity>
+
+        {/* Zoom Controls */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, flex: 1 }}>
+          <TouchableOpacity
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#555' }}
+            onPress={handleZoomOut}
+            disabled={scale === minScale}
+          >
+            <Ionicons name="remove" size={20} color={scale === minScale ? '#666' : '#fff'} />
+          </TouchableOpacity>
+          
+          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', minWidth: 50, textAlign: 'center' }}>{Math.round(scale * 100)}%</Text>
+          
+          <TouchableOpacity
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#555' }}
+            onPress={handleZoomIn}
+            disabled={scale === maxScale}
+          >
+            <Ionicons name="add" size={20} color={scale === maxScale ? '#666' : '#fff'} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#555', marginLeft: 8 }}
+            onPress={handleReset}
+          >
+            <Ionicons name="refresh" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -1317,7 +1328,12 @@ export default function SuperAdminTripsScreen() {
           />
         }
         ListEmptyComponent={
-          !loading && (
+          loading ? (
+            <View style={styles.emptyLoading}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.emptyLoadingText}>Loading trips...</Text>
+            </View>
+          ) : (
             <View style={styles.empty}>
               <Ionicons name="car-outline" size={64} color={COLORS.textSecondary} />
               <Text style={styles.emptyTitle}>No trips found</Text>
@@ -1342,15 +1358,25 @@ export default function SuperAdminTripsScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{selectedImage?.title}</Text>
-            <TouchableOpacity onPress={() => {
-              setImageModalVisible(false);
-              setModalSignedUrl(null);
-            }}>
+            <TouchableOpacity 
+              onPress={() => {
+                setImageModalVisible(false);
+                setModalSignedUrl(null);
+              }}
+              style={styles.closeButton}
+            >
               <Ionicons name="close" size={28} color="#fff" />
             </TouchableOpacity>
           </View>
           {modalSignedUrl ? (
-            <ZoomableImage imageUrl={modalSignedUrl} title={selectedImage?.title} />
+            <ZoomableImage 
+              imageUrl={modalSignedUrl} 
+              title={selectedImage?.title}
+              onClose={() => {
+                setImageModalVisible(false);
+                setModalSignedUrl(null);
+              }}
+            />
           ) : (
             <View style={styles.loadingContainer}>
               <Ionicons name="hourglass-outline" size={48} color="#888" />
@@ -2201,6 +2227,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  emptyLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+    gap: 12,
+  },
+  emptyLoadingText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    marginTop: 8,
+  },
   odometerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -2250,15 +2287,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
     color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 12,
   },
   loadingContainer: {
     flex: 1,

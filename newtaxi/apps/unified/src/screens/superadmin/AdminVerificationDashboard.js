@@ -44,24 +44,43 @@ const AdminVerificationDashboard = () => {
   const loadPendingVerifications = useCallback(async () => {
     try {
       setLoading(true);
-      const verifications = await documentService.getPendingVerifications();
+      console.log('📋 Starting to load pending verifications');
       
-      // Fetch all documents in one batch query instead of per-driver
-      if (verifications.length > 0) {
+      const verifications = await documentService.getPendingVerifications();
+      console.log('📋 getPendingVerifications returned:', verifications?.length || 0, 'records');
+      
+      // Fetch user details and documents for each verification
+      if (verifications && verifications.length > 0) {
+        // Get all driver IDs
         const driverIds = verifications.map(v => v.driver_id);
         
-        // Get all documents for all drivers in one query
-        const { data: allDocuments, error: docsError } = await supabase
-          .from('driver_documents')
-          .select('*')
-          .in('driver_id', driverIds)
-          .order('document_type', { ascending: true });
-
-        if (docsError) {
-          console.error('Error fetching documents batch:', docsError);
-          throw docsError;
+        // Fetch all user details at once
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id, email, phone, full_name')
+          .in('id', driverIds);
+        
+        if (usersError) {
+          console.warn('📋 Error fetching users:', usersError.message);
         }
-
+        
+        // Create user map
+        const userMap = {};
+        usersData?.forEach(user => {
+          userMap[user.id] = user;
+        });
+        
+        // Fetch documents WITHOUT the large base64 data initially
+        // Only fetch: id, driver_id, document_type, status, created_at, document_mime_type
+        const { data: allDocuments, error: docError } = await supabase
+          .from('driver_documents')
+          .select('id, driver_id, document_type, status, created_at, document_mime_type, verified_at, verified_by, rejection_reason')
+          .in('driver_id', driverIds);
+        
+        if (docError) {
+          console.error('📋 Error fetching documents:', docError.message);
+        }
+        
         // Group documents by driver_id
         const documentsByDriver = {};
         allDocuments?.forEach(doc => {
@@ -70,17 +89,32 @@ const AdminVerificationDashboard = () => {
           }
           documentsByDriver[doc.driver_id].push(doc);
         });
-
-        // Attach documents to verifications
-        const verificationsWithDocs = verifications.map(verification => ({
-          ...verification,
-          documents: documentsByDriver[verification.driver_id] || [],
-        }));
-
-        setPendingVerifications(verificationsWithDocs);
+        
+        console.log('📋 Fetched documents for', Object.keys(documentsByDriver).length, 'drivers');
+        
+        // Attach user and document data to verifications
+        const verificationsWithData = verifications.map(verification => {
+          const userData = userMap[verification.driver_id];
+          const docs = documentsByDriver[verification.driver_id] || [];
+          
+          console.log('📋 Driver:', userData?.full_name, '| Documents:', docs.length);
+          
+          return {
+            ...verification,
+            full_name: userData?.full_name || 'Unknown',
+            phone: userData?.phone || '',
+            email: userData?.email || '',
+            documents: docs
+          };
+        });
+        
+        console.log('📋 Setting pendingVerifications with', verificationsWithData.length, 'items');
+        setPendingVerifications(verificationsWithData);
       } else {
+        console.log('📋 No pending verifications found');
         setPendingVerifications([]);
       }
+      console.log('✅ Loaded', verifications?.length || 0, 'pending verifications');
     } catch (error) {
       console.error('Error loading verifications:', error);
       Alert.alert('Error', 'Failed to load pending verifications');
@@ -141,38 +175,48 @@ const AdminVerificationDashboard = () => {
     }
   };
 
-  const handleViewDocument = (document) => {
-    if (document.document_data) {
-      setSelectedDocument(document);
+  const handleViewDocument = useCallback(async (document) => {
+    try {
+      // If document_data is not already loaded, fetch it
+      if (!document.document_data) {
+        console.log('📋 Fetching document data for:', document.document_type);
+        const { data, error } = await supabase
+          .from('driver_documents')
+          .select('document_data')
+          .eq('id', document.id)
+          .single();
+        
+        if (error) throw error;
+        
+        setSelectedDocument({
+          data: data.document_data,
+          type: document.document_type,
+          mimeType: document.document_mime_type
+        });
+      } else {
+        setSelectedDocument({
+          data: document.document_data,
+          type: document.document_type,
+          mimeType: document.document_mime_type
+        });
+      }
       setViewerVisible(true);
+    } catch (error) {
+      console.error('📋 Error viewing document:', error);
+      Alert.alert('Error', 'Failed to load document');
     }
-  };
-
-  const handleOpenRejectModal = (driverId, documentType) => {
-    setRejectingDocument({ driverId, documentType });
-    setRejectModalVisible(true);
-  };
+  }, []);
 
   const renderDriverCard = ({ item: verification }) => {
-    const driver = verification.driver;
-    if (!driver) return null;
+    // Verification now has full_name, phone, email at top level
+    if (!verification.driver_id) return null;
 
-    // Show documents that are pending_review OR still pending (submitted but status not yet updated)
-    const pendingDocuments = verification.documents?.filter(
-      doc => doc.status === 'pending_review' || doc.status === 'pending'
-    ) || [];
-
-    // Check if driver is re-verification (was already approved, now re-uploading)
-    // Fallback: if any document is 'approved', this is a re-verification
-    const hasAnyApprovedDoc = verification.documents?.some(
-      doc => doc?.status === 'approved'
-    );
-    const isReVerification = verification.is_re_verification === true || hasAnyApprovedDoc;
+    const isExpanded = selectedDriver?.driver_id === verification.driver_id;
 
     return (
       <TouchableOpacity
         style={styles.driverCard}
-        onPress={() => setSelectedDriver(selectedDriver?.id === driver.id ? null : driver)}
+        onPress={() => setSelectedDriver(isExpanded ? null : verification)}
         activeOpacity={0.7}
       >
         <View style={styles.driverHeader}>
@@ -181,106 +225,84 @@ const AdminVerificationDashboard = () => {
               <Ionicons name="person-circle-outline" size={32} color={COLORS.primary} />
             </View>
             <View style={styles.driverDetails}>
-              {/* NEW / RE-UPLOAD badge */}
-              <View style={isReVerification ? styles.reUploadBadge : styles.newBadge}>
+              <View style={styles.newBadge}>
                 <Ionicons
-                  name={isReVerification ? 'refresh-circle-outline' : 'sparkles-outline'}
+                  name="sparkles-outline"
                   size={11}
-                  color={isReVerification ? '#ff9800' : '#4caf50'}
+                  color="#4caf50"
                 />
-                <Text style={[
-                  styles.badgeText,
-                  { color: isReVerification ? '#ff9800' : '#4caf50' }
-                ]}>
-                  {isReVerification ? 'RE-UPLOAD' : 'NEW'}
+                <Text style={[styles.badgeText, { color: '#4caf50' }]}>
+                  PENDING
                 </Text>
               </View>
-              <Text style={styles.driverName}>{driver.full_name || 'Unknown'}</Text>
-              <Text style={styles.driverPhone}>{driver.phone}</Text>
-              <Text style={styles.driverEmail}>{driver.email}</Text>
+              <Text style={styles.driverName}>{verification.full_name || 'Unknown'}</Text>
+              <Text style={styles.driverPhone}>{verification.phone || 'N/A'}</Text>
+              <Text style={styles.driverEmail}>{verification.email || 'N/A'}</Text>
             </View>
           </View>
           <Ionicons
-            name={selectedDriver?.id === driver.id ? 'chevron-up' : 'chevron-down'}
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={24}
             color={COLORS.textSecondary}
           />
         </View>
 
-        {selectedDriver?.id === driver.id && (
+        {isExpanded && (
           <View style={styles.driverDocuments}>
-            {/* Context banner for re-upload requests */}
-            {isReVerification && (
-              <View style={styles.reVerifyBanner}>
-                <Ionicons name="information-circle-outline" size={16} color="#ff9800" />
-                <Text style={styles.reVerifyBannerText}>
-                  This driver is already approved. They re-uploaded one or more documents for your review. Their dashboard access continues uninterrupted.
-                </Text>
-              </View>
-            )}
-            <Text style={styles.documentsTitle}>Documents</Text>
-            {pendingDocuments && pendingDocuments.length > 0 ? (
-              pendingDocuments.map((doc) => (
-                <View key={doc.id} style={styles.documentRow}>
-                  <TouchableOpacity
-                    style={styles.documentInfo}
-                    onPress={() => handleViewDocument(doc)}
-                  >
-                    <Ionicons
-                      name={documentService.getDocumentIcon(doc.document_type)}
-                      size={20}
-                      color={COLORS.primary}
-                    />
-                    <View style={styles.documentDetails}>
-                      <Text style={styles.documentName}>
-                        {documentService.getDocumentLabel(doc.document_type)}
-                      </Text>
-                      <Text style={styles.documentStatus}>
-                        Status: {doc.status}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {(doc.status === 'pending_review' || doc.status === 'pending') && (
-                    <View style={styles.documentActions}>
+            <Text style={styles.documentsTitle}>Documents for Review</Text>
+            {verification.documents && verification.documents.length > 0 ? (
+              <>
+                <Text style={styles.documentStatusSummary}>Total: {verification.documents.length} documents</Text>
+                {verification.documents.map((doc, idx) => {
+                  const shouldShow = doc.status === 'pending_review' || doc.status === 'pending';
+                  return (
+                    <View key={idx} style={styles.documentRow}>
                       <TouchableOpacity
-                        style={[styles.actionButton, styles.approveButton]}
-                        onPress={() => handleApproveDocument(driver.id, doc.document_type)}
-                        disabled={actionLoading}
+                        style={styles.documentInfo}
+                        onPress={() => handleViewDocument(doc)}
                       >
-                        <Ionicons name="checkmark" size={16} color={COLORS.text} />
+                        <Ionicons
+                          name="document-text-outline"
+                          size={20}
+                          color={shouldShow ? COLORS.primary : COLORS.textSecondary}
+                        />
+                        <View style={styles.documentDetails}>
+                          <Text style={styles.documentName}>
+                            {doc.document_type}
+                          </Text>
+                          <Text style={styles.documentStatus}>
+                            Status: {doc.status} {doc.verified_at ? '✓' : ''}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.rejectButton]}
-                        onPress={() => handleOpenRejectModal(driver.id, doc.document_type)}
-                        disabled={actionLoading}
-                      >
-                        <Ionicons name="close" size={16} color={COLORS.text} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
 
-                  {doc.status === 'approved' && (
-                    <View style={styles.statusBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                      <Text style={[styles.statusText, { color: COLORS.success }]}>
-                        Approved
-                      </Text>
+                      {shouldShow && (
+                        <View style={styles.documentActions}>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.approveButton]}
+                            onPress={() => handleApproveDocument(verification.driver_id, doc.document_type)}
+                            disabled={actionLoading}
+                          >
+                            <Ionicons name="checkmark" size={16} color="#fff" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.rejectButton]}
+                            onPress={() => {
+                              setRejectingDocument({ driverId: verification.driver_id, documentType: doc.document_type });
+                              setRejectModalVisible(true);
+                            }}
+                            disabled={actionLoading}
+                          >
+                            <Ionicons name="close" size={16} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
-                  )}
-
-                  {doc.status === 'rejected' && (
-                    <View style={styles.statusBadge}>
-                      <Ionicons name="close-circle" size={16} color={COLORS.error} />
-                      <Text style={[styles.statusText, { color: COLORS.error }]}>
-                        Rejected
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              ))
+                  );
+                })}
+              </>
             ) : (
-              <Text style={styles.noDocumentsText}>No documents pending review</Text>
+              <Text style={styles.noDocumentsText}>No documents available for this driver</Text>
             )}
           </View>
         )}
@@ -288,20 +310,12 @@ const AdminVerificationDashboard = () => {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <FlatList
         data={pendingVerifications}
         renderItem={renderDriverCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.driver_id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -315,10 +329,17 @@ const AdminVerificationDashboard = () => {
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="checkmark-done-circle-outline" size={48} color={COLORS.success} />
-            <Text style={styles.emptyStateText} numberOfLines={2}>All documents verified!</Text>
-          </View>
+          loading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.loadingText}>Loading verifications...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="checkmark-done-circle-outline" size={48} color={COLORS.success} />
+              <Text style={styles.emptyStateText} numberOfLines={2}>All documents verified!</Text>
+            </View>
+          )
         }
         contentContainerStyle={styles.listContent}
       />
@@ -379,8 +400,8 @@ const AdminVerificationDashboard = () => {
       {/* Document Viewer */}
       <DocumentViewer
         visible={viewerVisible}
-        documentData={selectedDocument?.document_data}
-        documentType={selectedDocument?.document_type}
+        documentData={selectedDocument?.data}
+        documentType={selectedDocument?.type}
         onClose={() => setViewerVisible(false)}
       />
     </View>
@@ -426,6 +447,17 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     width: '85%',
     numberOfLines: 2,
+  },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 8,
   },
   driverCard: {
     backgroundColor: COLORS.surface,
@@ -534,6 +566,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 8,
     textTransform: 'uppercase',
+  },
+  documentStatusSummary: {
+    fontSize: 11,
+    color: COLORS.textTertiary,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   documentRow: {
     flexDirection: 'row',

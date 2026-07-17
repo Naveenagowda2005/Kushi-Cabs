@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert, TextInput, Modal,
+  RefreshControl, Alert, TextInput, Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
@@ -71,21 +71,21 @@ export default function SuperAdminCommissionScreen({ navigation }) {
   const fetchCommissionData = async () => {
     try {
       setLoading(true);
+      
+      // First, fetch only completed trips without joins (simpler, faster query)
       const { data: trips, error } = await supabase
         .from('trips')
-        .select(`
-          *,
-          accepted_by_user:accepted_by ( full_name ),
-          vendors:vendor_id ( users ( full_name ) ),
-          created_by_user:created_by ( full_name )
-        `)
+        .select('id, booking_id_seq, status, created_at, commission_amount, fare_amount, pickup_location, dropoff_location, accepted_by, vendor_id, created_by')
         .eq('status', TRIP_STATUS.COMPLETED)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
+
+      console.log(`✅ Fetched ${trips?.length || 0} completed trips`);
       setCommissions(trips || []);
 
-      // Use stored commission_amount from trips table (historical record)
+      // Calculate statistics from the simple data
       const totalCommission = trips.reduce((s, t) => s + (t.commission_amount || 0), 0);
       const vendorCommission = totalCommission;
 
@@ -101,7 +101,7 @@ export default function SuperAdminCommissionScreen({ navigation }) {
       setStats({ totalCommission, vendorCommission, monthlyCommission });
     } catch (error) {
       console.error('Error fetching commission data:', error);
-      Alert.alert('Error', 'Failed to load commission data');
+      Alert.alert('Error', 'Failed to load commission data: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -120,10 +120,8 @@ export default function SuperAdminCommissionScreen({ navigation }) {
         </View>
       </View>
       <View style={styles.tripDetails}>
-        <View style={styles.detailRow}><Text style={styles.detailLabel}>Driver:</Text><Text style={styles.detailValue}>{commission.accepted_by_user?.full_name || 'N/A'}</Text></View>
-        <View style={styles.detailRow}><Text style={styles.detailLabel}>Vendor:</Text><Text style={styles.detailValue}>{commission.vendors?.users?.full_name || commission.created_by_user?.full_name || 'N/A'}</Text></View>
         <View style={styles.detailRow}><Text style={styles.detailLabel}>Fare:</Text><Text style={styles.detailValue}>₹{commission.fare_amount || 0}</Text></View>
-        <View style={styles.detailRow}><Text style={styles.detailLabel}>Commission earned by driver:</Text><Text style={styles.detailValue}>₹{(commission.commission_amount || 0).toFixed(2)}</Text></View>
+        <View style={styles.detailRow}><Text style={styles.detailLabel}>Commission Earned:</Text><Text style={styles.detailValue}>₹{(commission.commission_amount || 0).toFixed(2)}</Text></View>
         <View style={styles.detailRow}><Text style={styles.detailLabel}>Route:</Text><Text style={styles.detailValue} numberOfLines={1}>{commission.pickup_location} → {commission.dropoff_location}</Text></View>
       </View>
       <View style={styles.breakdown}>
@@ -154,7 +152,19 @@ export default function SuperAdminCommissionScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchCommissionData} />}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={!loading && <View style={styles.emptyContainer}><Ionicons name="trending-up-outline" size={64} color={COLORS.textSecondary} /><Text style={styles.emptyText}>No completed trips yet</Text></View>}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.warning} />
+              <Text style={styles.loadingText}>Loading commission data...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="trending-up-outline" size={64} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No completed trips yet</Text>
+            </View>
+          )
+        }
       />
 
       {/* Settings Modal */}
@@ -244,6 +254,8 @@ const styles = StyleSheet.create({
   breakdownValue: { fontSize: getResponsiveFontSize(14), fontWeight: '600', color: COLORS.text },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: getResponsiveFontSize(16), color: COLORS.textSecondary, marginTop: 16 },
+  loadingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
+  loadingText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginTop: 8 },
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: getResponsivePadding(24), paddingTop: hp(6), borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.text },

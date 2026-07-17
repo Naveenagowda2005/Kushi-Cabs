@@ -10,6 +10,7 @@ import { useAlert } from '../../context/AlertContext';
 import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import IDCard from '../../components/IDCard';
+import DocumentViewer from '../../components/DocumentViewer';
 
 export default function SuperAdminVendorsScreen({ navigation }) {
   const { forceUpdate } = useTheme();
@@ -30,6 +31,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [showIDCard, setShowIDCard] = useState(false);
+  const [vendorPhotoForIDCard, setVendorPhotoForIDCard] = useState(null);
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [vendorDocuments, setVendorDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
@@ -51,32 +53,11 @@ export default function SuperAdminVendorsScreen({ navigation }) {
           const { data: vendorProfile } = await supabase.from('vendors').select('*').eq('user_id', user.id).single();
           const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
           
-          // Fetch vendor selfie photo from vendor_documents table
-          let documentPhoto = null;
-          try {
-            // Query vendor_documents with user_id (the foreign key)
-            const { data: vendorDocs } = await supabase
-              .from('vendor_documents')
-              .select('documents')
-              .eq('user_id', user.id)
-              .maybeSingle();
-            
-            if (vendorDocs?.documents?.VENDOR_SELFIE?.document_data) {
-              const photoData = vendorDocs.documents.VENDOR_SELFIE.document_data;
-              documentPhoto = photoData.startsWith('data:') 
-                ? photoData
-                : `data:image/jpeg;base64,${photoData}`;
-              console.log('✅ Found VENDOR_SELFIE photo for:', user.full_name);
-            }
-          } catch (docError) {
-            console.log('⚠️ Error fetching vendor docs:', docError.message);
-          }
-          
           return { 
             ...user, 
             vendors: vendorProfile ? [vendorProfile] : [], 
             wallets: wallet ? [wallet] : [], 
-            documentPhoto 
+            documentPhoto: null  // Don't load document photo on list view
           };
         })
       );
@@ -163,10 +144,12 @@ export default function SuperAdminVendorsScreen({ navigation }) {
 
   const fetchAndViewVendorDocuments = async (vendor) => {
     try {
-      setLoadingDocuments(true);
-      setShowDocumentsModal(true);
-      
       console.log('📄 Fetching documents for vendor:', vendor.full_name, 'user_id:', vendor.id);
+      
+      // First open the modal with loading state
+      setShowDocumentsModal(true);
+      setLoadingDocuments(true);
+      setVendorDocuments([]);
       
       const { data: docs, error } = await supabase
         .from('vendor_documents')
@@ -175,15 +158,15 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         .maybeSingle();
       
       if (error) {
-        console.error('Error fetching documents:', error);
-        Alert.alert('Error', 'Failed to load documents');
+        console.error('❌ Error fetching documents:', error);
+        Alert.alert('Error', 'Failed to load documents: ' + error.message);
         setLoadingDocuments(false);
         return;
       }
       
       if (!docs || !docs.documents) {
-        setVendorDocuments([]);
         console.log('⚠️ No documents found for vendor');
+        setVendorDocuments([]);
       } else {
         // Transform vendor_documents format to array
         const docArray = Object.entries(docs.documents).map(([docType, docData]) => ({
@@ -195,15 +178,40 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         console.log('✅ Found', docArray.length, 'documents for vendor');
         setVendorDocuments(docArray);
       }
+      
+      setLoadingDocuments(false);
     } catch (e) {
-      console.error('Error in fetchAndViewVendorDocuments:', e);
-      Alert.alert('Error', e.message);
-    } finally {
+      console.error('❌ Exception in fetchAndViewVendorDocuments:', e);
+      Alert.alert('Error', 'Failed to load documents: ' + e.message);
       setLoadingDocuments(false);
     }
   };
 
-  const VendorCard = ({ vendor }) => {
+  const fetchVendorPhotoForIDCard = async (vendor) => {
+    try {
+      console.log('📸 Fetching vendor photo for ID card:', vendor.id);
+      
+      // Try to get VENDOR_SELFIE document
+      const { data: docs, error } = await supabase
+        .from('vendor_documents')
+        .select('documents')
+        .eq('user_id', vendor.id)
+        .maybeSingle();
+      
+      if (!error && docs?.documents?.VENDOR_SELFIE?.document_data) {
+        console.log('✅ Found VENDOR_SELFIE, setting photo');
+        setVendorPhotoForIDCard(docs.documents.VENDOR_SELFIE.document_data);
+      } else {
+        console.log('⚠️ No VENDOR_SELFIE found, using avatar_base64');
+        setVendorPhotoForIDCard(vendor.avatar_base64 || null);
+      }
+    } catch (e) {
+      console.error('Error fetching vendor photo:', e);
+      setVendorPhotoForIDCard(vendor.avatar_base64 || null);
+    }
+  };
+
+  const VendorCard = React.memo(({ vendor }) => {
     // Check if this is a dummy vendor
     const isDummyVendor = vendor.vendors?.[0]?.company_name?.trim().toUpperCase().startsWith('DUMMY');
     
@@ -256,7 +264,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
         <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#9c27b020' }]} onPress={() => { setSelectedVendor(vendor); setShowIDCard(true); }}>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#9c27b020' }]} onPress={() => { setSelectedVendor(vendor); fetchVendorPhotoForIDCard(vendor); setShowIDCard(true); }}>
             <Ionicons name="card" size={16} color="#9c27b0" />
             <Text style={[styles.actionButtonText, { color: '#9c27b0' }]}>ID Card</Text>
           </TouchableOpacity>
@@ -267,7 +275,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         </View>
       </TouchableOpacity>
     );
-  };
+  });
 
   return (
     <View style={styles.container}>
@@ -295,7 +303,19 @@ export default function SuperAdminVendorsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchVendors} />}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={!loading && <View style={styles.emptyContainer}><Ionicons name="business-outline" size={64} color={COLORS.textSecondary} /><Text style={styles.emptyText}>No vendors found</Text></View>}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.warning} />
+              <Text style={styles.loadingText}>Loading vendors...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="business-outline" size={64} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No vendors found</Text>
+            </View>
+          )
+        }
       />
 
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
@@ -464,7 +484,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
                   userType="vendor"
                   fullName={selectedVendor.full_name}
                   phone={selectedVendor.phone}
-                  photo={selectedVendor.avatar_base64 || selectedVendor.documentPhoto}
+                  photo={vendorPhotoForIDCard || selectedVendor.avatar_base64}
                   companyName={selectedVendor.vendors?.[0]?.company_name}
                   serialNumber={selectedVendor.vendors?.[0]?.id?.charCodeAt(0) || 12345}
                   isApproved={true}
@@ -496,7 +516,7 @@ export default function SuperAdminVendorsScreen({ navigation }) {
               <Text style={styles.emptyText}>No documents available</Text>
             </View>
           ) : (
-            <ScrollView style={styles.documentsListContainer}>
+            <ScrollView style={styles.documentsListContainer} scrollEnabled={true}>
               {vendorDocuments.map((doc, index) => (
                 <View key={index} style={styles.documentCard}>
                   <View style={styles.documentInfo}>
@@ -509,21 +529,34 @@ export default function SuperAdminVendorsScreen({ navigation }) {
                       )}
                     </View>
                   </View>
-                  {doc.document_data && (
+                  {doc.document_data ? (
                     <TouchableOpacity
                       style={styles.viewButton}
                       onPress={() => {
-                        setSelectedDocument({
+                        console.log('📸 Opening viewer for:', doc.document_type);
+                        console.log('📸 Document data exists:', !!doc.document_data);
+                        console.log('📸 Document data length:', doc.document_data?.length || 0);
+                        const docData = {
                           data: doc.document_data,
                           type: doc.document_type,
                           mimeType: doc.document_mime_type
-                        });
-                        setDocumentViewerVisible(true);
+                        };
+                        console.log('📸 Setting selectedDocument:', docData);
+                        setSelectedDocument(docData);
+                        console.log('📸 Closing documents modal and opening viewer');
+                        // Close documents modal first, then open viewer
+                        setShowDocumentsModal(false);
+                        setTimeout(() => {
+                          console.log('📸 Now opening DocumentViewer');
+                          setDocumentViewerVisible(true);
+                        }, 100);
                       }}
                     >
                       <Ionicons name="eye-outline" size={18} color="#2196F3" />
                       <Text style={{ color: '#2196F3', marginLeft: 4, fontWeight: '500' }}>View</Text>
                     </TouchableOpacity>
+                  ) : (
+                    <Text style={{ color: COLORS.textSecondary, fontSize: 12 }}>No data</Text>
                   )}
                 </View>
               ))}
@@ -533,35 +566,16 @@ export default function SuperAdminVendorsScreen({ navigation }) {
       </Modal>
 
       {/* Document Viewer Modal */}
-      {selectedDocument && (
-        <Modal visible={documentViewerVisible} animationType="fade" transparent onRequestClose={() => setDocumentViewerVisible(false)}>
-          <View style={styles.documentViewerOverlay}>
-            <View style={styles.documentViewerHeader}>
-              <Text style={styles.documentViewerTitle}>{selectedDocument.type}</Text>
-              <TouchableOpacity onPress={() => setDocumentViewerVisible(false)}>
-                <Ionicons name="close" size={28} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.documentViewerContent}>
-              {selectedDocument.data && (
-                selectedDocument.data.startsWith('data:') ? (
-                  <Image
-                    source={{ uri: selectedDocument.data }}
-                    style={styles.documentImage}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <Image
-                    source={{ uri: `data:${selectedDocument.mimeType || 'image/jpeg'};base64,${selectedDocument.data}` }}
-                    style={styles.documentImage}
-                    resizeMode="contain"
-                  />
-                )
-              )}
-            </View>
-          </View>
-        </Modal>
-      )}
+      <DocumentViewer
+        visible={documentViewerVisible}
+        documentData={selectedDocument?.data}
+        documentType={selectedDocument?.type}
+        onClose={() => {
+          console.log('📷 DocumentViewer closed');
+          setDocumentViewerVisible(false);
+          setTimeout(() => setSelectedDocument(null), 300);
+        }}
+      />
     </View>
   );
 }
@@ -804,6 +818,18 @@ const styles = StyleSheet.create({
     height: 500,
     marginVertical: 20,
     borderRadius: 8,
+  },
+  documentViewerEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  documentViewerEmptyText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
   },
 
   loadingContainer: {

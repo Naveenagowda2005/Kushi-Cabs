@@ -217,9 +217,26 @@ export default function VendorMyTripsScreen({ navigation }) {
 
       <View style={styles.tripHeader}>
         <View style={styles.tripInfo}>
-          <Text style={styles.tripLocations} numberOfLines={2}>
-            {item.pickup_location} → {item.dropoff_location}
-          </Text>
+          {/* Pickup and Dropoff on separate rows */}
+          <View style={styles.locationsColumn}>
+            {/* Pickup Row */}
+            <View style={styles.locationRow}>
+              <Ionicons name="location" size={12} color="#4caf50" />
+              <View style={styles.locationContent}>
+                <Text style={styles.locationLabel}>Pickup</Text>
+                <Text style={styles.tripLocations} numberOfLines={2}>{item.pickup_location}</Text>
+              </View>
+            </View>
+            
+            {/* Dropoff Row */}
+            <View style={styles.locationRow}>
+              <Ionicons name="flag" size={12} color="#e94560" />
+              <View style={styles.locationContent}>
+                <Text style={styles.locationLabel}>Dropoff</Text>
+                <Text style={styles.tripLocations} numberOfLines={2}>{item.dropoff_location}</Text>
+              </View>
+            </View>
+          </View>
           {item.return_location && (
             <View style={styles.returnLocationRow}>
               <Ionicons name="location-outline" size={12} color="#2196f3" />
@@ -708,6 +725,34 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   tripInfo: { flex: 1 },
+  locationsColumn: {
+    flexDirection: 'column',
+    marginBottom: 6,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'visible',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  locationContent: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 8,
+  },
+  locationLabel: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   returnLocationRow: {
     flexDirection: 'row',
     alignItems: 'center',

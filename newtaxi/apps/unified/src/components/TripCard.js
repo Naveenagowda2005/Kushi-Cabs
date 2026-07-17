@@ -259,31 +259,26 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       </View>
 
-      {/* Pickup and Dropoff in one row */}
-      <View style={styles.locationsRow}>
-        {/* Pickup */}
-        <View style={styles.locationSide}>
+      {/* Pickup and Dropoff on separate rows */}
+      <View style={styles.locationsColumn}>
+        {/* Pickup Row */}
+        <View style={styles.locationRow}>
           <View style={styles.locationRowContent}>
             <Ionicons name="location" size={16} color="#4caf50" />
             <View style={styles.locationContent}>
               <Text style={styles.locationLabel}>Pickup</Text>
-              <Text style={styles.location} numberOfLines={0}>{trip.pickup_location}</Text>
+              <Text style={styles.location} numberOfLines={2}>{trip.pickup_location}</Text>
             </View>
           </View>
         </View>
         
-        {/* Arrow Divider */}
-        <View style={styles.arrowDivider}>
-          <Ionicons name="arrow-forward-outline" size={16} color="#333" />
-        </View>
-        
-        {/* Dropoff */}
-        <View style={styles.locationSide}>
+        {/* Dropoff Row */}
+        <View style={styles.locationRow}>
           <View style={styles.locationRowContent}>
             <Ionicons name="flag" size={16} color="#e94560" />
             <View style={styles.locationContent}>
               <Text style={styles.locationLabel}>Dropoff</Text>
-              <Text style={styles.location} numberOfLines={0}>{trip.dropoff_location}</Text>
+              <Text style={styles.location} numberOfLines={2}>{trip.dropoff_location}</Text>
             </View>
           </View>
         </View>
@@ -650,18 +645,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
     overflow: 'visible',
-    flexWrap: 'wrap',
+  },
+  locationsColumn: {
+    flexDirection: 'column',
+    marginBottom: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'visible',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   locationSide: {
     flex: 1,
-    minWidth: 140,
+    minWidth: 0,
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
   },
   locationRowContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
+    flex: 1,
   },
   locationDivider: {
     width: 2,
@@ -670,6 +682,7 @@ const styles = StyleSheet.create({
   },
   locationContent: {
     flex: 1,
+    minWidth: 0,
   },
   locationLabel: {
     color: '#000',
@@ -680,10 +693,8 @@ const styles = StyleSheet.create({
   location: { 
     color: '#000', 
     fontSize: 17,
-    flex: 1,
-    flexWrap: 'wrap',
     fontWeight: '600',
-    flexShrink: 1,
+    lineHeight: 21,
   },
   arrowDivider: {
     justifyContent: 'center',

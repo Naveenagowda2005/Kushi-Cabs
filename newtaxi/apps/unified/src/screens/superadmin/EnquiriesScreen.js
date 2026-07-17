@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert, TextInput, Modal,
+  RefreshControl, Alert, TextInput, Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
@@ -263,7 +263,12 @@ export default function SuperAdminEnquiriesScreen({ navigation }) {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          !loading && (
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.warning} />
+              <Text style={styles.loadingText}>Loading enquiries...</Text>
+            </View>
+          ) : (
             <View style={styles.emptyContainer}>
               <Ionicons name="car-outline" size={64} color={COLORS.textSecondary} />
               <Text style={styles.emptyText}>No enquiries found</Text>
@@ -313,6 +318,8 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: getResponsiveFontSize(18), fontWeight: '600', color: COLORS.textSecondary, marginTop: 16 },
   emptySubtext: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginTop: 8, textAlign: 'center' },
+  loadingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
+  loadingText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginTop: 8 },
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: getResponsivePadding(24), paddingTop: hp(6), borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.text },

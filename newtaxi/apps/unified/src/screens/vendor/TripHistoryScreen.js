@@ -84,13 +84,24 @@ export default function VendorTripHistoryScreen({ navigation }) {
           <Text style={styles.fare}>₹{item.fare_amount}</Text>
         </View>
 
-        <View style={styles.row}>
-          <Ionicons name="location" size={16} color="#4caf50" />
-          <Text style={styles.location} numberOfLines={1}>{item.pickup_location}</Text>
-        </View>
-        <View style={styles.row}>
-          <Ionicons name="flag" size={16} color="#e94560" />
-          <Text style={styles.location} numberOfLines={1}>{item.dropoff_location}</Text>
+        <View style={styles.locationsColumn}>
+          {/* Pickup Row */}
+          <View style={styles.locationRow}>
+            <Ionicons name="location" size={16} color="#4caf50" />
+            <View style={styles.locationContent}>
+              <Text style={styles.locationLabel}>Pickup</Text>
+              <Text style={styles.location} numberOfLines={2}>{item.pickup_location}</Text>
+            </View>
+          </View>
+          
+          {/* Dropoff Row */}
+          <View style={styles.locationRow}>
+            <Ionicons name="flag" size={16} color="#e94560" />
+            <View style={styles.locationContent}>
+              <Text style={styles.locationLabel}>Dropoff</Text>
+              <Text style={styles.location} numberOfLines={2}>{item.dropoff_location}</Text>
+            </View>
+          </View>
         </View>
 
         {item.passenger_name && (
@@ -201,7 +212,35 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   fare: { color: '#4caf50', fontWeight: 'bold', fontSize: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6, paddingVertical: 4 },
-  location: { color: '#333', fontSize: 15, flex: 1, fontWeight: '500' },
+  location: { color: '#333', fontSize: 15, flex: 1, fontWeight: '500', lineHeight: 20 },
+  locationsColumn: {
+    flexDirection: 'column',
+    marginVertical: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'visible',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    gap: 10,
+  },
+  locationContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  locationLabel: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   meta: { color: '#666', fontSize: 14, flex: 1, fontWeight: '500' },
   commission: { color: '#4caf50', fontSize: 12 },
   driverSection: {

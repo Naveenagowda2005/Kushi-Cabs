@@ -266,59 +266,64 @@ export const submitDocumentsForVerification = async (driverId) => {
 };
 
 /**
+ * Get all pending verifications (admin only)
+ * @returns {Promise<array>} - Array of pending verifications
+ */
 export const getPendingVerifications = async () => {
   try {
     console.log('getPendingVerifications: Loading pending verifications');
     
-    // Query driver_verification_status for pending_review drivers
-    // Then fetch their user info separately
+    // Get documents that are PENDING or PENDING_REVIEW (not approved/rejected)
+    const { data: docRecords, error: docsError } = await supabase
+      .from('driver_documents')
+      .select('driver_id')
+      .in('status', ['pending', 'pending_review']);
+
+    if (docsError) {
+      console.error('getPendingVerifications: Error fetching pending documents:', docsError);
+      throw docsError;
+    }
+
+    // Get unique driver IDs that have pending documents
+    const uniqueDriverIds = [...new Set((docRecords || []).map(d => d.driver_id))];
+    console.log('getPendingVerifications: Found', uniqueDriverIds.length, 'drivers with pending documents');
+
+    if (uniqueDriverIds.length === 0) {
+      console.log('getPendingVerifications: No drivers with pending documents');
+      return [];
+    }
+
+    // Get verification status for these drivers
     const { data, error } = await supabase
       .from('driver_verification_status')
       .select('*')
-      .eq('overall_status', 'pending_review')
-      .order('submitted_at', { ascending: true });
+      .in('driver_id', uniqueDriverIds);
 
-    if (error) {
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 = no rows, which is fine
       console.error('getPendingVerifications: Query error:', error);
       throw error;
     }
 
-    // Now fetch driver and user info for each verification
-    if (data && data.length > 0) {
-      const verificationsWithUser = await Promise.all(
-        data.map(async (verification) => {
-          // Get driver info
-          const { data: driverData } = await supabase
-            .from('drivers')
-            .select('*')
-            .eq('user_id', verification.driver_id)
-            .single();
+    const verifiedDrivers = data || [];
+    console.log('getPendingVerifications: Retrieved', verifiedDrivers.length, 'verification status records');
 
-          // Get user info
-          const { data: userData } = await supabase
-            .from('users')
-            .select('id, email, phone, full_name')
-            .eq('id', verification.driver_id)
-            .single();
+    // For drivers without verification status, create temporary records
+    const driversWithoutStatus = uniqueDriverIds.filter(
+      driverId => !verifiedDrivers.find(v => v.driver_id === driverId)
+    );
 
-          return {
-            ...verification,
-            driver: {
-              id: userData?.id,
-              phone: userData?.phone,
-              full_name: userData?.full_name,
-              email: userData?.email,
-            },
-          };
-        })
-      );
-
-      console.log('getPendingVerifications: Retrieved', verificationsWithUser.length, 'pending verifications');
-      return verificationsWithUser;
+    if (driversWithoutStatus.length > 0) {
+      console.log('getPendingVerifications: Creating temporary records for', driversWithoutStatus.length, 'drivers without status');
+      const tempRecords = driversWithoutStatus.map(driverId => ({
+        driver_id: driverId,
+        overall_status: 'pending_review',
+        all_documents_submitted: true,
+      }));
+      return [...verifiedDrivers, ...tempRecords];
     }
 
-    console.log('getPendingVerifications: No pending verifications found');
-    return [];
+    return verifiedDrivers;
   } catch (error) {
     console.error('Error getting pending verifications:', error);
     throw error;

@@ -75,19 +75,19 @@ export default function SuperAdminNavigator() {
 
   const fetchPendingCounts = async () => {
     try {
-      // ALWAYS use direct query for driver count (RPC is broken)
-      // The RPC returns 0 even when records exist with overall_status = 'pending_review'
-      const { data: directDriverData, error: directDriverError } = await supabase
-        .from('driver_verification_status')
-        .select('id')
-        .eq('overall_status', 'pending_review');
+      // Get unique driver IDs that have documents in pending or pending_review status
+      const { data: docRecords, error: docError } = await supabase
+        .from('driver_documents')
+        .select('driver_id')
+        .in('status', ['pending', 'pending_review']);
 
-      if (!directDriverError) {
-        const driverCount = directDriverData?.length || 0;
-        console.log('✅ Driver count (direct query):', driverCount);
+      if (!docError && docRecords) {
+        const uniqueDriverIds = [...new Set((docRecords || []).map(d => d.driver_id))];
+        const driverCount = uniqueDriverIds.length;
+        console.log('✅ Driver count (documents with pending/pending_review):', driverCount);
         setPendingDriverCount(driverCount);
       } else {
-        console.error('🔴 Driver count query error:', directDriverError);
+        console.error('🔴 Driver documents query error:', docError);
         setPendingDriverCount(0);
       }
 

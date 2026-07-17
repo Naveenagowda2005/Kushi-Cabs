@@ -24,7 +24,7 @@ const DocumentViewer = ({
   onClose,
 }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!!documentData);
   const [imageError, setImageError] = useState(false);
   const [scale] = useState(new Animated.Value(1));
   const [imageWidth, setImageWidth] = useState(0);
@@ -32,6 +32,14 @@ const DocumentViewer = ({
 
   // Convert base64 to data URI for display
   const imageUri = documentData ? base64ToDataUri(documentData) : null;
+
+  // Reset loading state when documentData changes
+  React.useEffect(() => {
+    if (documentData) {
+      setIsLoading(true);
+      setImageError(false);
+    }
+  }, [documentData]);
 
   const handleShare = async () => {
     try {
@@ -92,13 +100,15 @@ const DocumentViewer = ({
         <View style={styles.fullScreenContainer}>
           <View style={styles.fullScreenHeader}>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={styles.backButton}
               onPress={() => {
+                console.log('📷 Full screen back button pressed');
                 setIsFullScreen(false);
                 resetZoom();
               }}
+              activeOpacity={0.6}
             >
-              <Ionicons name="close" size={28} color="#ffffff" />
+              <Ionicons name="chevron-back" size={28} color="#ffffff" />
             </TouchableOpacity>
             <Text style={styles.fullScreenTitle}>
               {getDocumentLabel(documentType)}
@@ -123,9 +133,20 @@ const DocumentViewer = ({
                 <Image
                   source={{ uri: imageUri }}
                   style={styles.fullScreenImage}
-                  onLoadStart={() => setIsLoading(true)}
-                  onLoadEnd={() => setIsLoading(false)}
-                  onError={() => {
+                  onLoadStart={() => {
+                    console.log('📷 Full screen image load started');
+                    setIsLoading(true);
+                  }}
+                  onLoad={() => {
+                    console.log('📷 Full screen image loaded successfully');
+                    setIsLoading(false);
+                  }}
+                  onLoadEnd={() => {
+                    console.log('📷 Full screen image load ended');
+                    setIsLoading(false);
+                  }}
+                  onError={(error) => {
+                    console.error('📷 Full screen image error:', error);
                     setImageError(true);
                     setIsLoading(false);
                   }}
@@ -180,9 +201,20 @@ const DocumentViewer = ({
                 <Image
                   source={{ uri: imageUri }}
                   style={styles.image}
-                  onLoadStart={() => setIsLoading(true)}
-                  onLoadEnd={() => setIsLoading(false)}
-                  onError={() => {
+                  onLoadStart={() => {
+                    console.log('📷 Modal image load started');
+                    setIsLoading(true);
+                  }}
+                  onLoad={() => {
+                    console.log('📷 Modal image loaded successfully');
+                    setIsLoading(false);
+                  }}
+                  onLoadEnd={() => {
+                    console.log('📷 Modal image load ended');
+                    setIsLoading(false);
+                  }}
+                  onError={(error) => {
+                    console.error('📷 Modal image error:', error);
                     setImageError(true);
                     setIsLoading(false);
                   }}
@@ -261,9 +293,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   closeButton: {
-    padding: 8,
-    marginRight: -8,
-    color: '#ffffff',
+    padding: 12,
+    marginRight: 0,
+    zIndex: 100,
+  },
+  backButton: {
+    padding: 16,
+    marginRight: 0,
+    zIndex: 100,
   },
   imageContainer: {
     width: '100%',
@@ -333,8 +370,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 16,
+    paddingVertical: 20,
+    paddingTop: 60,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
     backgroundColor: '#1a1a1a',
@@ -363,7 +400,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
+    paddingBottom: 80,
     backgroundColor: '#1a1a1a',
     borderTopWidth: 1,
     borderTopColor: '#333333',

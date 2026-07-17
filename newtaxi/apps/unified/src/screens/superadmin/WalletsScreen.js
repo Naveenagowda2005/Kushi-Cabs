@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert, TextInput, Modal,
+  RefreshControl, Alert, TextInput, Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
@@ -162,7 +162,19 @@ export default function SuperAdminWalletsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchWallets} />}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={!loading && <View style={styles.emptyContainer}><Ionicons name="wallet-outline" size={64} color={COLORS.textSecondary} /><Text style={styles.emptyText}>No wallets found</Text></View>}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.warning} />
+              <Text style={styles.loadingText}>Loading wallets...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="wallet-outline" size={64} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No wallets found</Text>
+            </View>
+          )
+        }
       />
 
       {/* Wallet Detail Modal */}
@@ -259,6 +271,8 @@ const styles = StyleSheet.create({
   detailText: { fontSize: getResponsiveFontSize(12), color: COLORS.textSecondary, marginLeft: 4 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginTop: 8, textAlign: 'center' },
+  loadingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
+  loadingText: { fontSize: getResponsiveFontSize(14), color: COLORS.textSecondary, marginTop: 8 },
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: getResponsivePadding(24), paddingTop: hp(6), borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: getResponsiveFontSize(20), fontWeight: 'bold', color: COLORS.text },
