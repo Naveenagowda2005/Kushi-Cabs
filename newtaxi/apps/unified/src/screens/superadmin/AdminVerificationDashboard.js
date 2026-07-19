@@ -70,11 +70,11 @@ const AdminVerificationDashboard = () => {
           userMap[user.id] = user;
         });
         
-        // Fetch documents WITHOUT the large base64 data initially
-        // Only fetch: id, driver_id, document_type, status, created_at, document_mime_type
+        // Fetch documents - STORAGE ONLY, no base64 from database
+        // Only fetch metadata needed to identify documents
         const { data: allDocuments, error: docError } = await supabase
           .from('driver_documents')
-          .select('id, driver_id, document_type, status, created_at, document_mime_type, verified_at, verified_by, rejection_reason')
+          .select('id, driver_id, document_type, status, created_at, document_mime_type, verified_at, verified_by, rejection_reason, storage_path, document_url, document_data')
           .in('driver_id', driverIds);
         
         if (docError) {
@@ -175,31 +175,26 @@ const AdminVerificationDashboard = () => {
     }
   };
 
-  const handleViewDocument = useCallback(async (document) => {
+  const handleViewDocument = useCallback(async (document, driverId) => {
     try {
-      // If document_data is not already loaded, fetch it
-      if (!document.document_data) {
-        console.log('📋 Fetching document data for:', document.document_type);
-        const { data, error } = await supabase
-          .from('driver_documents')
-          .select('document_data')
-          .eq('id', document.id)
-          .single();
-        
-        if (error) throw error;
-        
-        setSelectedDocument({
-          data: data.document_data,
-          type: document.document_type,
-          mimeType: document.document_mime_type
-        });
-      } else {
-        setSelectedDocument({
-          data: document.document_data,
-          type: document.document_type,
-          mimeType: document.document_mime_type
-        });
+      // Get document URL from backend API
+      console.log('📋 Fetching document from backend for driver:', driverId, 'type:', document.document_type);
+      
+      const documents = await documentService.getDriverAllDocuments(driverId);
+      const docWithUrl = documents.find(d => d.document_type === document.document_type);
+      
+      if (!docWithUrl || !docWithUrl.document_url) {
+        return Alert.alert('Error', 'Document URL not found');
       }
+
+      console.log('📋 Viewing document:', document.document_type, docWithUrl.document_url);
+      
+      // Use public URL directly from backend response
+      setSelectedDocument({
+        url: docWithUrl.document_url,
+        type: document.document_type,
+        mimeType: 'image/jpeg'
+      });
       setViewerVisible(true);
     } catch (error) {
       console.error('📋 Error viewing document:', error);
@@ -259,7 +254,7 @@ const AdminVerificationDashboard = () => {
                     <View key={idx} style={styles.documentRow}>
                       <TouchableOpacity
                         style={styles.documentInfo}
-                        onPress={() => handleViewDocument(doc)}
+                        onPress={() => handleViewDocument(doc, verification.driver_id)}
                       >
                         <Ionicons
                           name="document-text-outline"
@@ -400,6 +395,7 @@ const AdminVerificationDashboard = () => {
       {/* Document Viewer */}
       <DocumentViewer
         visible={viewerVisible}
+        documentUrl={selectedDocument?.url}
         documentData={selectedDocument?.data}
         documentType={selectedDocument?.type}
         onClose={() => setViewerVisible(false)}

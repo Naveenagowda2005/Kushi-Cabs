@@ -91,10 +91,12 @@ export default function EnquiryCard({ trip, onPress, onAccept, onCancel, isNewes
         style={{ flex: 1 }}
       >
         <View style={{ flex: 1 }}>
-          {/* Booking ID Badge - Positioned at top right */}
+          {/* Booking ID Badge - Top Left */}
           <View style={styles.bookingIdBadgePositionTop}>
-            <Text style={styles.bookingIdBadgeLabel}>Booking ID</Text>
-            <Text style={styles.bookingIdBadgeValue}>{bookingId}</Text>
+            <View style={styles.bookingIdBadgeContainer}>
+              <Text style={styles.bookingIdBadgeLabel}>Booking ID</Text>
+              <Text style={styles.bookingIdBadgeValue}>{bookingId}</Text>
+            </View>
           </View>
 
           <View style={styles.header}>
@@ -351,25 +353,27 @@ const styles = StyleSheet.create({
     borderColor: '#2196f3',
   },
   bookingIdBadgePositionTop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    flexDirection: 'column',
+    marginBottom: 0,
+    paddingVertical: 0,
+    alignSelf: 'flex-start',
+  },
+  bookingIdBadgeContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 1,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
     backgroundColor: '#e3f2fd',
     borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
     borderWidth: 1.5,
     borderColor: '#2196f3',
-    zIndex: 10,
+    gap: 1,
   },
   bookingIdBadgeLabel: {
     color: '#2196f3',
     fontSize: Math.max(8, screenWidth * 0.021),
     fontWeight: '700',
     letterSpacing: 0.3,
+    marginRight: 4,
   },
   bookingIdBadgeValue: {
     color: '#2196f3',

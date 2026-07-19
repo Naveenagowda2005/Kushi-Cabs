@@ -191,6 +191,14 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       )}
 
+      {/* Booking ID - First Line at Top Right */}
+      <View style={styles.topBookingIdRow}>
+        <View style={styles.topBookingIdBadge}>
+          <Text style={styles.topBookingIdLabel}>Booking ID</Text>
+          <Text style={styles.topBookingIdValue} numberOfLines={1}>{bookingId}</Text>
+        </View>
+      </View>
+
       {/* Header: Trip type and Booking ID */}
       <View style={styles.header}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -200,10 +208,6 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
               <Text style={styles.newTripBadgeText}>🆕 NEW</Text>
             </View>
           )}
-        </View>
-        <View style={styles.bookingIdBadge}>
-          <Text style={styles.bookingIdBadgeLabel}>Booking ID</Text>
-          <Text style={styles.bookingIdBadgeValue}>{bookingId}</Text>
         </View>
       </View>
 
@@ -424,6 +428,35 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: '#ff9800',
+  },
+  topBookingIdRow: {
+    marginBottom: 0,
+    paddingVertical: 0,
+  },
+  topBookingIdBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 12,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196f3',
+    gap: 8,
+    alignSelf: 'flex-start',
+  },
+  topBookingIdLabel: {
+    color: '#2196f3',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  topBookingIdValue: {
+    color: '#2196f3',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontFamily: 'monospace',
   },
   header: {
     flexDirection: 'row',

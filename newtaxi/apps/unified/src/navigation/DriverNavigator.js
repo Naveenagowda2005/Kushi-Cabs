@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { View, ActivityIndicator, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '../constants';
 import * as documentService from '../services/documentService';
 import { supabase } from '../lib/supabase';
@@ -191,71 +192,193 @@ export default function DriverNavigator() {
   const [loading, setLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Dashboard');
 
-  useEffect(() => {
-    // Check driver's verification status on mount
-    const checkVerificationStatus = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const checkVerificationStatus = React.useCallback(async () => {
+    try {
+      // Get driver ID from OTP session in AsyncStorage or from Supabase auth
+      let userId = null;
 
-        // First check driver_verification_status table
-        const { data: verificationStatus, error } = await supabase
-          .from('driver_verification_status')
-          .select('overall_status')
-          .eq('driver_id', user.id)
+      // Try to get from AsyncStorage first (OTP-based login)
+      try {
+        const otpSessionStr = await AsyncStorage.getItem('otpUserSession');
+        if (otpSessionStr) {
+          const otpSession = JSON.parse(otpSessionStr);
+          userId = otpSession?.user?.id;
+          console.log('DriverNavigator: Got userId from OTP session:', userId);
+        }
+      } catch (e) {
+        console.log('DriverNavigator: Could not get OTP session from AsyncStorage');
+      }
+
+      // If not found in AsyncStorage, try Supabase auth
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id;
+        console.log('DriverNavigator: Got userId from Supabase auth:', userId);
+      }
+
+      if (!userId) {
+        console.log('DriverNavigator: No user found');
+        setShowWaitingScreen(true);
+        return;
+      }
+
+      console.log('DriverNavigator: Checking verification for user:', userId);
+
+      // First check driver_verification_status table
+      const { data: verificationStatus, error } = await supabase
+        .from('driver_verification_status')
+        .select('overall_status')
+        .eq('driver_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('DriverNavigator: Error checking verification status:', error);
+        setShowWaitingScreen(true);
+        return;
+      }
+
+      console.log('DriverNavigator: Verification status found:', verificationStatus?.overall_status);
+
+      // Decision logic:
+      // - If overall_status === 'approved' → show dashboard
+      // - If overall_status === 'pending_review' or 'pending' → show waiting screen
+      // - If no verification record → check users table for legacy verification_status
+      if (verificationStatus?.overall_status === 'approved') {
+        console.log('DriverNavigator: Driver approved - showing dashboard');
+        setShowWaitingScreen(false);
+      } else if (verificationStatus?.overall_status === 'pending_review' || verificationStatus?.overall_status === 'pending') {
+        console.log('DriverNavigator: Documents pending review - showing waiting screen');
+        setShowWaitingScreen(true);
+      } else if (!verificationStatus) {
+        // No verification record — check users.verification_status directly (for dummy drivers or old data)
+        const { data: userData } = await supabase
+          .from('users')
+          .select('verification_status')
+          .eq('id', userId)
           .single();
 
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error checking verification status:', error);
+        console.log('DriverNavigator: No DVS record, checking users table. verification_status:', userData?.verification_status);
+
+        if (userData?.verification_status === 'approved') {
+          // Approved at user level — also create the missing dvs record so future checks work
+          console.log('DriverNavigator: User verified in users table, creating DVS record');
+          await supabase
+            .from('driver_verification_status')
+            .upsert({
+              driver_id: userId,
+              overall_status: 'approved',
+              all_documents_submitted: true,
+              submitted_at: new Date().toISOString(),
+              approved_at: new Date().toISOString(),
+            }, { onConflict: 'driver_id' });
+
+          setShowWaitingScreen(false);
+        } else {
+          console.log('DriverNavigator: User not verified, showing waiting screen');
           setShowWaitingScreen(true);
-          setLoading(false);
+        }
+      } else {
+        // Record exists but status is something else (rejected, etc.) → show waiting screen
+        console.log('DriverNavigator: Unknown verification status, showing waiting screen:', verificationStatus?.overall_status);
+        setShowWaitingScreen(true);
+      }
+    } catch (err) {
+      console.error('DriverNavigator: Error in verification check:', err);
+      // On error, show waiting screen to be safe
+      setShowWaitingScreen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial check on mount
+    setLoading(true);
+    checkVerificationStatus().finally(() => setLoading(false));
+  }, [checkVerificationStatus]);
+
+  useEffect(() => {
+    // Initial check on mount
+    setLoading(true);
+    checkVerificationStatus().finally(() => setLoading(false));
+  }, [checkVerificationStatus]);
+
+  useEffect(() => {
+    // Subscribe to auth changes to re-check verification when user logs in/out
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('DriverNavigator: Auth state changed:', event, 'user:', session?.user?.id);
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        checkVerificationStatus();
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [checkVerificationStatus]);
+
+  // Real-time subscription to watch for approval status changes (e.g., when admin approves)
+  useEffect(() => {
+    let userId = null;
+
+    // Get user ID synchronously
+    const getAndSubscribe = async () => {
+      try {
+        // Try to get from AsyncStorage first (OTP-based login)
+        try {
+          const otpSessionStr = await AsyncStorage.getItem('otpUserSession');
+          if (otpSessionStr) {
+            const otpSession = JSON.parse(otpSessionStr);
+            userId = otpSession?.user?.id;
+          }
+        } catch (e) {
+          console.log('DriverNavigator: Could not get OTP session');
+        }
+
+        // If not found in AsyncStorage, try Supabase auth
+        if (!userId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          userId = user?.id;
+        }
+
+        if (!userId) {
+          console.log('DriverNavigator: No user ID for real-time subscription');
           return;
         }
 
-        console.log('DriverNavigator: Verification status:', verificationStatus?.overall_status);
+        console.log('DriverNavigator: Setting up real-time subscription for:', userId);
 
-        if (verificationStatus?.overall_status === 'approved') {
-          setShowWaitingScreen(false);
-        } else if (!verificationStatus) {
-          // No verification record — check users.verification_status directly (for dummy drivers)
-          const { data: userData } = await supabase
-            .from('users')
-            .select('verification_status')
-            .eq('id', user.id)
-            .single();
+        const subscription = supabase
+          .channel(`driver-verification:${userId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'driver_verification_status',
+              filter: `driver_id=eq.${userId}`,
+            },
+            (payload) => {
+              console.log('🔔 DriverNavigator: Real-time approval status changed:', payload.new?.overall_status);
+              // Re-check status when it changes
+              checkVerificationStatus();
+            }
+          )
+          .subscribe();
 
-          console.log('DriverNavigator: users.verification_status:', userData?.verification_status);
-
-          if (userData?.verification_status === 'approved') {
-            // Approved at user level — also create the missing dvs record so future checks work
-            await supabase
-              .from('driver_verification_status')
-              .upsert({
-                driver_id: user.id,
-                overall_status: 'approved',
-                all_documents_submitted: true,
-                submitted_at: new Date().toISOString(),
-                approved_at: new Date().toISOString(),
-              }, { onConflict: 'driver_id' });
-
-            setShowWaitingScreen(false);
-          } else {
-            setShowWaitingScreen(true);
-          }
-        } else {
-          setShowWaitingScreen(true);
-        }
-      } catch (err) {
-        console.error('Error in DriverNavigator verification check:', err);
-        // On error, show waiting screen to be safe
-        setShowWaitingScreen(true);
-      } finally {
-        setLoading(false);
+        // Cleanup subscription on unmount
+        return () => {
+          console.log('DriverNavigator: Unsubscribing from real-time updates');
+          supabase.removeChannel(subscription);
+        };
+      } catch (error) {
+        console.error('DriverNavigator: Error setting up real-time subscription:', error);
       }
     };
 
-    checkVerificationStatus();
-  }, []);
+    const cleanup = getAndSubscribe();
+    return () => {
+      cleanup?.then(fn => fn?.());
+    };
+  }, [checkVerificationStatus]);
 
   if (loading) {
     return (
@@ -271,8 +394,8 @@ export default function DriverNavigator() {
       <Stack.Navigator
         screenOptions={{
           headerShown: true,
-          headerStyle: { backgroundColor: '#001a33' },
-          headerTintColor: COLORS.textLight,
+          headerStyle: { backgroundColor: '#ffffff' },
+          headerTintColor: '#333',
         }}
       >
         <Stack.Screen

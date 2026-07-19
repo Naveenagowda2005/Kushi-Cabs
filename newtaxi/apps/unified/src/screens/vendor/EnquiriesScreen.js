@@ -113,7 +113,7 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
       onPress={() => navigation.navigate('EnquiryDetail', { trip: item, readOnly: true })}
       activeOpacity={0.8}
     >
-      {/* Booking ID Badge - Top Right */}
+      {/* Booking ID Badge - Top */}
       <View style={styles.bookingIdBadgeRow}>
         <View style={styles.bookingIdBadge}>
           <Text style={styles.bookingIdLabel}>Booking ID</Text>
@@ -990,17 +990,15 @@ const styles = StyleSheet.create({
     borderColor: '#4caf50',
   },
   bookingIdBadgeRow: {
-    position: 'absolute',
-    top: screenWidth * 0.02,
-    right: screenWidth * 0.02,
-    zIndex: 10,
+    marginBottom: 0,
+    paddingVertical: 0,
   },
   bookingIdBadge: {
     backgroundColor: '#2196f3',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: 'flex-end',
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
   },
   bookingIdLabel: {
     color: '#ffffff',
@@ -1012,7 +1010,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: 'bold',
-    marginTop: 2,
+    marginTop: 0,
   },
   tripTypeBadgeRow: {
     marginBottom: 6,

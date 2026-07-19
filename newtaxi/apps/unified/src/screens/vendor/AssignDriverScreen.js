@@ -30,12 +30,26 @@ export default function AssignDriverScreen({ route, navigation }) {
   useEffect(() => {
     let filtered = drivers;
 
+    console.log(`📊 Filtering ${drivers.length} drivers, tab: ${filterTab}`);
+
     // Apply filter tab
     if (filterTab === 'approved') {
-      filtered = filtered.filter(d => !d.users?.full_name?.toLowerCase().includes('dummy'));
+      filtered = filtered.filter(d => {
+        const nameForCheck = (d.users?.full_name || '').toLowerCase();
+        const isDummy = nameForCheck === 'dummy' || nameForCheck === 'dummy driver';
+        console.log(`  ✓ APPROVED TAB: "${d.users?.full_name}" => "${nameForCheck}" => isDummy: ${isDummy}, keeping: ${!isDummy}`);
+        return !isDummy;
+      });
     } else if (filterTab === 'dummy') {
-      filtered = filtered.filter(d => d.users?.full_name?.toLowerCase().includes('dummy'));
+      filtered = filtered.filter(d => {
+        const nameForCheck = (d.users?.full_name || '').toLowerCase();
+        const isDummy = nameForCheck === 'dummy' || nameForCheck === 'dummy driver';
+        console.log(`  ✓ DUMMY TAB: "${d.users?.full_name}" => "${nameForCheck}" => isDummy: ${isDummy}, keeping: ${isDummy}`);
+        return isDummy;
+      });
     }
+
+    console.log(`✅ After filter: ${filtered.length} drivers`);
 
     // Apply search query
     if (searchQuery.trim() === '') {
@@ -64,6 +78,8 @@ export default function AssignDriverScreen({ route, navigation }) {
 
       if (usersError) throw usersError;
       
+      console.log('📋 All fetched drivers:', usersData?.map(d => ({ name: d.users?.full_name, id: d.id })));
+      
       // Transform the data to match expected format
       const transformedUsers = (usersData || []).map(driver => ({
         id: driver.id, // Now driver.id is the actual driver ID from drivers table
@@ -79,37 +95,27 @@ export default function AssignDriverScreen({ route, navigation }) {
 
           // Skip if no driver profile
           if (driverProfile) {
-            // Fetch driver SELFIE photo from driver_documents
+            // Fetch driver SELFIE photo from storage ONLY
             let photoUrl = null;
             try {
-              // Query driver documents using user.id (driver_id in driver_documents)
+              // Query driver documents to get storage URL
               const { data: driverDocs, error: docsError } = await supabase
                 .from('driver_documents')
-                .select('document_data, document_mime_type, document_type')
+                .select('document_url, id')
                 .eq('driver_id', user.id)
                 .eq('document_type', 'DRIVER_SELFIE')
                 .maybeSingle();
 
-              if (docsError) {
-                console.warn('❌ Error fetching docs for', user.full_name, ':', docsError.message);
-              }
+              console.log(`🔍 Photo query for ${user.full_name}:`, { driverDocs, docsError });
 
-              if (driverDocs?.document_data) {
-                // Convert base64 or data URL to proper format
-                if (driverDocs.document_data.startsWith('data:')) {
-                  photoUrl = driverDocs.document_data;
-                  console.log('✅ Found data URL photo for:', user.full_name);
-                } else {
-                  // Convert base64 to data URL
-                  const mimeType = driverDocs.document_mime_type || 'image/jpeg';
-                  photoUrl = `data:${mimeType};base64,${driverDocs.document_data}`;
-                  console.log('✅ Found base64 photo for:', user.full_name, 'converted to data URL');
-                }
+              if (driverDocs?.document_url) {
+                console.log('📄 Document found:', driverDocs.document_url);
+                photoUrl = driverDocs.document_url;
               } else {
-                console.log('⚠️ No DRIVER_SELFIE document found for', user.full_name);
+                console.log(`⚠️ No DRIVER_SELFIE document for ${user.full_name}`);
               }
             } catch (err) {
-              console.warn('❌ Exception fetching driver photo for', user.full_name, ':', err.message);
+              console.warn('❌ Exception fetching driver photo:', err.message);
             }
 
             return {
@@ -135,6 +141,15 @@ export default function AssignDriverScreen({ route, navigation }) {
         .sort((a, b) => (a.users?.full_name || '').localeCompare(b.users?.full_name || ''));
 
       console.log(`✅ Loaded ${validDrivers.length} drivers (including dummy drivers)`);
+      
+      // Debug: Show all driver names and check dummy detection
+      validDrivers.forEach((driver, idx) => {
+        const name = driver.users?.full_name || 'Unknown';
+        const nameLower = name.toLowerCase();
+        const isDummy = nameLower === 'dummy' || nameLower === 'dummy driver';
+        console.log(`  [${idx}] "${name}" => lowercase: "${nameLower}" => isDummy: ${isDummy}`);
+      });
+      
       setDrivers(validDrivers);
     } catch (err) {
       console.error('Error fetching drivers:', err);
@@ -218,6 +233,15 @@ export default function AssignDriverScreen({ route, navigation }) {
     const isApproved = item.users?.verification_status === 'approved';
     const hasImageError = imageErrors[item.id];
     
+    // Check dummy driver - name-based only
+    const nameForCheck = (item.users?.full_name || '').toLowerCase();
+    const isDummyDriver = nameForCheck === 'dummy' || nameForCheck === 'dummy driver';
+    
+    // Debug log
+    if (item.users?.full_name) {
+      console.log(`📍 renderDriverItem: "${item.users.full_name}" => "${nameForCheck}" => isDummy: ${isDummyDriver}`);
+    }
+    
     return (
       <TouchableOpacity
         style={[styles.driverCard, isSelected && styles.driverCardSelected]}
@@ -250,7 +274,15 @@ export default function AssignDriverScreen({ route, navigation }) {
           )}
 
           <View style={styles.driverInfo}>
-            <Text style={styles.driverName}>{item.users?.full_name || 'Unknown'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.driverName}>{item.users?.full_name || 'Unknown'}</Text>
+              {isDummyDriver && (
+                <View style={styles.dummyBadge}>
+                  <Ionicons name="flash" size={10} color="#fff" />
+                  <Text style={styles.dummyBadgeText}>DUMMY</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.driverPhone}>{item.users?.phone || 'N/A'}</Text>
             <View style={styles.vehicleInfo}>
               <Ionicons name="car-outline" size={14} color="#888" />
@@ -373,7 +405,14 @@ export default function AssignDriverScreen({ route, navigation }) {
             <View style={styles.emptyContainer}>
               <Ionicons name="car-outline" size={56} color="#ccc" />
               <Text style={styles.emptyText}>
-                {drivers.length === 0 ? 'No drivers available' : 'No drivers match your search'}
+                {drivers.length === 0 
+                  ? 'No drivers available' 
+                  : filterTab === 'dummy'
+                  ? 'No dummy drivers found'
+                  : 'No approved drivers found'}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                Total drivers: {drivers.length}, Filtered: {filteredDrivers.length}
               </Text>
             </View>
           )
@@ -430,6 +469,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginTop: 12,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 12,
+    color: '#bbb',
+    marginTop: 8,
     textAlign: 'center',
   },
   tripHeader: {
@@ -589,6 +634,20 @@ const styles = StyleSheet.create({
   checkmark: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  dummyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ff6b00',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  dummyBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#fff',
   },
   footer: {
     position: 'absolute',

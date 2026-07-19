@@ -1,5 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 console.log('🔧 Environment loaded');
+console.log(`ℹ️  SUPABASE_URL: ${process.env.SUPABASE_URL ? '✓ loaded' : '✗ missing'}`);
+console.log(`ℹ️  SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ loaded' : '✗ missing'}`);
 
 const express = require('express');
 console.log('📦 Express loaded');
@@ -13,8 +16,20 @@ console.log('📦 SMS router loaded');
 const adminRouter = require('./routes/admin');
 console.log('📦 Admin router loaded');
 
+const storageMigrationRouter = require('./routes/storage-migration');
+console.log('📦 Storage migration router loaded');
+
+const documentUploadRouter = require('./routes/document-upload');
+console.log('📦 Document upload router loaded');
+
+const databaseOptimizationRouter = require('./routes/database-optimization');
+console.log('📦 Database optimization router loaded');
+
+const tripsRouter = require('./routes/trips');
+console.log('📦 Trips router loaded');
+
 const app = express();
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 4000;
 console.log(`🔧 Configured port: ${port}`);
 
 // Enable CORS for all origins
@@ -24,8 +39,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Increase payload size limit for large base64 images (default is 100kb)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: false }));
 
 // Health check endpoint - MUST be first
 app.get('/health', (req, res) => {
@@ -49,6 +65,26 @@ app.use('/admin', (req, res, next) => {
   next();
 }, adminRouter);
 
+app.use('/api/storage-migration', (req, res, next) => {
+  console.log(`💾 Storage Migration Request: ${req.method} ${req.path}`);
+  next();
+}, storageMigrationRouter);
+
+app.use('/api/upload', (req, res, next) => {
+  console.log(`📤 Document Upload Request: ${req.method} ${req.path}`);
+  next();
+}, documentUploadRouter);
+
+app.use('/api/db-optimization', (req, res, next) => {
+  console.log(`🔧 Database Optimization Request: ${req.method} ${req.path}`);
+  next();
+}, databaseOptimizationRouter);
+
+app.use('/api/trips', (req, res, next) => {
+  console.log(`📄 Trips Request: ${req.method} ${req.path}`);
+  next();
+}, tripsRouter);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found', path: req.path });
@@ -61,9 +97,9 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`✅ Taxi SMS backend listening on http://127.0.0.1:${port}`);
-  console.log(`✅ Access from phone at: http://192.168.1.110:${port}`);
+const server = app.listen(port, '192.168.1.114', () => {
+  console.log(`✅ Taxi SMS backend listening on http://192.168.1.114:${port}`);
+  console.log(`✅ Access from phone at: http://192.168.1.114:${port}`);
   console.log(`📱 API endpoints:`);
   console.log(`   - POST /sms/otp - Send OTP`);
   console.log(`   - POST /sms/verify - Verify OTP`);
@@ -75,7 +111,18 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`   - POST /admin/delete-user - Delete user`);
   console.log(`   - POST /admin/update-admin-phone - Update admin phone`);
   console.log(`   - GET /admin/user/:userId - Get user info`);
+  console.log(`   - POST /api/storage-migration/migrate-documents - Migrate docs to storage`);
+  console.log(`   - POST /api/storage-migration/migrate-avatars - Migrate avatars to storage`);
+  console.log(`   - GET /api/storage-migration/status - Migration status`);
+  console.log(`   - POST /api/upload/upload-document - Upload document to bucket`);
+  console.log(`   - POST /api/upload/upload-avatar - Upload avatar to bucket`);
   console.log(`   - GET /health - Health check`);
+  console.log(`   - POST /api/db-optimization/apply-trips-indexes - Apply trips table indexes`);
+  console.log(`   - GET /api/db-optimization/verify-trips-indexes - Verify indexes exist`);
+  console.log(`   - GET /api/db-optimization/trips-table-stats - Check trips table row count`);
+  console.log(`   - GET /api/trips/list - Get paginated trips`);
+  console.log(`   - GET /api/trips/count-by-status - Get trip counts by status`);
+  console.log(`   - GET /api/trips/quick-count - Get total trip count`);
   console.log(`🟢 SERVICE READY FOR REQUESTS`);
 });
 

@@ -41,10 +41,12 @@ export function useAvailableTrips() {
       });
 
       // Get admin-assigned trips for this driver (via admin_assigned_drivers array)
+      // AND get admin-published trips (admin_assigned_drivers is empty/null = published to all)
       let adminTrips = [];
       // Get admin-reassigned trips for this driver (trip reassigned specifically to this driver)
       let adminReassignedTrips = [];
       if (user?.id) {
+        // First: Get admin trips where this driver is in the admin_assigned_drivers array
         const { data: adminTripData, error: adminError } = await supabase
           .from('trips')
           .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id, booking_id_seq')
@@ -54,7 +56,7 @@ export function useAvailableTrips() {
           .order('created_at', { ascending: false });
 
         if (adminError && adminError.code !== 'PGRST116') {
-          console.warn('⚠️ Could not fetch admin trips:', adminError.message);
+          console.warn('⚠️ Could not fetch admin-assigned trips:', adminError.message);
         } else {
           // Filter to only show trips where this driver is the LAST (current) assignment
           adminTrips = (adminTripData || []).filter(trip => {
@@ -64,6 +66,22 @@ export function useAvailableTrips() {
             // Only include if user.id is the LAST element (most recent assignment)
             return trip.admin_assigned_drivers[trip.admin_assigned_drivers.length - 1] === user.id;
           });
+        }
+
+        // Second: Get admin-published trips (where admin_assigned_drivers is empty/null = published to ALL drivers)
+        const { data: adminPublishedTripData, error: adminPublishedError } = await supabase
+          .from('trips')
+          .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, notes, is_admin_trip, admin_assigned_drivers, driver_id, booking_id_seq')
+          .eq('status', TRIP_STATUS.PENDING)
+          .eq('is_admin_trip', true)
+          .or('admin_assigned_drivers.is.null,admin_assigned_drivers.eq.{}')
+          .order('created_at', { ascending: false });
+
+        if (adminPublishedError && adminPublishedError.code !== 'PGRST116') {
+          console.warn('⚠️ Could not fetch admin-published trips:', adminPublishedError.message);
+        } else {
+          // These are already published to all, so include them all
+          adminTrips = [...adminTrips, ...(adminPublishedTripData || [])];
         }
 
         // Also fetch admin-reassigned trips (where admin reassigned to this driver specifically)

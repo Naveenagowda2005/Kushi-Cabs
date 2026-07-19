@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS } from '../../constants';
 import DocumentViewer from '../../components/DocumentViewer';
+import { getPendingVerifications, getDriverAllDocuments, getVendorAllDocuments } from '../../services/documentService';
 
 const AdminVendorVerificationDashboard = () => {
   const { forceUpdate } = useTheme();
@@ -29,14 +30,17 @@ const AdminVendorVerificationDashboard = () => {
   }, [forceUpdate]);
   
   const [pendingVendors, setPendingVendors] = useState([]);
+  const [pendingDrivers, setPendingDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
+  const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [mainTabIndex, setMainTabIndex] = useState(0); // 0: Vendors, 1: Drivers
   const [tabIndex, setTabIndex] = useState(0); // 0: Pending, 1: Approved, 2: Rejected
   const [forceSyncLoading, setForceSyncLoading] = useState(false);
 
@@ -61,26 +65,53 @@ const AdminVendorVerificationDashboard = () => {
       // Fetch user info, vendor info, and documents for each record
       const verificationsWithDocs = await Promise.all(
         verifications.map(async (verification) => {
-          const [userResult, vendorResult, docsResult] = await Promise.all([
-            supabase.rpc('get_user_by_id', { p_user_id: verification.user_id }),
-            supabase.rpc('get_vendor_by_id', { p_vendor_id: verification.vendor_id }),
-            supabase.rpc('get_vendor_documents_by_user', { p_user_id: verification.user_id }),
-          ]);
+          try {
+            const [userResult, vendorResult] = await Promise.all([
+              supabase.rpc('get_user_by_id', { p_user_id: verification.user_id }),
+              supabase.rpc('get_vendor_by_id', { p_vendor_id: verification.vendor_id }),
+            ]);
 
-          const userData = userResult.data?.[0] || null;
-          const vendorData = vendorResult.data?.[0] || null;
-          const documents = docsResult.data?.[0]?.documents || {};
+            const userData = userResult.data?.[0] || null;
+            const vendorData = vendorResult.data?.[0] || null;
+            
+            // Fetch vendor documents from backend (reads from vendor_documents table)
+            const documentArray = await getVendorAllDocuments(verification.user_id);
+            
+            // Transform array to object keyed by document_type
+            const documents = {};
+            if (Array.isArray(documentArray)) {
+              documentArray.forEach(doc => {
+                documents[doc.document_type] = {
+                  status: doc.status,
+                  document_type: doc.document_type,
+                  uploaded_at: doc.uploaded_at,
+                  url: doc.document_url || null,
+                  document_url: doc.document_url || null,
+                  document_data: doc.document_data || null,  // May have base64 data
+                  rejection_reason: doc.rejection_reason,
+                };
+              });
+            }
 
-          return {
-            ...verification,
-            users: userData,
-            vendors: vendorData,
-            documents,
-          };
+            return {
+              ...verification,
+              users: userData,
+              vendors: vendorData,
+              documents,
+            };
+          } catch (error) {
+            console.error('Error enriching vendor verification:', error);
+            return {
+              ...verification,
+              users: null,
+              vendors: null,
+              documents: {},
+            };
+          }
         })
       );
 
-      console.log('All verifications loaded:', verificationsWithDocs.length);
+      console.log('✅ All vendor verifications loaded:', verificationsWithDocs.length);
       setPendingVendors(verificationsWithDocs);
     } catch (error) {
       console.error('Error loading vendor verifications:', error);
@@ -90,17 +121,110 @@ const AdminVendorVerificationDashboard = () => {
     }
   }, [tabIndex]);
 
+  // Load pending driver verifications
+  const loadDriverVerifications = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      console.log('Loading driver verifications...');
+
+      // Get pending driver verifications using the service function
+      const driverVerifications = await getPendingVerifications();
+
+      if (!driverVerifications || driverVerifications.length === 0) {
+        setPendingDrivers([]);
+        return;
+      }
+
+      // Fetch driver info and documents for each record
+      const verificationsWithDocs = await Promise.all(
+        driverVerifications.map(async (verification) => {
+          try {
+            // Get driver user info
+            const { data: userData, error: userError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', verification.driver_id)
+              .single();
+
+            if (userError && userError.code !== 'PGRST116') {
+              console.error('Error fetching user:', userError);
+            }
+
+            // Get driver documents as array from backend
+            const documentArray = await getDriverAllDocuments(verification.driver_id);
+
+            // Transform array to object keyed by document_type
+            const documents = {};
+            if (Array.isArray(documentArray)) {
+              documentArray.forEach(doc => {
+                // Map status: backend returns 'pending', 'approved', 'rejected'
+                let displayStatus = doc.status;
+                if (doc.status === 'pending') {
+                  displayStatus = 'Uploaded - Pending Review';
+                } else if (doc.status === 'approved') {
+                  displayStatus = 'Approved';
+                } else if (doc.status === 'rejected') {
+                  displayStatus = 'Rejected';
+                }
+                
+                documents[doc.document_type] = {
+                  status: displayStatus,
+                  document_type: doc.document_type,
+                  uploaded_at: doc.uploaded_at,
+                  url: doc.document_url,
+                  document_url: doc.document_url,
+                };
+              });
+            }
+
+            return {
+              ...verification,
+              user_id: verification.driver_id,
+              users: userData || { full_name: 'Unknown', phone: 'N/A' },
+              documents: documents,
+            };
+          } catch (error) {
+            console.error('Error enriching driver verification:', error);
+            return {
+              ...verification,
+              user_id: verification.driver_id,
+              users: { full_name: 'Unknown', phone: 'N/A' },
+              documents: {},
+            };
+          }
+        })
+      );
+
+      console.log('✅ Driver verifications loaded:', verificationsWithDocs.length);
+      setPendingDrivers(verificationsWithDocs);
+    } catch (error) {
+      console.error('Error loading driver verifications:', error);
+      Alert.alert('Error', 'Failed to load driver verifications: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      loadVendorVerifications();
-    }, [loadVendorVerifications])
+      if (mainTabIndex === 0) {
+        loadVendorVerifications();
+      } else {
+        loadDriverVerifications();
+      }
+    }, [mainTabIndex, loadVendorVerifications, loadDriverVerifications])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadVendorVerifications();
+    if (mainTabIndex === 0) {
+      await loadVendorVerifications();
+    } else {
+      await loadDriverVerifications();
+    }
     setRefreshing(false);
-  }, [loadVendorVerifications]);
+  }, [mainTabIndex, loadVendorVerifications, loadDriverVerifications]);
 
   const handleApproveVendor = async (vendorId, userId) => {
     Alert.alert(
@@ -334,31 +458,35 @@ const AdminVendorVerificationDashboard = () => {
                       style={styles.documentInfo}
                       onPress={() => {
                         if (doc?.document_url || doc?.document_data) {
+                          console.log('📸 Opening vendor document:', docType, 'has_url:', !!doc.document_url, 'has_data:', !!doc.document_data);
                           setSelectedDocument({
-                            data: doc.document_data,
+                            url: doc.document_url || null,
+                            data: doc.document_data || null,
                             type: docType,
                           });
                           setViewerVisible(true);
+                        } else {
+                          console.warn('⚠️ No URL or data for document:', docType);
                         }
                       }}
                     >
                       <Ionicons
                         name="image-outline"
                         size={20}
-                        color={doc?.document_data ? COLORS.vendor.primary : '#ccc'}
+                        color={doc?.document_url || doc?.document_data ? COLORS.vendor.primary : '#ccc'}
                       />
                       <View style={styles.documentDetails}>
                         <Text style={styles.documentName}>
                           {getDocumentLabel(docType)}
                         </Text>
                         <Text style={styles.documentStatus}>
-                          Status: {doc?.status === 'approved' ? 'Approved' : doc?.status === 'rejected' ? 'Rejected' : 'Pending'}
+                          Status: {doc?.status === 'approved' ? 'Approved' : doc?.status === 'rejected' ? 'Rejected' : doc?.status === 'pending' ? 'Pending' : 'Pending Review'}
                         </Text>
                       </View>
                     </TouchableOpacity>
 
-                    {/* Approve/Reject buttons — show ONLY on Pending tab for pending docs */}
-                    {tabIndex === 0 && doc?.document_data && doc?.status === 'pending' && (
+                    {/* Approve/Reject buttons — show ONLY on Pending tab for pending docs that have data */}
+                    {tabIndex === 0 && (doc?.document_url || doc?.document_data) && (doc?.status === 'pending' || doc?.status === 'Uploaded - Pending Review') && (
                       <View style={styles.documentActions}>
                           <TouchableOpacity
                             style={[styles.actionButton, styles.approveButton]}
@@ -548,6 +676,264 @@ const AdminVendorVerificationDashboard = () => {
     );
   };
 
+  // Render driver card similar to vendor but for drivers
+  const renderDriverCard = ({ item: driver }) => {
+    if (!driver.users) return null;
+
+    return (
+      <TouchableOpacity
+        style={styles.vendorCard}
+        onPress={() => setSelectedDriver(selectedDriver?.user_id === driver.user_id ? null : driver)}
+        activeOpacity={0.7}
+      >
+        {/* Driver Header */}
+        <View style={styles.vendorHeader}>
+          <View style={styles.vendorInfo}>
+            <View style={styles.vendorAvatar}>
+              <Ionicons name="person-circle-outline" size={32} color={COLORS.driver?.primary || '#4CAF50'} />
+            </View>
+            <View style={styles.vendorDetailInfo}>
+              {/* PENDING badge */}
+              <View style={styles.newBadge}>
+                <Ionicons
+                  name="clock-outline"
+                  size={11}
+                  color="#2196F3"
+                />
+                <Text style={[
+                  styles.badgeText,
+                  { color: '#2196F3' }
+                ]}>
+                  PENDING
+                </Text>
+              </View>
+              <Text style={styles.vendorName}>{driver.users?.full_name || 'Unknown Driver'}</Text>
+              <Text style={styles.vendorPhone}>{driver.users?.phone || 'N/A'}</Text>
+            </View>
+          </View>
+          <Ionicons
+            name={selectedDriver?.user_id === driver.user_id ? 'chevron-up' : 'chevron-down'}
+            size={24}
+            color={COLORS.textSecondary}
+          />
+        </View>
+
+        {/* Expanded Documents Section */}
+        {selectedDriver?.user_id === driver.user_id && (
+          <View style={styles.documentsSection}>
+            <Text style={styles.sectionTitle}>Documents</Text>
+            {Object.keys(driver.documents).length > 0 ? (
+              Object.entries(driver.documents).map(([docType, doc]) => {
+                return (
+                  <View key={`${driver.user_id}-${docType}`} style={styles.documentRow}>
+                    <TouchableOpacity
+                      style={styles.documentInfo}
+                      onPress={() => {
+                        if (doc?.url || doc?.document_url) {
+                          const documentUrl = doc.url || doc.document_url;
+                          console.log('📸 Opening document viewer for:', docType, 'URL:', documentUrl);
+                          setSelectedDocument({
+                            url: documentUrl,
+                            type: docType,
+                          });
+                          setViewerVisible(true);
+                        } else {
+                          console.warn('⚠️ No URL available for document:', docType, 'Status:', doc?.status);
+                        }
+                      }}
+                    >
+                      <Ionicons
+                        name="image-outline"
+                        size={20}
+                        color={doc?.status ? COLORS.driver?.primary || '#4CAF50' : '#ccc'}
+                      />
+                      <View style={styles.documentDetails}>
+                        <Text style={styles.documentName}>
+                          {docType.replace(/_/g, ' ')}
+                        </Text>
+                        <Text style={styles.documentStatus}>
+                          Status: {doc?.status || 'Pending'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {doc?.status === 'Uploaded - Pending Review' && (
+                      <View style={styles.documentActions}>
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.approveButton]}
+                          onPress={async () => {
+                            try {
+                              setActionLoading(true);
+
+                              // Update driver document status to approved
+                              const { error: updateError } = await supabase
+                                .from('driver_documents')
+                                .update({
+                                  status: 'approved',
+                                  approved_at: new Date().toISOString(),
+                                })
+                                .eq('driver_id', driver.user_id)
+                                .eq('document_type', docType);
+
+                              if (updateError) throw updateError;
+
+                              // Update local state
+                              const updatedDocs = { ...driver.documents };
+                              updatedDocs[docType] = { ...updatedDocs[docType], status: 'Approved' };
+                              
+                              setPendingDrivers((prevDrivers) =>
+                                prevDrivers.map((d) =>
+                                  d.user_id === driver.user_id
+                                    ? { ...d, documents: updatedDocs }
+                                    : d
+                                )
+                              );
+
+                              Alert.alert('Success', `${docType} approved`);
+                            } catch (error) {
+                              Alert.alert('Error', error.message);
+                            } finally {
+                              setActionLoading(false);
+                            }
+                          }}
+                          disabled={actionLoading || doc?.status !== 'Uploaded - Pending Review'}
+                        >
+                          {actionLoading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Ionicons name="checkmark" size={16} color="#fff" />
+                          )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.rejectButton]}
+                          onPress={() => {
+                            setSelectedDriver({ ...driver, rejectingDocType: docType });
+                            setRejectModalVisible(true);
+                          }}
+                          disabled={actionLoading}
+                        >
+                          {actionLoading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Ionicons name="close" size={16} color="#fff" />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {doc?.status === 'Approved' && (
+                      <View style={styles.statusBadge}>
+                        <Ionicons name="checkmark-circle" size={16} color="#4caf50" />
+                        <Text style={[styles.statusText, { color: '#4caf50' }]}>
+                          Approved
+                        </Text>
+                      </View>
+                    )}
+
+                    {doc?.status === 'Rejected' && (
+                      <View style={styles.statusBadge}>
+                        <Ionicons name="close-circle" size={16} color="#f44336" />
+                        <Text style={[styles.statusText, { color: '#f44336' }]}>
+                          Rejected
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={styles.noDocumentsText}>No documents yet</Text>
+            )}
+
+            {/* Overall Approve Button */}
+            {(() => {
+              const allDocsApproved = Object.values(driver.documents || {}).every(
+                (doc) => doc?.status === 'Approved'
+              );
+
+              return (
+                <View style={styles.overallApproveSection}>
+                  <Text style={styles.overallApproveHint}>
+                    {allDocsApproved
+                      ? 'All documents approved — ready to activate driver'
+                      : `${Object.values(driver.documents || {}).filter(d => d?.status === 'Approved').length} / ${Object.keys(driver.documents || {}).length} documents approved`}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.overallApproveButton,
+                      !allDocsApproved && styles.overallApproveButtonDisabled,
+                    ]}
+                    disabled={!allDocsApproved || actionLoading}
+                    onPress={async () => {
+                      try {
+                        setActionLoading(true);
+
+                        // Update driver verification status via backend API
+                        const approveResponse = await fetch('http://192.168.1.114:4000/admin/approve-driver/' + driver.user_id, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                        });
+
+                        if (!approveResponse.ok) {
+                          const errorData = await approveResponse.json();
+                          throw new Error(errorData.error || 'Failed to approve driver');
+                        }
+
+                        Alert.alert('Success', 'Driver approved successfully', [
+                          {
+                            text: 'OK',
+                            onPress: async () => {
+                              await loadDriverVerifications();
+                            },
+                          },
+                        ]);
+                      } catch (error) {
+                        Alert.alert('Error', error.message);
+                      } finally {
+                        setActionLoading(false);
+                      }
+                    }}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={18}
+                          color={allDocsApproved ? '#fff' : '#666'}
+                        />
+                        <Text style={[
+                          styles.overallApproveButtonText,
+                          !allDocsApproved && styles.overallApproveButtonTextDisabled,
+                        ]}>
+                          Approve Driver
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.overallRejectButton}
+                    disabled={actionLoading}
+                    onPress={() => {
+                      setSelectedDriver(driver);
+                      setRejectModalVisible(true);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#fff" />
+                    <Text style={styles.overallRejectButtonText}>Reject Application</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -558,117 +944,148 @@ const AdminVendorVerificationDashboard = () => {
 
   return (
     <View style={styles.container}>
-      {/* Tab Bar */}
-      <View style={styles.tabBar}>
-        {['Pending', 'Approved', 'Rejected'].map((label, index) => (
-          <TouchableOpacity
-            key={label}
-            style={[styles.tabButton, tabIndex === index && styles.tabButtonActive]}
-            onPress={() => setTabIndex(index)}
-          >
-            <Text style={[styles.tabButtonText, tabIndex === index && styles.tabButtonTextActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Force Sync Button */}
-      {tabIndex === 0 && (
-        <TouchableOpacity
-          style={styles.forceSyncButton}
-          onPress={handleForceSyncVendorStatuses}
-          disabled={forceSyncLoading}
-        >
-          {forceSyncLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="refresh" size={16} color="#fff" />
-              <Text style={styles.forceSyncButtonText}>Force Sync All Approved Vendors</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      )}
-
-      <FlatList
-        data={pendingVendors}
-        renderItem={renderVendorCard}
-        keyExtractor={(item) => item.user_id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="checkmark-circle-outline" size={64} color={COLORS.textSecondary} />
-            <Text style={styles.emptyText} numberOfLines={2}>No vendors to review</Text>
+      {/* Tab Bar - Pending, Approved, Rejected */}
+        <View style={styles.tabBar}>
+            {['Pending', 'Approved', 'Rejected'].map((label, index) => (
+              <TouchableOpacity
+                key={label}
+                style={[styles.tabButton, tabIndex === index && styles.tabButtonActive]}
+                onPress={() => setTabIndex(index)}
+              >
+                <Text style={[styles.tabButtonText, tabIndex === index && styles.tabButtonTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        }
-        contentContainerStyle={styles.listContent}
-      />
 
-      {/* Document Viewer Modal */}
-      <DocumentViewer
-        visible={viewerVisible}
-        documentData={selectedDocument?.data}
-        documentType={selectedDocument?.type}
-        onClose={() => setViewerVisible(false)}
-      />
+          {/* Force Sync Button */}
+          {tabIndex === 0 && (
+            <TouchableOpacity
+              style={styles.forceSyncButton}
+              onPress={handleForceSyncVendorStatuses}
+              disabled={forceSyncLoading}
+            >
+              {forceSyncLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="refresh" size={16} color="#fff" />
+                  <Text style={styles.forceSyncButtonText}>Force Sync All Approved Vendors</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
-      {/* Rejection Reason Modal */}
-      <Modal visible={rejectModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Reject Vendor Application</Text>
-            <Text style={styles.modalSubtitle}>
-              {selectedVendor?.users?.full_name} - {selectedVendor?.vendors?.company_name}
-            </Text>
+          <FlatList
+            data={pendingVendors}
+            renderItem={renderVendorCard}
+            keyExtractor={(item) => item.user_id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="checkmark-circle-outline" size={64} color={COLORS.textSecondary} />
+                <Text style={styles.emptyText} numberOfLines={2}>No vendors to review</Text>
+              </View>
+            }
+            contentContainerStyle={styles.listContent}
+          />
+        
+        {/* Document Viewer Modal */}
+        <DocumentViewer
+          visible={viewerVisible}
+          documentUrl={selectedDocument?.url}
+          documentData={selectedDocument?.data}
+          documentType={selectedDocument?.type}
+          onClose={() => setViewerVisible(false)}
+        />
 
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Enter rejection reason..."
-              placeholderTextColor="#888"
-              value={rejectionReason}
-              onChangeText={setRejectionReason}
-              multiline
-              numberOfLines={4}
-            />
+        {/* Rejection Reason Modal */}
+        <Modal visible={rejectModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                Reject Vendor Application
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                {selectedVendor?.users?.full_name} - {selectedVendor?.vendors?.company_name}
+              </Text>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => {
-                  setRejectModalVisible(false);
-                  setRejectionReason('');
-                }}
-                disabled={actionLoading}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              <TextInput
+                style={styles.reasonInput}
+                placeholder="Enter rejection reason..."
+                placeholderTextColor="#888"
+                value={rejectionReason}
+                onChangeText={setRejectionReason}
+                multiline
+                numberOfLines={4}
+              />
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonReject, actionLoading && styles.buttonDisabled]}
-                onPress={handleRejectVendor}
-                disabled={actionLoading}
-              >
-                {actionLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalButtonText}>Reject</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={() => {
+                    setRejectModalVisible(false);
+                    setRejectionReason('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  <Text style={styles.modalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonReject, actionLoading && styles.buttonDisabled]}
+                  onPress={handleRejectVendor}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.modalButtonText}>Reject</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </View>
-  );
+        </Modal>
+      </View>
+    );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  mainTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  mainTabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+    gap: 8,
+  },
+  mainTabButtonActive: {
+    borderBottomColor: '#2196F3',
+  },
+  mainTabButtonText: {
+    fontSize: 14,
+    color: '#999999',
+    fontWeight: '600',
+  },
+  mainTabButtonTextActive: {
+    color: '#2196F3',
   },
   tabBar: {
     flexDirection: 'row',

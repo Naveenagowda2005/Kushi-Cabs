@@ -72,11 +72,11 @@ export const pickDocumentImage = async (useCamera = false) => {
 };
 
 /**
- * Upload document image to database as base64
+ * Upload document image to storage bucket AND create database record
  * @param {string} driverId - Driver ID
  * @param {string} documentType - Document type (DL, VEHICLE_FRONT, etc.)
  * @param {object} imageData - Image data from pickDocumentImage
- * @returns {Promise<string>} - Base64 string of uploaded document
+ * @returns {Promise<string>} - Storage URL of uploaded document
  */
 export const uploadDocumentImage = async (driverId, documentType, imageData) => {
   try {
@@ -84,8 +84,7 @@ export const uploadDocumentImage = async (driverId, documentType, imageData) => 
       throw new Error('Invalid image data - no base64 content');
     }
 
-    console.log('uploadDocumentImage: Starting upload for', documentType, 'driver:', driverId);
-    console.log('uploadDocumentImage: Image size:', imageData.base64.length, 'bytes');
+    console.log('📤 Uploading document:', documentType, 'for driver:', driverId);
 
     // Check if base64 is valid and not too large
     if (imageData.base64.length === 0) {
@@ -96,44 +95,88 @@ export const uploadDocumentImage = async (driverId, documentType, imageData) => 
       throw new Error('Image too large (max 10MB)');
     }
 
-    const base64Data = imageData.base64;
+    console.log('📤 Using backend API for upload (service role key supports upsert)');
 
-    console.log('uploadDocumentImage: Preparing upsert');
+    // Always use backend API with service role key for reliable upsert behavior
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://192.168.1.114:8080';
+    
+    const response = await fetch(`${backendUrl}/api/upload/upload-document`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        driverId,
+        documentType,
+        base64Data: imageData.base64,
+        fileName: imageData.fileName,
+        mimeType: 'image/jpeg',
+      }),
+    });
 
-    // Use upsert to handle both insert and update cases
-    const { data, error } = await supabase
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Upload failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Uploaded via Backend API:', result.url);
+
+    // NOW create database record for tracking
+    console.log('📝 Creating database record for document tracking');
+    const { data: existingDoc, error: checkError } = await supabase
       .from('driver_documents')
-      .upsert(
-        {
+      .select('id')
+      .eq('driver_id', driverId)
+      .eq('document_type', documentType)
+      .maybeSingle();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking existing document:', checkError);
+      // Continue anyway - the file is uploaded
+    }
+
+    if (existingDoc) {
+      // Update existing record
+      console.log('📝 Updating existing document record');
+      const { error: updateError } = await supabase
+        .from('driver_documents')
+        .update({
+          status: 'pending',
+          uploaded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('driver_id', driverId)
+        .eq('document_type', documentType);
+
+      if (updateError) {
+        console.error('Error updating document record:', updateError);
+        // Don't throw - file is already uploaded
+      }
+    } else {
+      // Create new record
+      console.log('📝 Creating new document record');
+      const { error: insertError } = await supabase
+        .from('driver_documents')
+        .insert([{
           driver_id: driverId,
           document_type: documentType,
-          document_data: base64Data,
-          document_name: imageData.fileName,
-          document_mime_type: imageData.type || 'image/jpeg',
           status: 'pending',
-          updated_at: new Date().toISOString(),
-        },
-        { 
-          onConflict: 'driver_id,document_type'
-        }
-      )
-      .select()
-      .single();
+          uploaded_at: new Date().toISOString(),
+        }]);
 
-    if (error) {
-      console.error('uploadDocumentImage: Upsert error:', error.message, error.code, error.details);
-      throw error;
+      if (insertError) {
+        console.error('Error creating document record:', insertError);
+        // Don't throw - file is already uploaded, just couldn't track it
+      }
     }
 
-    if (!data) {
-      throw new Error('Upload returned no data');
-    }
+    console.log('✅ Successfully uploaded', documentType, 'to storage bucket and created database record');
 
-    console.log('uploadDocumentImage: Successfully uploaded', documentType, 'with id:', data.id);
-
-    return base64Data;
+    // Return storage URL
+    return result.url;
   } catch (error) {
-    console.error('Error uploading document:', error.message);
+    console.error('❌ Error uploading document:', error.message);
     throw new Error(`Failed to upload ${documentType}: ${error.message}`);
   }
 };
@@ -355,25 +398,82 @@ export const getDriverVerificationStatus = async (driverId) => {
 };
 
 /**
- * Get all documents for a driver with their statuses
+ * Get all documents for a driver from storage bucket via backend API
  * @param {string} driverId - Driver ID
- * @returns {Promise<array>} - Array of driver documents
+ * @returns {Promise<array>} - Array of driver documents with storage URLs
  */
-export const getDriverAllDocuments = async (driverId) => {
+// Helper function to fetch documents from Supabase
+const getDriverAllDocumentsFromSupabase = async (driverId) => {
   try {
+    console.log('getDriverAllDocumentsFromSupabase: Fetching for driver:', driverId);
     const { data, error } = await supabase
       .from('driver_documents')
       .select('*')
       .eq('driver_id', driverId)
-      .order('document_type', { ascending: true });
-
+      .order('uploaded_at', { ascending: false });
+    
     if (error) throw error;
+    console.log('getDriverAllDocumentsFromSupabase: Found', data?.length || 0, 'documents');
     return data || [];
   } catch (error) {
-    console.error('Error getting all driver documents:', error);
-    throw error;
+    console.error('getDriverAllDocumentsFromSupabase: Error:', error);
+    return [];
   }
 };
+
+export const getDriverAllDocuments = async (driverId) => {
+  try {
+    console.log('getDriverAllDocuments: Fetching documents for driver:', driverId);
+    
+    // Call backend API to list documents (uses service role key, no RLS restrictions)
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://192.168.1.114:4000';
+    const url = `${backendUrl}/api/upload/list-documents/${driverId}`;
+    
+    console.log('getDriverAllDocuments: Calling backend API:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('getDriverAllDocuments: Backend returned error:', response.status, errorData);
+      console.error('getDriverAllDocuments: Please ensure backend is running on', backendUrl);
+      
+      // Try to fetch directly from Supabase as fallback for old drivers
+      console.log('getDriverAllDocuments: Falling back to Supabase direct query');
+      return await getDriverAllDocumentsFromSupabase(driverId);
+    }
+
+    const result = await response.json();
+    console.log('getDriverAllDocuments: Backend response:', result);
+    console.log('getDriverAllDocuments: Found', result.documents?.length || 0, 'documents');
+    
+    if (result.documents && Array.isArray(result.documents)) {
+      console.log('getDriverAllDocuments: Documents:', JSON.stringify(result.documents, null, 2));
+      return result.documents;
+    }
+
+    console.log('getDriverAllDocuments: No documents in response');
+    return [];
+  } catch (error) {
+    console.error('Error getting all driver documents:', error);
+    console.error('Error details:', error.message);
+    console.error('Please verify backend is running and accessible');
+    
+    // Try Supabase fallback
+    try {
+      console.log('getDriverAllDocuments: Attempting Supabase fallback');
+      return await getDriverAllDocumentsFromSupabase(driverId);
+    } catch (fallbackError) {
+      console.error('getDriverAllDocuments: Fallback also failed:', fallbackError);
+      return [];
+    }
+  }
+};;
 
 /**
  * Approve a document (admin only)
@@ -523,4 +623,50 @@ export const getDocumentIcon = (documentType) => {
 export const base64ToDataUri = (base64Data, mimeType = 'image/jpeg') => {
   if (!base64Data) return null;
   return `data:${mimeType};base64,${base64Data}`;
+};
+
+/**
+ * Fetch all vendor documents from backend (reads from vendor_documents table only)
+ * @param {string} userId - Vendor user ID
+ * @returns {Promise<Array>} - Array of vendor documents with data from database
+ */
+export const getVendorAllDocuments = async (userId) => {
+  try {
+    console.log('getVendorAllDocuments: Fetching documents for vendor user:', userId);
+    
+    // Call backend API to fetch vendor documents from database table
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://192.168.1.114:4000';
+    const url = `${backendUrl}/api/upload/list-vendor-documents/${userId}`;
+    
+    console.log('getVendorAllDocuments: Calling backend API:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('getVendorAllDocuments: Backend returned error:', response.status, errorData);
+      return [];
+    }
+
+    const result = await response.json();
+    console.log('getVendorAllDocuments: Backend response:', result);
+    console.log('getVendorAllDocuments: Found', result.documents?.length || 0, 'documents');
+    
+    if (result.documents && Array.isArray(result.documents)) {
+      console.log('getVendorAllDocuments: Documents from database:', JSON.stringify(result.documents, null, 2));
+      return result.documents;
+    }
+
+    console.log('getVendorAllDocuments: No documents in response');
+    return [];
+  } catch (error) {
+    console.error('Error getting vendor documents:', error);
+    console.error('Error details:', error.message);
+    return [];
+  }
 };

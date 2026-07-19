@@ -123,33 +123,66 @@ export default function SuperAdminDashboardScreen({ navigation }) {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      console.log('📊 Fetching dashboard statistics...');
 
-      const [tripsResult, driversResult, vendorsResult] = await Promise.all([
-        supabase.from('trips').select('*'),
-        supabase.from('users').select('*').eq('role_id', 3).eq('is_active', true),
-        supabase.from('users').select('*').eq('role_id', 2).eq('is_active', true),
+      // Use optimized queries with aggregation to avoid fetching all records
+      const [tripsCountResult, tripsStatsResult, driversCountResult, vendorsCountResult] = await Promise.all([
+        // Get total trips count
+        supabase
+          .from('trips')
+          .select('id', { count: 'exact', head: true }),
+        
+        // Get trip statistics (completed, pending, revenue)
+        supabase
+          .from('trips')
+          .select('status, fare_amount')
+          .in('status', [TRIP_STATUS.COMPLETED, TRIP_STATUS.PENDING]),
+        
+        // Count active drivers (role_id = 3)
+        supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('role_id', 3)
+          .eq('is_active', true),
+        
+        // Count active vendors (role_id = 2)
+        supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('role_id', 2)
+          .eq('is_active', true),
       ]);
 
-      const trips = tripsResult.data || [];
-      const drivers = driversResult.data || [];
-      const vendors = vendorsResult.data || [];
+      const totalTrips = tripsCountResult.count || 0;
+      const tripsData = tripsStatsResult.data || [];
+      const activeDrivers = driversCountResult.count || 0;
+      const activeVendors = vendorsCountResult.count || 0;
 
-      const completedTrips = trips.filter(t => t.status === TRIP_STATUS.COMPLETED);
-      const pendingTrips = trips.filter(t => t.status === TRIP_STATUS.PENDING);
+      // Calculate stats from limited data
+      const completedTrips = tripsData.filter(t => t.status === TRIP_STATUS.COMPLETED);
+      const pendingTrips = tripsData.filter(t => t.status === TRIP_STATUS.PENDING);
       const totalRevenue = completedTrips.reduce((s, t) => s + (t.fare_amount || 0), 0);
       const totalCommission = completedTrips.reduce((s, t) => s + (t.fare_amount * 0.1 || 0), 0);
 
+      console.log('✅ Dashboard stats fetched:', {
+        totalTrips,
+        completedTrips: completedTrips.length,
+        pendingTrips: pendingTrips.length,
+        activeDrivers,
+        activeVendors,
+      });
+
       setStats({
-        totalTrips: trips.length,
+        totalTrips,
         totalRevenue,
-        activeDrivers: drivers.length,
-        activeVendors: vendors.length,
+        activeDrivers,
+        activeVendors,
         pendingTrips: pendingTrips.length,
         completedTrips: completedTrips.length,
         totalCommission,
       });
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error.message);
       Alert.alert('Error', 'Failed to load dashboard data');
     } finally {
       setLoading(false);

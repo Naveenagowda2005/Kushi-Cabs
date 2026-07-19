@@ -20,26 +20,29 @@ import { getDocumentLabel, base64ToDataUri } from '../services/documentService';
 const DocumentViewer = ({
   visible,
   documentData,
+  documentUrl,
   documentType,
   onClose,
 }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!documentData);
+  const [isLoading, setIsLoading] = useState(!!documentData || !!documentUrl);
   const [imageError, setImageError] = useState(false);
   const [scale] = useState(new Animated.Value(1));
   const [imageWidth, setImageWidth] = useState(0);
   const [imageHeight, setImageHeight] = useState(0);
 
-  // Convert base64 to data URI for display
-  const imageUri = documentData ? base64ToDataUri(documentData) : null;
+  // Use storage URL if available, otherwise convert base64 to data URI
+  const imageUri = documentUrl 
+    ? documentUrl 
+    : (documentData ? base64ToDataUri(documentData) : null);
 
   // Reset loading state when documentData changes
   React.useEffect(() => {
-    if (documentData) {
+    if (documentData || documentUrl) {
       setIsLoading(true);
       setImageError(false);
     }
-  }, [documentData]);
+  }, [documentData, documentUrl]);
 
   const handleShare = async () => {
     try {

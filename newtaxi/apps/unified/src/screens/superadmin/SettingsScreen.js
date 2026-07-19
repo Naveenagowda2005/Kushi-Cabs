@@ -31,7 +31,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
   // Dummy Drivers
   const [showDummyForm, setShowDummyForm] = useState(false);
   const [dummyPhone, setDummyPhone] = useState('');
-  const [dummyName, setDummyName] = useState('');
+  const [dummyName, setDummyName] = useState('Dummy'); // Pre-filled with "Dummy"
   const [dummyDrivers, setDummyDrivers] = useState([]);
   const [loadingDummy, setLoadingDummy] = useState(false);
   const [creatingDummy, setCreatingDummy] = useState(false);
@@ -424,7 +424,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
         `Name: ${result.driver.name}\nPhone: ${result.driver.phone}\n\nThis driver can log in immediately with OTP and take trips without document verification.`
       );
       setDummyPhone('');
-      setDummyName('');
+      setDummyName('Dummy'); // Reset to "Dummy"
       setShowDummyForm(false);
       await fetchDummyDrivers();
     } catch (err) {
@@ -643,7 +643,7 @@ export default function SuperAdminSettingsScreen({ navigation }) {
     if (!adminTripForm.carType) return 'Please select a car type.';
     if (!adminTripForm.seaterType) return 'Please select seater type.';
     if (!adminTripForm.fuelType) return 'Please select fuel type.';
-    if (selectedDrivers.length === 0) return 'Please select at least one driver to assign this trip.';
+    // Note: selectedDrivers can be empty (publish to all drivers)
     return null;
   };
 
@@ -716,7 +716,9 @@ export default function SuperAdminSettingsScreen({ navigation }) {
 
       Alert.alert(
         '✅ Admin Trip Created',
-        `Trip has been created and assigned to ${selectedDrivers.length} driver(s).\n\nThey will see this trip in their available trips list.\n\n${commissionToPay > 0 ? `Commission to pay: ₹${commissionToPay.toFixed(2)}` : 'No commission required.'}`,
+        selectedDrivers.length === 0
+          ? `Trip has been PUBLISHED TO ALL DRIVERS.\n\nAll approved drivers will see this trip in their available trips list.\n\n${commissionToPay > 0 ? `Commission to pay: ₹${commissionToPay.toFixed(2)}` : 'No commission required.'}`
+          : `Trip has been created and assigned to ${selectedDrivers.length} driver(s).\n\nThey will see this trip in their available trips list.\n\n${commissionToPay > 0 ? `Commission to pay: ₹${commissionToPay.toFixed(2)}` : 'No commission required.'}`,
         [{
           text: 'OK',
           onPress: () => {
@@ -1008,15 +1010,11 @@ export default function SuperAdminSettingsScreen({ navigation }) {
               />
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Name (optional)</Text>
-              <TextInput
-                style={styles.input}
-                value={dummyName}
-                onChangeText={setDummyName}
-                placeholder="e.g. Dummy Driver 1"
-                placeholderTextColor={COLORS.textTertiary}
-                editable={!creatingDummy}
-              />
+              <Text style={styles.label}>Driver Name</Text>
+              <View style={[styles.input, { justifyContent: 'center', backgroundColor: COLORS.border + '40' }]}>
+                <Text style={{ fontSize: getResponsiveFontSize(16), color: COLORS.text, fontWeight: '500' }}>Dummy</Text>
+              </View>
+              <Text style={{ fontSize: getResponsiveFontSize(11), color: COLORS.textSecondary, marginTop: 4 }}>All dummy drivers are named "Dummy"</Text>
             </View>
             <TouchableOpacity
               style={[styles.button, styles.dummyCreateBtn, creatingDummy && styles.buttonDisabled]}
@@ -1422,7 +1420,12 @@ export default function SuperAdminSettingsScreen({ navigation }) {
 
             {/* Driver Selection */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Assign Drivers * ({selectedDrivers.length} selected)</Text>
+              <Text style={styles.label}>Assign Drivers ({selectedDrivers.length} selected)</Text>
+              <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 8 }}>
+                {selectedDrivers.length === 0 
+                  ? '⭐ Leave empty to publish this trip to ALL drivers'
+                  : `Trip will be assigned to ${selectedDrivers.length} selected driver(s)`}
+              </Text>
               <View style={{ maxHeight: 200 }}>
                 <ScrollView nestedScrollEnabled>
                   {availableDrivers.map((driver) => (

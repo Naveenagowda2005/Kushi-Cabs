@@ -143,10 +143,56 @@ export default function VendorProfileScreen({ navigation }) {
       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
       const currentDocs = existingDocs?.documents || {};
+      
+      // Upload to storage bucket ONLY
+      console.log('handleUpdateDocument: Uploading', docType, 'to storage bucket');
+      
+      // Convert base64 to binary
+      const binaryString = atob(imageData.base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: imageData.type || 'image/jpeg' });
+      
+      // Get vendor_id
+      const { data: vendorRow } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      
+      const vendorId = vendorRow?.id;
+      
+      // Upload to storage
+      const fileName = `${docType}_${Date.now()}.jpg`;
+      const storagePath = `${vendorId}/${fileName}`;
+      
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('vendor-documents')
+        .upload(storagePath, blob, {
+          contentType: imageData.type || 'image/jpeg',
+          upsert: false,
+        });
+      
+      if (storageError) {
+        console.error('handleUpdateDocument: ❌ Storage upload failed:', storageError.message);
+        throw storageError;
+      }
+      
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('vendor-documents')
+        .getPublicUrl(storagePath);
+      
+      console.log('handleUpdateDocument: ✅ Uploaded to storage:', publicUrlData.publicUrl);
+      
       // Reset this document to pending — requires admin re-review
+      // Store metadata ONLY (no base64)
       currentDocs[docType] = {
         status: 'pending',
-        document_data: imageData.base64,
+        storage_path: storagePath,
+        document_url: publicUrlData.publicUrl,
         uploaded_at: new Date().toISOString(),
         rejection_reason: null, // clear any old rejection reason
       };
@@ -486,9 +532,9 @@ export default function VendorProfileScreen({ navigation }) {
 
             {previewDoc?.document_data ? (
               <Image
-                source={{ uri: previewDoc.document_data.startsWith('data:')
+                source={{ uri: previewDoc.document_url || (previewDoc.document_data.startsWith('data:')
                   ? previewDoc.document_data
-                  : `data:image/jpeg;base64,${previewDoc.document_data}` }}
+                  : `data:image/jpeg;base64,${previewDoc.document_data}`) }}
                 style={styles.previewImage}
                 resizeMode="contain"
               />

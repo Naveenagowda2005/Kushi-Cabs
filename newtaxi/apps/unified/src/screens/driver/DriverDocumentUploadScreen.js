@@ -84,27 +84,51 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
       const docs = await Promise.race([docsPromise, timeoutPromise]);
       
       console.log('loadDocuments: Retrieved documents count:', docs?.length);
-      console.log('loadDocuments: Retrieved documents:', docs);
       
       // Create a map of documents by type
       const docMap = {};
-      docs.forEach(doc => {
-        docMap[doc.document_type] = doc;
-      });
+      if (docs && Array.isArray(docs)) {
+        docs.forEach(doc => {
+          console.log(`loadDocuments: Mapping document type: ${doc.document_type}, has URL: ${!!doc.document_url}`);
+          docMap[doc.document_type] = doc;
+        });
+      }
+
+      console.log('loadDocuments: DocMap keys:', Object.keys(docMap));
 
       // Ensure all required documents are in the list
-      const allDocs = REQUIRED_DOCUMENTS.map(type => 
-        docMap[type] || { document_type: type, status: 'pending', document_data: null }
-      );
+      // For each required type, use the uploaded document if exists, otherwise create pending placeholder
+      const allDocs = REQUIRED_DOCUMENTS.map(type => {
+        const uploadedDoc = docMap[type];
+        
+        if (uploadedDoc && uploadedDoc.document_url) {
+          // Document exists in bucket - show it with URL
+          console.log(`loadDocuments: ✅ Found uploaded document for ${type}: ${uploadedDoc.document_url}`);
+          return uploadedDoc;
+        } else {
+          // Document not uploaded yet - show as pending
+          console.log(`loadDocuments: ❌ No uploaded document found for ${type}`);
+          return { 
+            document_type: type, 
+            status: 'pending', 
+            document_url: null,
+            rejection_reason: null
+          };
+        }
+      });
 
       console.log('loadDocuments: Final documents list count:', allDocs.length);
-      console.log('loadDocuments: Final documents list:', allDocs);
+      console.log('loadDocuments: Final documents with URLs:', allDocs.map(d => ({ type: d.document_type, hasUrl: !!d.document_url })));
 
       setDocuments(allDocs);
     } catch (error) {
       console.error('Error loading documents:', error);
       Alert.alert('Error', 'Failed to load documents: ' + error.message);
-      setDocuments(REQUIRED_DOCUMENTS.map(type => ({ document_type: type, status: 'pending', document_data: null })));
+      setDocuments(REQUIRED_DOCUMENTS.map(type => ({ 
+        document_type: type, 
+        status: 'pending', 
+        document_url: null 
+      })));
     } finally {
       setLoading(false);
     }
@@ -139,15 +163,20 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
 
       console.log('handleUploadDocument: Image picked successfully, size:', imageData.base64?.length || 0);
 
-      // Upload to database (stores base64)
-      console.log('handleUploadDocument: Uploading to database');
-      const base64Data = await documentService.uploadDocumentImage(
+      // Upload to storage bucket ONLY (not to database)
+      console.log('handleUploadDocument: Uploading to storage bucket');
+      const storageUrl = await documentService.uploadDocumentImage(
         driverId,
         documentType,
         imageData
       );
 
-      console.log('handleUploadDocument: Upload successful, base64 length:', base64Data.length);
+      console.log('handleUploadDocument: Upload successful, storage URL:', storageUrl);
+
+      // Add delay to ensure file is written to storage and indexed before we list
+      // Increased from 1000ms to 2000ms for consistency
+      console.log('handleUploadDocument: Waiting for storage sync...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Reload documents
       console.log('handleUploadDocument: Reloading documents');
@@ -185,11 +214,11 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
       console.log('handleSubmitDocuments: Starting submission');
       console.log('handleSubmitDocuments: Documents:', documents);
 
-      // Check if all documents have been uploaded (have document_data)
-      const allUploaded = documents.every(doc => !!doc.document_data);
+      // Check if all documents have been uploaded (have document_url from storage)
+      const allUploaded = documents.every(doc => !!doc.document_url);
       
       console.log('handleSubmitDocuments: All uploaded check:', allUploaded);
-      console.log('handleSubmitDocuments: Documents with data:', documents.map(d => ({ type: d.document_type, hasData: !!d.document_data })));
+      console.log('handleSubmitDocuments: Documents with URLs:', documents.map(d => ({ type: d.document_type, hasUrl: !!d.document_url })));
 
       if (!allUploaded) {
         Alert.alert('Incomplete', 'Please upload all required documents');
@@ -213,7 +242,7 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
   };
 
   const handleViewDocument = (document) => {
-    if (document.document_data) {
+    if (document.document_url) {
       setSelectedDocument(document);
       setViewerVisible(true);
     }
@@ -228,7 +257,7 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
 
   const summary = getSummary();
   const allApproved = summary.approved === REQUIRED_DOCUMENTS.length;
-  const allDocumentsUploaded = documents.every(doc => !!doc.document_data);
+  const allDocumentsUploaded = documents.every(doc => !!doc.document_url);
 
   if (loading) {
     return (
@@ -245,6 +274,7 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -311,7 +341,7 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
                 rejectionReason={doc.rejection_reason}
                 onUpload={handleUploadDocument}
                 isUploading={uploading[doc.document_type]}
-                hasData={!!doc.document_data}
+                hasData={!!doc.document_url}
               />
             </TouchableOpacity>
           ))}
@@ -353,9 +383,28 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
 
       {allApproved && (
         <View style={styles.footer}>
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              !allDocumentsUploaded && styles.submitButtonDisabled,
+            ]}
+            onPress={handleSubmitDocuments}
+            disabled={!allDocumentsUploaded || submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color={COLORS.text} size="small" />
+            ) : (
+              <>
+                <Ionicons name="reload-outline" size={20} color={COLORS.text} />
+                <Text style={styles.submitButtonText}>
+                  {allDocumentsUploaded ? 'Re-submit Changes' : 'No Changes to Submit'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
           <View style={styles.approvedBox}>
-            <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
-            <Text style={styles.approvedText}>All documents approved!</Text>
+            <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+            <Text style={styles.approvedBoxText}>Documents approved - you're all set!</Text>
           </View>
         </View>
       )}
@@ -363,6 +412,7 @@ const DriverDocumentUploadScreen = ({ navigation }) => {
       {/* Document Viewer */}
       <DocumentViewer
         visible={viewerVisible}
+        documentUrl={selectedDocument?.document_url}
         documentData={selectedDocument?.document_data}
         documentType={selectedDocument?.document_type}
         onClose={() => setViewerVisible(false)}
@@ -389,7 +439,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#ffffff',
     marginBottom: 4,
   },
   headerSubtitle: {
@@ -484,6 +534,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingBottom: 20,
+    paddingTop: 60,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
@@ -515,10 +566,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.success,
     gap: 8,
+    marginTop: 12,
   },
   approvedText: {
     fontSize: 14,
     fontWeight: '600',
+    color: COLORS.success,
+  },
+  approvedBoxText: {
+    fontSize: 13,
+    fontWeight: '500',
     color: COLORS.success,
   },
 });

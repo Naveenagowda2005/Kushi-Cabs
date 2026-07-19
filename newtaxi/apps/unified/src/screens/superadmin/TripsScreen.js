@@ -164,7 +164,7 @@ export default function SuperAdminTripsScreen() {
   
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('pending'); // Default to pending instead of 'all'
   const [filterAdminCreated, setFilterAdminCreated] = useState('all'); // New filter
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -215,122 +215,88 @@ export default function SuperAdminTripsScreen() {
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [reassigningTrip, setReassigningTrip] = useState(null);
   const [loadingDummyDrivers, setLoadingDummyDrivers] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const TRIPS_PER_PAGE = 50;
 
   const fetchTrips = useCallback(async () => {
     setLoading(true);
     try {
-      // First fetch trips without relationships to avoid RLS issues
-      let query = supabase
-        .from('trips')
-        .select(`
-          id,
-          booking_id_seq,
-          status,
-          fare_amount,
-          pickup_location,
-          dropoff_location,
-          return_location,
-          return_date,
-          passenger_name,
-          passenger_phone,
-          car_type,
-          car_model,
-          seater_type,
-          fuel_type,
-          segment_id,
-          package_id,
-          fixed_km,
-          commission_amount,
-          customer_pre_advance,
-          toll_included,
-          state_tax_included,
-          pet_travelling,
-          hills_included,
-          notes,
-          start_km,
-          end_km,
-          start_odometer_url,
-          end_odometer_url,
-          created_at,
-          accepted_at,
-          started_at,
-          completed_at,
-          created_by,
-          accepted_by,
-          admin_assigned_drivers,
-          trip_segments(id, name)
-        `);
+      console.log(`📄 Fetching trips (status: ${filterStatus}, admin: ${filterAdminCreated}, page: ${currentPage + 1})...`);
 
+      // Build query parameters
+      const params = new URLSearchParams();
       if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
+        params.append('status', filterStatus);
       }
-
-      // Filter by admin created trips
       if (filterAdminCreated === 'admin') {
-        query = query.eq('is_admin_trip', true);
+        params.append('is_admin_trip', 'true');
       } else if (filterAdminCreated === 'vendor') {
-        query = query.eq('is_admin_trip', false);
+        params.append('is_admin_trip', 'false');
+      }
+      params.append('page', currentPage);
+      params.append('limit', TRIPS_PER_PAGE);
+
+      // Call backend API instead of direct Supabase query
+      const response = await fetch(`http://192.168.1.114:4000/api/trips/list?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const { data: tripsData, error: tripsError } = await query.order('created_at', { ascending: false });
+      const result = await response.json();
 
-      if (tripsError) throw tripsError;
-
-      // Now fetch user details separately for creators and drivers
-      if (tripsData && tripsData.length > 0) {
-        const userIds = new Set();
-        tripsData.forEach(trip => {
-          if (trip.created_by) userIds.add(trip.created_by);
-          if (trip.accepted_by) userIds.add(trip.accepted_by);
-          // Also add admin_assigned_drivers
-          if (trip.admin_assigned_drivers && Array.isArray(trip.admin_assigned_drivers)) {
-            trip.admin_assigned_drivers.forEach(driverId => userIds.add(driverId));
-          }
-        });
-
-        if (userIds.size > 0) {
-          const { data: usersData, error: usersError } = await supabase
-            .from('users')
-            .select('id, full_name, phone, role_id')
-            .in('id', Array.from(userIds));
-
-          if (usersError) {
-            console.warn('Error fetching user details:', usersError.message);
-            // Continue anyway with partial data
-          } else {
-            // Create a map of user data
-            const userMap = {};
-            usersData?.forEach(user => {
-              userMap[user.id] = user;
-            });
-
-            // Attach user data to trips
-            const enrichedTrips = tripsData.map(trip => ({
-              ...trip,
-              creator: trip.created_by ? userMap[trip.created_by] : null,
-              driver: trip.accepted_by ? userMap[trip.accepted_by] : null,
-              // Only show the most recent admin assigned driver (last one in array)
-              latestAdminAssignedDriver: (trip.admin_assigned_drivers && Array.isArray(trip.admin_assigned_drivers) && trip.admin_assigned_drivers.length > 0)
-                ? userMap[trip.admin_assigned_drivers[trip.admin_assigned_drivers.length - 1]]
-                : null
-            }));
-
-            setTrips(enrichedTrips);
-            return;
-          }
-        }
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Failed to fetch trips');
       }
 
-      setTrips(tripsData || []);
+      console.log(`✅ ${result.data?.length || 0} trips loaded (page ${currentPage + 1}, total: ${result.pagination?.total})`);
+      setTrips(result.data || []);
     } catch (err) {
-      console.error('Error fetching trips:', err.message);
+      console.error('❌ Error fetching trips:', err.message);
       Alert.alert('Error', 'Failed to fetch trips: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterAdminCreated]);
+  }, [filterStatus, filterAdminCreated, currentPage]);
 
   useFocusEffect(useCallback(() => { fetchTrips(); }, [fetchTrips]));
+
+  // Lazy load user details when needed (e.g., when expanding trip details)
+  const loadUserDetailsForTrip = useCallback(async (trip) => {
+    const userIds = [];
+    if (trip.created_by) userIds.push(trip.created_by);
+    if (trip.accepted_by) userIds.push(trip.accepted_by);
+    if (trip.admin_assigned_drivers && Array.isArray(trip.admin_assigned_drivers)) {
+      trip.admin_assigned_drivers.forEach(id => userIds.push(id));
+    }
+
+    if (userIds.length === 0) return null;
+
+    try {
+      const { data: usersData, error } = await supabase
+        .from('users')
+        .select('id, full_name, phone, role_id')
+        .in('id', userIds);
+
+      if (error) throw error;
+
+      const userMap = {};
+      usersData?.forEach(user => {
+        userMap[user.id] = user;
+      });
+
+      return {
+        creator: trip.created_by ? userMap[trip.created_by] : null,
+        driver: trip.accepted_by ? userMap[trip.accepted_by] : null,
+        latestAdminAssignedDriver: (trip.admin_assigned_drivers && trip.admin_assigned_drivers.length > 0)
+          ? userMap[trip.admin_assigned_drivers[trip.admin_assigned_drivers.length - 1]]
+          : null
+      };
+    } catch (error) {
+      console.warn('⚠️ Failed to load user details:', error.message);
+      return null;
+    }
+  }, []);
 
   const fetchAdminTripOptions = useCallback(async () => {
     try {
@@ -627,11 +593,11 @@ export default function SuperAdminTripsScreen() {
         return_date: selectedSegment?.name === 'Round trips' && editForm.return_date ? editForm.return_date.toISOString() : null,
         passenger_name: editForm.passenger_name.trim(),
         passenger_phone: editForm.passenger_phone.trim(),
-        car_type: editForm.car_type,
-        car_model: editForm.car_model,
-        seater_type: editForm.seater_type,
-        fuel_type: editForm.fuel_type,
-        segment_id: editForm.segment,
+        car_type: editForm.car_type || null,
+        car_model: editForm.car_model || null,
+        seater_type: editForm.seater_type || null,
+        fuel_type: editForm.fuel_type || null,
+        segment_id: editForm.segment || null,
         package_id: editForm.package || null,
         fixed_km: fixedKm,
         commission_amount: commissionAmount,
@@ -651,14 +617,9 @@ export default function SuperAdminTripsScreen() {
 
       if (error) throw error;
 
-      // Update local state
-      setTrips(prevTrips =>
-        prevTrips.map(trip =>
-          trip.id === editingTrip.id
-            ? { ...trip, ...updates }
-            : trip
-        )
-      );
+      // Refresh trips list from backend to ensure we get the latest data
+      console.log('🔄 Refreshing trips list after update');
+      await fetchTrips();
 
       Alert.alert('✅ Success', 'Trip updated successfully');
       setEditModalVisible(false);
@@ -673,34 +634,30 @@ export default function SuperAdminTripsScreen() {
 
   // Helper function to check if a trip was created by a super admin
   const isSuperAdminCreatedTrip = useCallback((trip) => {
-    if (!trip.creator) return false;
-    // Check if the creator's role_id is 5 (super_admin role)
-    // In the database, super_admin role has id=5
-    return trip.creator.role_id === 5;
+    // Check if trip has is_admin_trip flag set to true
+    return trip.is_admin_trip === true;
   }, []);
 
-  // Function to fetch dummy drivers
-  const fetchDummyDrivers = useCallback(async () => {
+  // Function to fetch all drivers
+  const fetchAllDrivers = useCallback(async () => {
     try {
       setLoadingDummyDrivers(true);
       const { data, error } = await supabase
         .from('users')
         .select('id, full_name, phone, avatar_base64')
         .eq('role_id', 3) // Driver role
+        .eq('is_active', true)
         .order('full_name');
 
       if (error) throw error;
 
-      // Filter for dummy drivers (those with "DUMMY" in their name or created as test drivers)
-      const dummyDriversList = (data || []).filter(driver =>
-        driver.full_name?.toUpperCase().includes('DUMMY')
-      );
-
-      setDummyDrivers(dummyDriversList);
-      console.log('✅ Fetched dummy drivers:', dummyDriversList.length);
+      // Show all approved drivers
+      const allDriversList = data || [];
+      setDummyDrivers(allDriversList);
+      console.log('✅ Fetched all drivers:', allDriversList.length);
     } catch (err) {
-      console.error('Error fetching dummy drivers:', err);
-      Alert.alert('Error', 'Failed to load dummy drivers');
+      console.error('Error fetching drivers:', err);
+      Alert.alert('Error', 'Failed to load drivers');
     } finally {
       setLoadingDummyDrivers(false);
     }
@@ -1097,24 +1054,26 @@ export default function SuperAdminTripsScreen() {
         )}
 
         {/* Edit Trip Button - Only for super-admin-created trips */}
-        {isSuperAdminCreatedTrip(item) && item.status === 'pending' && (
+        {isSuperAdminCreatedTrip(item) && (
           <View style={styles.section}>
             <View style={styles.buttonRow}>
+              {item.status === 'pending' && (
+                <TouchableOpacity
+                  style={[styles.editButton, { flex: 1, marginRight: 4 }]}
+                  onPress={() => openEditModal(item)}
+                >
+                  <Ionicons name="pencil-outline" size={16} color="#fff" />
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                style={[styles.editButton, { flex: 1, marginRight: 3 }]}
-                onPress={() => openEditModal(item)}
-              >
-                <Ionicons name="pencil-outline" size={16} color="#fff" />
-                <Text style={styles.editButtonText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.reassignButton, { flex: 1, marginHorizontal: 3 }]}
+                style={[styles.reassignButton, { flex: item.status === 'pending' ? 1 : 1.5, marginHorizontal: 4 }]}
                 onPress={() => {
                   if (item.status !== 'pending') {
                     Alert.alert('Cannot Reassign', 'Trip can only be reassigned if it is pending');
                     return;
                   }
-                  fetchDummyDrivers();
+                  fetchAllDrivers();
                   setReassigningTrip(item);
                   setSelectedDriver(null);
                   setReassignModalVisible(true);
@@ -1124,7 +1083,7 @@ export default function SuperAdminTripsScreen() {
                 <Text style={styles.reassignButtonText}>Reassign</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteButton, { flex: 1, marginLeft: 3 }]}
+                style={[styles.deleteButton, { flex: item.status === 'pending' ? 1 : 1.5, marginLeft: 4 }]}
                 onPress={() => {
                   Alert.alert(
                     '⚠️ Delete Trip',
@@ -1176,19 +1135,27 @@ export default function SuperAdminTripsScreen() {
               ]}
               onPress={() => {
                 Alert.alert(
-                  item.is_published ? 'Unpublish Trip' : 'Publish Trip',
+                  item.is_published ? 'Unpublish Trip' : 'Publish to All Drivers',
                   item.is_published 
                     ? 'Remove this trip from driver visibility?'
-                    : 'Make this trip visible to all drivers?',
+                    : 'Make this trip visible to ALL drivers? (Clears any specific driver assignments)',
                   [
                     { text: 'Cancel', style: 'cancel' },
                     {
-                      text: item.is_published ? 'Unpublish' : 'Publish',
+                      text: item.is_published ? 'Unpublish' : 'Publish to All',
                       onPress: async () => {
                         try {
+                          // When publishing, also clear admin_assigned_drivers to make it visible to ALL drivers
+                          const updateData = item.is_published
+                            ? { is_published: false }
+                            : { 
+                                is_published: true,
+                                admin_assigned_drivers: null  // Clear specific assignments = publish to ALL
+                              };
+
                           const { error } = await supabase
                             .from('trips')
-                            .update({ is_published: !item.is_published })
+                            .update(updateData)
                             .eq('id', item.id);
 
                           if (error) throw error;
@@ -1197,15 +1164,15 @@ export default function SuperAdminTripsScreen() {
                           setTrips(prevTrips =>
                             prevTrips.map(trip =>
                               trip.id === item.id
-                                ? { ...trip, is_published: !trip.is_published }
+                                ? { ...trip, ...updateData }
                                 : trip
                             )
                           );
                           
-                          // Show different message based on current published state
+                          // Show different message based on action
                           const successMsg = item.is_published 
                             ? 'Trip unpublished successfully' 
-                            : 'Trip published to drivers';
+                            : '✅ Trip published to ALL drivers!';
                           Alert.alert('Success', successMsg);
                         } catch (err) {
                           Alert.alert('Error', err.message);
@@ -1225,7 +1192,7 @@ export default function SuperAdminTripsScreen() {
                 styles.publishButtonText,
                 item.is_published && styles.publishButtonTextActive
               ]}>
-                {item.is_published ? 'Published to Drivers' : 'Publish to Drivers'}
+                {item.is_published ? 'Published ✓' : 'Publish to All'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1847,7 +1814,7 @@ export default function SuperAdminTripsScreen() {
       >
         <View style={styles.reassignModalOverlay}>
           <View style={styles.reassignModalContent}>
-            <Text style={styles.reassignModalTitle}>Reassign Trip to Dummy Driver</Text>
+            <Text style={styles.reassignModalTitle}>Reassign Trip to Driver</Text>
             
             {loadingDummyDrivers ? (
               <View style={styles.loadingContainer}>

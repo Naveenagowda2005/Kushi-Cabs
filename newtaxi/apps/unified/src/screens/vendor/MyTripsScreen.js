@@ -206,12 +206,8 @@ export default function VendorMyTripsScreen({ navigation }) {
       {/* Booking ID and Trip Type Badge */}
       <View style={styles.headerBadgeRow}>
         <View style={styles.bookingIdBadge}>
-          <Text style={styles.bookingIdLabel}>Booking ID</Text>
+          <Text style={styles.bookingIdLabel}>Booking ID:</Text>
           <Text style={styles.bookingIdValue}>{bookingId}</Text>
-        </View>
-        <View style={styles.tripTypeBadge}>
-          <Ionicons name="tag-outline" size={14} color="#2196f3" />
-          <Text style={styles.tripTypeBadgeText}>{segmentName || 'ONE WAY'}</Text>
         </View>
       </View>
 
@@ -693,18 +689,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   headerBadgeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 8,
+    marginBottom: 0,
+    paddingVertical: 0,
   },
   bookingIdBadge: {
+    flexDirection: 'row',
     backgroundColor: '#fff3cd',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    flex: 1,
+    paddingVertical: 2,
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
   },
   bookingIdLabel: {
     color: '#856404',
@@ -714,9 +710,8 @@ const styles = StyleSheet.create({
   },
   bookingIdValue: {
     color: '#856404',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
-    marginTop: 2,
   },
   tripHeader: {
     flexDirection: 'row',

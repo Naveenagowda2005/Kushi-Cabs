@@ -22,14 +22,23 @@ export default function IDCard({
   const accountTypeCode = userType === 'driver' ? 'D' : 'V';
   const uniqueID = `KUSH${accountTypeCode}${String(serialNumber).padStart(6, '0')}`;
   
-  // Try avatar_base64 first, then fallback to documentPhoto
+  // Try avatar_base64 first, then fallback to documentPhoto or direct URL
   let photoUri = null;
   const photoData = photo || documentPhoto;
   
   if (photoData) {
-    photoUri = photoData.startsWith('data:') 
-      ? photoData 
-      : `data:image/jpeg;base64,${photoData}`;
+    // Check if it's already a data URI
+    if (photoData.startsWith('data:')) {
+      photoUri = photoData;
+    }
+    // Check if it's a URL (http/https)
+    else if (photoData.startsWith('http://') || photoData.startsWith('https://')) {
+      photoUri = photoData;
+    }
+    // Otherwise assume it's base64 and wrap it
+    else {
+      photoUri = `data:image/jpeg;base64,${photoData}`;
+    }
   }
 
   return (

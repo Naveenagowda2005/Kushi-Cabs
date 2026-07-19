@@ -30,6 +30,32 @@ export default function DriverProfileScreen({ navigation }) {
   const [docsExpanded, setDocsExpanded] = useState(false);
   const [driverProfile, setDriverProfile] = useState(null);
   const [showIDCard, setShowIDCard] = useState(false);
+  const [userInfo, setUserInfo] = useState(null); // Fallback user info from database
+
+  // Load user info from database if not in AuthContext
+  useEffect(() => {
+    if (!user?.id) return;
+    if (user?.full_name) {
+      setUserInfo(user); // Use user from AuthContext
+      return;
+    }
+    
+    // Fallback: fetch from database if AuthContext doesn't have full_name
+    const fetchUserInfo = async () => {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('id, full_name, phone, email')
+          .eq('id', user.id)
+          .single();
+        setUserInfo(data || user);
+      } catch (e) {
+        console.error('Error loading user info:', e);
+        setUserInfo(user);
+      }
+    };
+    fetchUserInfo();
+  }, [user?.id, user?.full_name]);
 
   // Load avatar
   useEffect(() => {
@@ -65,7 +91,7 @@ export default function DriverProfileScreen({ navigation }) {
       setDocuments(docs || []);
 
       // Use DRIVER_SELFIE as profile photo if no custom avatar set
-      const selfie = docs?.find(d => d.document_type === 'DRIVER_SELFIE' && d.document_data);
+      const selfie = docs?.find(d => d.document_type === 'DRIVER_SELFIE' && d.document_url);
       if (selfie) {
         // Only set if user hasn't manually set their own avatar
         supabase.from('users').select('avatar_base64').eq('id', user.id).maybeSingle()
@@ -73,12 +99,8 @@ export default function DriverProfileScreen({ navigation }) {
             if (data?.avatar_base64) {
               setAvatarBase64(data.avatar_base64); // user's custom photo takes priority
             } else {
-              // Fall back to selfie document
-              const selfieData = selfie.document_data;
-              const uri = selfieData.startsWith('data:')
-                ? selfieData
-                : `data:${selfie.document_mime_type || 'image/jpeg'};base64,${selfieData}`;
-              setAvatarBase64(uri);
+              // Fall back to selfie document URL from storage
+              setAvatarBase64(selfie.document_url);
             }
           });
       }
@@ -275,8 +297,8 @@ export default function DriverProfileScreen({ navigation }) {
           </View>
         </TouchableOpacity>
         <Text style={styles.photoHint}>Tap to change photo</Text>
-        <Text style={styles.name}>{user?.full_name || 'Driver'}</Text>
-        <Text style={styles.phone}>{user?.phone}</Text>
+        <Text style={styles.name}>{userInfo?.full_name || user?.full_name || 'Driver'}</Text>
+        <Text style={styles.phone}>{userInfo?.phone || user?.phone}</Text>
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>Driver</Text>
         </View>
@@ -326,7 +348,6 @@ export default function DriverProfileScreen({ navigation }) {
             ) : (
               documents.map((doc) => {
                 const cfg = STATUS_CONFIG[doc.status] || STATUS_CONFIG.pending;
-                const hasData = !!doc.document_data;
                 const isUpdating = updatingDoc === doc.document_type;
 
                 return (
@@ -334,14 +355,13 @@ export default function DriverProfileScreen({ navigation }) {
                     {/* Icon - tap to preview */}
                     <TouchableOpacity
                       style={[styles.docIcon, { backgroundColor: cfg.color + '20' }]}
-                      onPress={() => hasData && setPreviewDoc({
+                      onPress={() => doc.document_url && setPreviewDoc({
                         label: documentService.getDocumentLabel(doc.document_type),
-                        data: doc.document_data,
-                        mime: doc.document_mime_type || 'image/jpeg',
+                        url: doc.document_url,
                         rejectionReason: doc.rejection_reason,
                         status: doc.status,
                       })}
-                      disabled={!hasData}
+                      disabled={!doc.document_url}
                     >
                       <Ionicons name={documentService.getDocumentIcon(doc.document_type)} size={20} color={cfg.color} />
                     </TouchableOpacity>
@@ -353,7 +373,7 @@ export default function DriverProfileScreen({ navigation }) {
                         <Text style={styles.docRejectionReason} numberOfLines={1}>⚠️ {doc.rejection_reason}</Text>
                       ) : (
                         <Text style={styles.docDate}>
-                          {doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : 'Not uploaded'}
+                          {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : 'Not uploaded'}
                         </Text>
                       )}
                     </View>
@@ -413,8 +433,8 @@ export default function DriverProfileScreen({ navigation }) {
             <ScrollView contentContainerStyle={styles.idCardModalContent} showsVerticalScrollIndicator={false}>
               <IDCard 
                 userType="driver"
-                fullName={user?.full_name}
-                phone={user?.phone}
+                fullName={userInfo?.full_name || user?.full_name}
+                phone={userInfo?.phone || user?.phone}
                 photo={avatarBase64}
                 licenseNumber={driverProfile?.license_number}
                 vehicleNumber={driverProfile?.vehicle_number}
@@ -450,9 +470,9 @@ export default function DriverProfileScreen({ navigation }) {
                 <Text style={styles.rejectionText}>{previewDoc.rejectionReason}</Text>
               </View>
             ) : null}
-            {previewDoc?.data ? (
+            {previewDoc?.url ? (
               <Image
-                source={{ uri: previewDoc.data.startsWith('data:') ? previewDoc.data : `data:${previewDoc.mime};base64,${previewDoc.data}` }}
+                source={{ uri: previewDoc.url }}
                 style={styles.previewImage}
                 resizeMode="contain"
               />

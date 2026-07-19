@@ -10,6 +10,7 @@ import { COLORS, API_CONFIG } from '../../constants';
 import { hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import IDCard from '../../components/IDCard';
 import DocumentViewer from '../../components/DocumentViewer';
+import { getDriverAllDocuments } from '../../services/documentService';
 
 export default function SuperAdminDriversScreen({ navigation }) {
   const { forceUpdate } = useTheme();
@@ -35,7 +36,10 @@ export default function SuperAdminDriversScreen({ navigation }) {
   const [documentViewerVisible, setDocumentViewerVisible] = useState(false);
   const [pendingDriverCount, setPendingDriverCount] = useState(0);
 
-  useEffect(() => { fetchDrivers(); }, []);
+  useEffect(() => { 
+    // Force clear any cached data and fetch fresh
+    fetchDrivers(); 
+  }, []);
   useEffect(() => { filterDrivers(); }, [searchQuery, drivers]);
 
   const fetchDrivers = async () => {
@@ -60,26 +64,22 @@ export default function SuperAdminDriversScreen({ navigation }) {
       );
       setDrivers(driversWithDetails);
 
-      // Calculate pending drivers count
-      // Pending = Total non-dummy drivers - Approved - Rejected
-      // Dummy drivers are always "Approved" so exclude them from pending count
-      const dummyDrivers = driversWithDetails.filter(d => 
-        d.drivers?.[0]?.license_number?.toUpperCase().startsWith('DUMMY-') || 
-        d.full_name?.toUpperCase().includes('DUMMY')
-      );
-      const approvedCount = driversWithDetails.filter(d => d.verification_status === 'approved').length;
-      const rejectedCount = driversWithDetails.filter(d => d.verification_status === 'rejected').length;
-      const pendingCount = driversWithDetails.length - approvedCount - rejectedCount - dummyDrivers.length;
+      // Calculate stats - only count non-dummy drivers
+      // Dummy drivers are identified by name "Dummy" (case-insensitive)
+      const dummyDrivers = driversWithDetails.filter(d => (d.full_name || '').toLowerCase() === 'dummy');
+      const nonDummyDrivers = driversWithDetails.filter(d => (d.full_name || '').toLowerCase() !== 'dummy');
       
-      console.log('📋 Driver counts:', {
-        total: driversWithDetails.length,
-        dummy: dummyDrivers.length,
-        approved: approvedCount,
-        rejected: rejectedCount,
-        pending: pendingCount
-      });
+      const approvedCount = nonDummyDrivers.filter(d => d.verification_status === 'approved').length;
+      const rejectedCount = nonDummyDrivers.filter(d => d.verification_status === 'rejected').length;
       
-      setPendingDriverCount(pendingCount);
+      console.log('📋 DRIVER COUNTS:');
+      console.log('  Total drivers:', driversWithDetails.length);
+      console.log('  Dummy drivers:', dummyDrivers.length);
+      console.log('  Non-dummy drivers:', nonDummyDrivers.length);
+      console.log('  Approved:', approvedCount);
+      console.log('  Rejected:', rejectedCount);
+      
+      setPendingDriverCount(0); // Remove pending count completely
     } catch (error) {
       console.error('Error fetching drivers:', error);
       Alert.alert('Error', 'Failed to load drivers');
@@ -161,31 +161,36 @@ export default function SuperAdminDriversScreen({ navigation }) {
 
   const fetchAndViewDriverDocuments = async (driver) => {
     try {
-      console.log('📄 Fetching documents for driver:', driver.full_name, 'user_id:', driver.id);
+      console.log('📄 Fetching documents from bucket for driver:', driver.full_name, 'user_id:', driver.id);
       
       // First open the modal with loading state
       setShowDocumentsModal(true);
       setLoadingDocuments(true);
       setDriverDocuments([]);
       
-      const { data: docs, error } = await supabase
-        .from('driver_documents')
-        .select('*')
-        .eq('driver_id', driver.id);
+      // Use backend API to list documents (service role access)
+      const documents = await getDriverAllDocuments(driver.id);
       
-      if (error) {
-        console.error('❌ Error fetching documents:', error);
-        Alert.alert('Error', 'Failed to load documents: ' + error.message);
-        setLoadingDocuments(false);
-        return;
-      }
-      
-      if (!docs || docs.length === 0) {
-        console.log('⚠️ No documents found for driver');
+      if (!documents || documents.length === 0) {
+        console.log('⚠️ No documents found in bucket for driver');
         setDriverDocuments([]);
       } else {
-        console.log('✅ Found', docs.length, 'documents for driver');
-        setDriverDocuments(docs);
+        console.log('✅ Found', documents.length, 'documents for driver');
+        
+        // Map backend response to document format
+        const mappedDocs = documents.map((doc) => ({
+          id: doc.document_type,
+          document_type: doc.document_type,
+          filename: `${doc.document_type}.jpg`,
+          created_at: doc.uploaded_at,
+          updated_at: doc.uploaded_at,
+          document_url: doc.document_url,
+          status: doc.status,
+          size: 0,
+          document_mime_type: doc.mime_type || 'image/jpeg'
+        }));
+        
+        setDriverDocuments(mappedDocs);
       }
       
       setLoadingDocuments(false);
@@ -198,23 +203,51 @@ export default function SuperAdminDriversScreen({ navigation }) {
 
   const fetchDriverPhotoForIDCard = async (driver) => {
     try {
-      console.log('📸 Fetching driver photo for ID card:', driver.id);
+      console.log('📸 Fetching driver selfie for ID card:', driver.id);
       
-      // Try to get DRIVER_SELFIE document
-      const { data: selfieDoc, error } = await supabase
+      // First, try to get DRIVER_SELFIE from driver_documents table
+      const { data: docs, error: docsError } = await supabase
         .from('driver_documents')
-        .select('document_data')
+        .select('document_url, document_type')
         .eq('driver_id', driver.id)
         .eq('document_type', 'DRIVER_SELFIE')
         .single();
       
-      if (!error && selfieDoc?.document_data) {
-        console.log('✅ Found DRIVER_SELFIE, setting photo');
-        setDriverPhotoForIDCard(selfieDoc.document_data);
-      } else {
-        console.log('⚠️ No DRIVER_SELFIE found, using avatar_base64');
-        setDriverPhotoForIDCard(driver.avatar_base64 || null);
+      if (!docsError && docs?.document_url) {
+        console.log('✅ Found DRIVER_SELFIE with URL in database');
+        setDriverPhotoForIDCard(docs.document_url);
+        return;
       }
+      
+      console.log('⚠️ DRIVER_SELFIE URL not in database, fetching from backend...');
+      
+      try {
+        // Use backend API to fetch documents (has service role access)
+        const documents = await getDriverAllDocuments(driver.id);
+        
+        if (documents && documents.length > 0) {
+          console.log(`📄 Found ${documents.length} documents from backend`);
+          
+          // Find DRIVER_SELFIE document
+          const selfieDoc = documents.find(d => d.document_type === 'DRIVER_SELFIE');
+          
+          if (selfieDoc && selfieDoc.document_url) {
+            console.log('✅ Found DRIVER_SELFIE from backend with URL');
+            setDriverPhotoForIDCard(selfieDoc.document_url);
+            return;
+          } else {
+            console.log('⚠️ DRIVER_SELFIE not found in backend documents. Types:', documents.map(d => d.document_type).join(', '));
+          }
+        } else {
+          console.log('⚠️ No documents found from backend');
+        }
+      } catch (e) {
+        console.log('⚠️ Error fetching from backend:', e.message);
+      }
+      
+      // Final fallback to avatar
+      console.log('⚠️ Using avatar as fallback');
+      setDriverPhotoForIDCard(driver.avatar_base64 || null);
     } catch (e) {
       console.error('Error fetching driver photo:', e);
       setDriverPhotoForIDCard(driver.avatar_base64 || null);
@@ -222,21 +255,36 @@ export default function SuperAdminDriversScreen({ navigation }) {
   };
 
   const DriverCard = React.memo(({ driver }) => {
-    // Check if this is a dummy driver (license number or full_name starts with DUMMY)
-    const isDummyDriver = driver.drivers?.[0]?.license_number?.toUpperCase().startsWith('DUMMY-') || 
-                          driver.full_name?.toUpperCase().includes('DUMMY');
+    // Check if this is a dummy driver by name or phone number
+    const nameForCheck = (driver.full_name || '').toLowerCase();
+    const isDummyDriver = nameForCheck === 'dummy' || nameForCheck === 'dummy driver' || driver.phone === '8050017071';
+    
+    // Debug log to verify name detection
+    React.useEffect(() => {
+      if (driver.full_name) {
+        console.log(`🔍 DriverCard render:`, {
+          fullName: driver.full_name,
+          nameForCheck: nameForCheck,
+          equals_dummy: nameForCheck === 'dummy',
+          phone: driver.phone,
+          equals_phone: driver.phone === '8050017071',
+          isDummyDriver: isDummyDriver
+        });
+      }
+    }, [driver.full_name, driver.phone, nameForCheck, isDummyDriver]);
     
     // Required documents for drivers
     const REQUIRED_DOCUMENTS = ['DL', 'VEHICLE_FRONT', 'INSURANCE', 'FC', 'EMISSION', 'RC', 'AADHAR', 'BANK_PASSBOOK_FRONT', 'DRIVER_SELFIE'];
     
     // Determine approval status based on actual documents
     const getApprovalStatus = async () => {
-      // Dummy drivers are automatically approved (no document verification needed)
-      if (isDummyDriver) {
-        return { text: 'Approved', color: COLORS.success };
-      }
-      
       try {
+        // Dummy drivers don't need document verification - they're always approved
+        if (isDummyDriver) {
+          console.log('✅ Dummy driver detected, showing Approved status - Name:', driver.full_name, 'Phone:', driver.phone);
+          return { text: 'Approved', color: COLORS.success };
+        }
+
         const { data: docs, error } = await supabase
           .from('driver_documents')
           .select('document_type, status')
@@ -289,13 +337,13 @@ export default function SuperAdminDriversScreen({ navigation }) {
     
     React.useEffect(() => {
       getApprovalStatus().then(status => setApproval(status));
-    }, [driver.id, isDummyDriver]);
+    }, [driver.id, isDummyDriver, driver.full_name]);
 
     return (
       <TouchableOpacity style={styles.card} onPress={() => { setSelectedDriver(driver); setModalVisible(true); }}>
         <View style={styles.cardHeader}>
           <View style={styles.cardInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               <Text style={styles.cardName}>{driver.full_name || 'No Name'}</Text>
               {isDummyDriver && (
                 <View style={styles.dummyBadge}>
@@ -476,35 +524,48 @@ export default function SuperAdminDriversScreen({ navigation }) {
                       )}
                     </View>
                   </View>
-                  {doc.document_data ? (
-                    <TouchableOpacity
-                      style={styles.viewButton}
-                      onPress={() => {
-                        console.log('📸 Opening viewer for:', doc.document_type);
-                        console.log('📸 Document data exists:', !!doc.document_data);
-                        console.log('📸 Document data length:', doc.document_data?.length || 0);
+                  <TouchableOpacity
+                    style={styles.viewButton}
+                    onPress={async () => {
+                      try {
+                        console.log('📸 Viewing document:', doc.document_url);
+                        setLoadingDocuments(true);
+                        
+                        // Use the document URL directly (already public from backend)
+                        if (!doc.document_url) {
+                          Alert.alert('Error', 'Document URL not available');
+                          setLoadingDocuments(false);
+                          return;
+                        }
+                        
+                        console.log('📸 Document URL ready, opening viewer');
                         const docData = {
-                          data: doc.document_data,
+                          url: doc.document_url,
                           type: doc.document_type,
                           mimeType: doc.document_mime_type
                         };
-                        console.log('📸 Setting selectedDocument:', docData);
                         setSelectedDocument(docData);
-                        console.log('📸 Closing documents modal and opening viewer');
-                        // Close documents modal first, then open viewer
                         setShowDocumentsModal(false);
                         setTimeout(() => {
-                          console.log('📸 Now opening DocumentViewer');
                           setDocumentViewerVisible(true);
+                          setLoadingDocuments(false);
                         }, 100);
-                      }}
-                    >
-                      <Ionicons name="eye-outline" size={18} color="#2196F3" />
-                      <Text style={{ color: '#2196F3', marginLeft: 4, fontWeight: '500' }}>View</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={{ color: COLORS.textSecondary, fontSize: 12 }}>No data</Text>
-                  )}
+                      } catch (error) {
+                        console.error('❌ Error viewing document:', error);
+                        Alert.alert('Error', 'Failed to view document: ' + error.message);
+                        setLoadingDocuments(false);
+                      }
+                    }}
+                  >
+                    {loadingDocuments ? (
+                      <ActivityIndicator size="small" color="#2196F3" />
+                    ) : (
+                      <>
+                        <Ionicons name="eye-outline" size={18} color="#2196F3" />
+                        <Text style={{ color: '#2196F3', marginLeft: 4, fontWeight: '500' }}>View</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
@@ -515,7 +576,7 @@ export default function SuperAdminDriversScreen({ navigation }) {
       {/* Document Viewer Modal */}
       <DocumentViewer
         visible={documentViewerVisible}
-        documentData={selectedDocument?.data}
+        documentUrl={selectedDocument?.url}
         documentType={selectedDocument?.type}
         onClose={() => {
           console.log('📷 DocumentViewer closed');

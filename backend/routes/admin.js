@@ -369,12 +369,115 @@ router.post('/delete-user', async (req, res) => {
       console.log('✅ Driver profile deleted');
     }
 
+    // Step 4: Delete storage bucket files (driver documents in Supabase Storage)
+    console.log(`Step 4: Deleting storage files for driver ${userId}...`);
+    console.log(`📂 Storage cleanup starting for user: ${userId}`);
+    let storageDeletedCount = 0;
+    let avatarDeletedCount = 0;
+    
+    try {
+      // Storage path format: drivers/userId/filename (files are stored under drivers folder)
+      const driverFolder = `drivers/${userId}`;
+      console.log(`🗑️  Attempting to delete all files in driver-documents: ${driverFolder}`);
+      
+      // First, list all files in the driver's folder in driver-documents bucket
+      const { data: files, error: listError } = await supabaseAdmin.storage
+        .from('driver-documents')
+        .list(driverFolder, { limit: 1000 });
+
+      console.log(`📂 List result:`, { filesCount: files?.length, error: listError?.message });
+
+      if (listError && listError.message && listError.message.includes('not found')) {
+        console.log(`✅ Storage folder does not exist (already deleted or never created)`);
+      } else if (listError) {
+        console.warn(`⚠️  Could not list files:`, listError.message);
+      } else if (files && files.length > 0) {
+        // Filter out directories, only get actual files
+        const actualFiles = files.filter(f => f.id && !f.name.endsWith('/'));
+        
+        if (actualFiles.length > 0) {
+          // Build full paths for all files - need to include the folder
+          const filePaths = actualFiles.map(f => `${driverFolder}/${f.name}`);
+          
+          console.log(`📦 Found ${actualFiles.length} files to delete:`, filePaths);
+          
+          // Delete files in batches if needed (Supabase API limit)
+          for (let i = 0; i < filePaths.length; i += 100) {
+            const batch = filePaths.slice(i, i + 100);
+            console.log(`📦 Deleting batch ${Math.floor(i/100) + 1}: ${batch.length} files`);
+            console.log(`   Batch files:`, batch);
+            
+            const { error: deleteError, data: deleteData } = await supabaseAdmin.storage
+              .from('driver-documents')
+              .remove(batch);
+
+            if (deleteError) {
+              console.error(`❌ Error deleting batch ${Math.floor(i/100) + 1}:`, deleteError.message);
+              console.error(`   Error code:`, deleteError.statusCode);
+              console.error(`   Error details:`, deleteError);
+            } else {
+              storageDeletedCount += batch.length;
+              console.log(`✅ Deleted batch ${Math.floor(i/100) + 1} (${batch.length} files)`);
+              console.log(`   Response data:`, deleteData);
+            }
+          }
+          
+          console.log(`✅ Total files deleted from driver-documents: ${storageDeletedCount}`);
+        } else {
+          console.log(`ℹ️  Found ${files.length} items but no actual files (may be directories)`);
+        }
+      } else {
+        console.log(`✅ No files found in storage folder ${driverFolder}`);
+      }
+      
+      // Also delete from user-avatars bucket if avatar exists
+      console.log(`📂 Attempting to delete avatar files in user-avatars: ${driverFolder}`);
+      const { data: avatarFiles, error: avatarListError } = await supabaseAdmin.storage
+        .from('user-avatars')
+        .list(driverFolder, { limit: 100 });
+      
+      if (avatarListError && avatarListError.message && avatarListError.message.includes('not found')) {
+        console.log(`✅ Avatar folder does not exist (already deleted or never created)`);
+      } else if (avatarListError) {
+        console.warn(`⚠️  Could not list avatar files:`, avatarListError.message);
+      } else if (avatarFiles && avatarFiles.length > 0) {
+        const actualAvatarFiles = avatarFiles.filter(f => f.id && !f.name.endsWith('/'));
+        if (actualAvatarFiles.length > 0) {
+          const avatarPaths = actualAvatarFiles.map(f => `${driverFolder}/${f.name}`);
+          console.log(`📦 Found ${actualAvatarFiles.length} avatar files to delete:`, avatarPaths);
+          
+          const { error: avatarDeleteError, data: avatarDeleteData } = await supabaseAdmin.storage
+            .from('user-avatars')
+            .remove(avatarPaths);
+          
+          if (avatarDeleteError) {
+            console.error(`❌ Error deleting avatars:`, avatarDeleteError.message);
+          } else {
+            avatarDeletedCount = actualAvatarFiles.length;
+            console.log(`✅ Deleted ${avatarDeletedCount} avatar files`);
+            console.log(`   Response data:`, avatarDeleteData);
+          }
+        }
+      } else {
+        console.log(`✅ No avatar files found in user-avatars/${driverFolder}`);
+      }
+      
+    } catch (storageError) {
+      console.error('❌ Storage cleanup exception:', storageError.message);
+      console.error('Stack:', storageError.stack);
+      // Don't fail the entire deletion if storage cleanup fails
+    }
+
     res.json({
       success: true,
       message: 'User deleted successfully',
       deleted: {
         auth: !authError,
         database: !dbError,
+        storage: (storageDeletedCount + avatarDeletedCount) > 0,
+        storageFilesDeleted: storageDeletedCount,
+        avatarFilesDeleted: avatarDeletedCount,
+        totalFilesDeleted: storageDeletedCount + avatarDeletedCount,
         related: {
           documents: !docsError,
           verification: !verifyError,
@@ -997,12 +1100,21 @@ router.post('/create-admin-trip', async (req, res) => {
       });
     }
 
-    if (!Array.isArray(assignedDriverIds) || assignedDriverIds.length === 0) {
-      return res.status(400).json({ error: 'At least one driver must be assigned' });
+    if (!Array.isArray(assignedDriverIds)) {
+      return res.status(400).json({ error: 'assignedDriverIds must be an array' });
     }
 
+    // If empty array, it means publish to ALL drivers
+    // If array has driver IDs, it means publish to those specific drivers
+    const isPublishToAll = assignedDriverIds.length === 0;
+    const adminAssignedDrivers = isPublishToAll ? null : assignedDriverIds;
+
     console.log(`📝 Creating admin trip: ${pickupLocation} → ${dropoffLocation}`);
-    console.log(`   Assigned to ${assignedDriverIds.length} driver(s)`);
+    if (isPublishToAll) {
+      console.log(`   Publishing to ALL drivers`);
+    } else {
+      console.log(`   Assigned to ${assignedDriverIds.length} specific driver(s)`);
+    }
 
     // Create the trip
     const tripData = {
@@ -1034,7 +1146,7 @@ router.post('/create-admin-trip', async (req, res) => {
       is_published: false,
       commission_paid: false,
       is_admin_trip: true,
-      admin_assigned_drivers: assignedDriverIds, // Store as JSON array in trip
+      admin_assigned_drivers: adminAssignedDrivers, // null if publish to all, array if specific drivers
     };
 
     const { data: trip, error: tripError } = await supabaseAdmin
@@ -1051,27 +1163,32 @@ router.post('/create-admin-trip', async (req, res) => {
     console.log(`✅ Admin trip created: ${trip.id}`);
 
     // Try to create assignments in admin_trip_assignments table (if it exists)
-    const assignments = assignedDriverIds.map(driverId => ({
-      trip_id: trip.id,
-      driver_id: driverId,
-      assigned_at: new Date().toISOString(),
-      assigned_by: createdBy,
-    }));
+    // Only if trip is assigned to specific drivers (not publish-to-all)
+    if (!isPublishToAll && assignedDriverIds.length > 0) {
+      const assignments = assignedDriverIds.map(driverId => ({
+        trip_id: trip.id,
+        driver_id: driverId,
+        assigned_at: new Date().toISOString(),
+        assigned_by: createdBy,
+      }));
 
-    const { error: assignError } = await supabaseAdmin
-      .from('admin_trip_assignments')
-      .insert(assignments);
+      const { error: assignError } = await supabaseAdmin
+        .from('admin_trip_assignments')
+        .insert(assignments);
 
-    if (assignError && assignError.code !== 'PGRST116' && assignError.code !== 'PGRST101') {
-      console.warn('⚠️ Could not save admin_trip_assignments:', assignError.message);
-      console.log('   Continuing anyway - driver IDs stored in trip.admin_assigned_drivers');
-    } else if (!assignError) {
-      console.log(`✅ Trip assignments saved for ${assignedDriverIds.length} driver(s)`);
+      if (assignError && assignError.code !== 'PGRST116' && assignError.code !== 'PGRST101') {
+        console.warn('⚠️ Could not save admin_trip_assignments:', assignError.message);
+        console.log('   Continuing anyway - driver IDs stored in trip.admin_assigned_drivers');
+      } else if (!assignError) {
+        console.log(`✅ Trip assignments saved for ${assignedDriverIds.length} driver(s)`);
+      }
     }
 
     res.json({
       success: true,
-      message: `Admin trip created and assigned to ${assignedDriverIds.length} driver(s)`,
+      message: isPublishToAll 
+        ? `Admin trip created and published to ALL drivers`
+        : `Admin trip created and assigned to ${assignedDriverIds.length} driver(s)`,
       trip: {
         id: trip.id,
         pickupLocation: trip.pickup_location,
@@ -1079,7 +1196,7 @@ router.post('/create-admin-trip', async (req, res) => {
         fareAmount: trip.fare_amount,
         commissionAmount: trip.commission_amount,
         passengerName: trip.passenger_name,
-        assignedDrivers: assignedDriverIds.length,
+        assignedDrivers: isPublishToAll ? 'ALL' : assignedDriverIds.length,
       }
     });
 
@@ -1087,6 +1204,43 @@ router.post('/create-admin-trip', async (req, res) => {
     console.error('❌ CREATE ADMIN TRIP ERROR:', error);
     res.status(500).json({
       error: 'Failed to create admin trip',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /admin/approve-driver/:driverId
+ * Approve a driver by updating their driver_verification_status to 'approved'
+ */
+router.put('/approve-driver/:driverId', async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    if (!driverId) return res.status(400).json({ error: 'driverId is required' });
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Admin credentials not configured' });
+
+    console.log(`✅ Approving driver: ${driverId}`);
+
+    // Update driver_verification_status to approved
+    const { error: updateError, data } = await supabaseAdmin
+      .from('driver_verification_status')
+      .update({
+        overall_status: 'approved',
+        approved_at: new Date().toISOString(),
+      })
+      .eq('driver_id', driverId);
+
+    if (updateError) {
+      console.error('❌ Error approving driver:', updateError);
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    console.log(`✅ Driver ${driverId} approved successfully. Data returned:`, data);
+    res.json({ success: true, message: 'Driver approved' });
+  } catch (error) {
+    console.error('❌ APPROVE DRIVER ERROR:', error);
+    res.status(500).json({
+      error: 'Failed to approve driver',
       message: error.message
     });
   }

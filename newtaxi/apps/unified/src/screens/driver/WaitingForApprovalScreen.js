@@ -91,6 +91,11 @@ const WaitingForApprovalScreen = ({ navigation }) => {
       
       setVerificationStatus(status);
       setDocuments(docs || []);
+
+      // CHECK IF APPROVED - log it for debugging
+      if (status?.overall_status === 'approved') {
+        console.log('✅ WaitingForApprovalScreen: Driver is approved (DriverNavigator should handle navigation)');
+      }
     } catch (error) {
       console.error('Error loading verification status:', error);
       Alert.alert('Error', 'Failed to load approval status: ' + error.message);
@@ -101,8 +106,46 @@ const WaitingForApprovalScreen = ({ navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
+      // Load status only once when screen is focused
       loadVerificationStatus();
-    }, [loadVerificationStatus])
+      
+      // Subscribe to real-time changes in driver_verification_status table
+      // This way, when admin approves the driver, we'll be notified
+      if (!driverId) {
+        return () => {};
+      }
+
+      console.log('WaitingForApprovalScreen: Setting up real-time subscription for driver:', driverId);
+
+      const subscription = supabase
+        .channel(`verification-status:${driverId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'driver_verification_status',
+            filter: `driver_id=eq.${driverId}`,
+          },
+          (payload) => {
+            console.log('🔔 Real-time update received:', payload);
+            const newStatus = payload.new?.overall_status;
+            
+            // If status changed to approved, reload and let DriverNavigator handle the transition
+            if (newStatus === 'approved') {
+              console.log('✅ Driver approved in real-time! Reloading status...');
+              loadVerificationStatus();
+            }
+          }
+        )
+        .subscribe();
+
+      // Cleanup subscription on unmount
+      return () => {
+        console.log('WaitingForApprovalScreen: Unsubscribing from real-time updates');
+        supabase.removeChannel(subscription);
+      };
+    }, [driverId, loadVerificationStatus])
   );
 
   const onRefresh = useCallback(async () => {
@@ -112,6 +155,7 @@ const WaitingForApprovalScreen = ({ navigation }) => {
   }, [loadVerificationStatus]);
 
   const handleCheckStatus = async () => {
+    // Just refresh the data once, don't start polling
     setCheckingApproval(true);
     await loadVerificationStatus();
     setCheckingApproval(false);
@@ -163,6 +207,7 @@ const WaitingForApprovalScreen = ({ navigation }) => {
       <ScrollView
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
         {/* Header - changes based on status */}
         <View style={[styles.header, isRejected && styles.headerRejected]}>
@@ -194,8 +239,8 @@ const WaitingForApprovalScreen = ({ navigation }) => {
             {rejectedDocs.length > 0 && (
               <>
                 <Text style={styles.subSectionTitle}>⚠️ Rejected - Action Required</Text>
-                {rejectedDocs.map(doc => (
-                  <View key={doc.id} style={styles.docRow}>
+                {rejectedDocs.map((doc, index) => (
+                  <View key={`rejected-${doc.document_type}-${index}`} style={styles.docRow}>
                     <View style={[styles.docStatusDot, { backgroundColor: COLORS.error }]} />
                     <View style={styles.docInfo}>
                       <Text style={styles.docName}>{documentService.getDocumentLabel(doc.document_type)}</Text>
@@ -213,8 +258,8 @@ const WaitingForApprovalScreen = ({ navigation }) => {
             {pendingDocs.length > 0 && (
               <>
                 <Text style={[styles.subSectionTitle, { marginTop: 12 }]}>⏳ Pending Review</Text>
-                {pendingDocs.map(doc => (
-                  <View key={doc.id} style={styles.docRow}>
+                {pendingDocs.map((doc, index) => (
+                  <View key={`pending-${doc.document_type}-${index}`} style={styles.docRow}>
                     <View style={[styles.docStatusDot, { backgroundColor: COLORS.warning }]} />
                     <Text style={styles.docName}>{documentService.getDocumentLabel(doc.document_type)}</Text>
                     <Ionicons name="time-outline" size={20} color={COLORS.warning} />
@@ -227,8 +272,8 @@ const WaitingForApprovalScreen = ({ navigation }) => {
             {approvedDocs.length > 0 && (
               <>
                 <Text style={[styles.subSectionTitle, { marginTop: 12 }]}>✅ Approved</Text>
-                {approvedDocs.map(doc => (
-                  <View key={doc.id} style={styles.docRow}>
+                {approvedDocs.map((doc, index) => (
+                  <View key={`approved-${doc.document_type}-${index}`} style={styles.docRow}>
                     <View style={[styles.docStatusDot, { backgroundColor: COLORS.success }]} />
                     <Text style={styles.docName}>{documentService.getDocumentLabel(doc.document_type)}</Text>
                     <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
@@ -289,46 +334,50 @@ const WaitingForApprovalScreen = ({ navigation }) => {
             </Text>
           </View>
         </View>
-      </ScrollView>
 
-      {/* Footer Buttons */}
-      <View style={styles.footer}>
-        {isRejected ? (
-          <TouchableOpacity style={styles.reUploadButton} onPress={handleReUpload}>
-            <Ionicons name="cloud-upload-outline" size={18} color={COLORS.text} />
-            <Text style={styles.reUploadButtonText}>Re-upload Documents</Text>
-          </TouchableOpacity>
-        ) : (
+        {/* Buttons Row - Inside ScrollView */}
+        <View style={styles.buttonsRow}>
+          {isRejected ? (
+            <TouchableOpacity style={styles.reUploadButton} onPress={handleReUpload}>
+              <Ionicons name="cloud-upload-outline" size={18} color={COLORS.text} />
+              <Text style={styles.reUploadButtonText}>Re-upload Documents</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.checkButton}
+              onPress={handleCheckStatus}
+              disabled={checkingApproval}
+            >
+              {checkingApproval ? (
+                <ActivityIndicator color={COLORS.primary} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="refresh-outline" size={18} color={COLORS.primary} />
+                  <Text style={styles.checkButtonText}>Check Status</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
-            style={styles.checkButton}
-            onPress={handleCheckStatus}
-            disabled={checkingApproval}
+            style={styles.logoutButton}
+            onPress={handleLogout}
+            disabled={loggingOut}
           >
-            {checkingApproval ? (
+            {loggingOut ? (
               <ActivityIndicator color={COLORS.primary} size="small" />
             ) : (
               <>
-                <Ionicons name="refresh-outline" size={18} color={COLORS.primary} />
-                <Text style={styles.checkButtonText}>Check Status</Text>
+                <Ionicons name="log-out-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.logoutButtonText}>Logout</Text>
               </>
             )}
           </TouchableOpacity>
-        )}
+        </View>
+      </ScrollView>
 
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          disabled={loggingOut}
-        >
-          {loggingOut ? (
-            <ActivityIndicator color={COLORS.primary} size="small" />
-          ) : (
-            <>
-              <Ionicons name="log-out-outline" size={18} color={COLORS.primary} />
-              <Text style={styles.logoutButtonText}>Logout</Text>
-            </>
-          )}
-        </TouchableOpacity>
+      {/* Empty Footer */}
+      <View style={styles.footer}>
       </View>
     </View>
   );
@@ -399,23 +448,31 @@ const styles = StyleSheet.create({
   infoContent: { flex: 1 },
   infoTitle: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 4 },
   infoText: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 18 },
+  buttonsRow: {
+    paddingHorizontal: 16, paddingVertical: 16,
+    flexDirection: 'row',
+    gap: 8,
+  },
   footer: {
     paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 20,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1, borderTopColor: COLORS.border, gap: 8,
   },
   checkButton: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.primary,
     borderRadius: 8, paddingVertical: 12, gap: 8,
   },
   checkButtonText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   reUploadButton: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: COLORS.error, borderRadius: 8, paddingVertical: 14, gap: 8,
   },
   reUploadButtonText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   logoutButton: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border,
     borderRadius: 8, paddingVertical: 12, gap: 8,

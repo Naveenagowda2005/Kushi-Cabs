@@ -1,0 +1,141 @@
+-- ============================================================
+-- STORAGE BUCKETS SETUP
+-- Migration: 101_create_storage_buckets.sql
+-- Purpose: Setup Supabase Storage buckets with RLS policies
+-- Note: All documents (driver, vendor, user avatars) stored in buckets ONLY
+-- ============================================================
+
+-- NO DATABASE COLUMNS - All files stored directly in Supabase Storage buckets
+
+-- RLS on storage is automatically managed by Supabase
+-- Buckets created as "Private" automatically enable RLS
+
+-- ============================================================
+-- BUCKETS ALREADY CREATED (via Supabase Dashboard):
+-- ============================================================
+-- 1. driver-documents (Private)
+-- 2. vendor-documents (Private)
+-- 3. user-avatars (Private)
+
+-- ============================================================
+-- DRIVER DOCUMENTS BUCKET POLICIES
+-- ============================================================
+-- NOTE: Create these policies manually in Supabase Dashboard:
+-- Storage → [bucket-name] → Policies → New Policy
+
+-- Policy 1: Users can upload their own documents
+-- CREATE POLICY "Users can upload their own documents"
+-- ON storage.objects
+-- FOR INSERT
+-- WITH CHECK (
+--   bucket_id = 'driver-documents'
+--   AND (
+--     auth.uid()::text = (storage.foldername(name))[1]
+--     OR auth.jwt() ->> 'role' = 'super_admin'
+--   )
+-- );
+
+-- Policy 2: Users can view their own documents
+-- CREATE POLICY "Users can view their own documents"
+-- ON storage.objects
+-- FOR SELECT
+-- USING (
+--   bucket_id = 'driver-documents'
+--   AND (
+--     auth.uid()::text = (storage.foldername(name))[1]
+--     OR auth.jwt() ->> 'role' = 'super_admin'
+--   )
+-- );
+
+-- Policy 3: Only super admin can delete driver documents
+-- CREATE POLICY "Only super admin can delete driver documents"
+-- ON storage.objects
+-- FOR DELETE
+-- USING (
+--   bucket_id = 'driver-documents'
+--   AND auth.jwt() ->> 'role' = 'super_admin'
+-- );
+
+-- ============================================================
+-- USER AVATARS BUCKET POLICIES
+-- ============================================================
+-- Policy 1: Users can upload their own avatar
+-- CREATE POLICY "Users can upload their own avatar"
+-- ON storage.objects
+-- FOR INSERT
+-- WITH CHECK (
+--   bucket_id = 'user-avatars'
+--   AND (
+--     auth.uid()::text = (storage.foldername(name))[1]
+--     OR auth.jwt() ->> 'role' = 'super_admin'
+--   )
+-- );
+
+-- Policy 2: Authenticated users can view avatars
+-- CREATE POLICY "Authenticated users can view avatars"
+-- ON storage.objects
+-- FOR SELECT
+-- USING (
+--   bucket_id = 'user-avatars'
+--   AND auth.role() = 'authenticated'
+-- );
+
+-- Policy 3: Users can update their own avatar
+-- CREATE POLICY "Users can update their own avatar"
+-- ON storage.objects
+-- FOR UPDATE
+-- WITH CHECK (
+--   bucket_id = 'user-avatars'
+--   AND (
+--     auth.uid()::text = (storage.foldername(name))[1]
+--     OR auth.jwt() ->> 'role' = 'super_admin'
+--   )
+-- );
+
+-- Policy 4: Users can delete their own avatar
+-- CREATE POLICY "Users can delete their own avatar"
+-- ON storage.objects
+-- FOR DELETE
+-- USING (
+--   bucket_id = 'user-avatars'
+--   AND (
+--     auth.uid()::text = (storage.foldername(name))[1]
+--     OR auth.jwt() ->> 'role' = 'super_admin'
+--   )
+-- );
+
+-- ============================================================
+-- VENDOR DOCUMENTS BUCKET POLICIES
+-- ============================================================
+-- Policy 1: Vendors can upload their own documents
+-- CREATE POLICY "Vendors can upload their own documents"
+-- ON storage.objects
+-- FOR INSERT
+-- WITH CHECK (
+--   bucket_id = 'vendor-documents'
+--   AND (
+--     auth.uid()::text = (storage.foldername(name))[1]
+--     OR auth.jwt() ->> 'role' = 'super_admin'
+--   )
+-- );
+
+-- Policy 2: Vendors can view their own documents
+-- CREATE POLICY "Vendors can view their own documents"
+-- ON storage.objects
+-- FOR SELECT
+-- USING (
+--   bucket_id = 'vendor-documents'
+--   AND (
+--     auth.uid()::text = (storage.foldername(name))[1]
+--     OR auth.jwt() ->> 'role' = 'super_admin'
+--   )
+-- );
+
+-- Policy 3: Only super admin can delete vendor documents
+-- CREATE POLICY "Only super admin can delete vendor documents"
+-- ON storage.objects
+-- FOR DELETE
+-- USING (
+--   bucket_id = 'vendor-documents'
+--   AND auth.jwt() ->> 'role' = 'super_admin'
+-- );
