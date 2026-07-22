@@ -97,9 +97,9 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const server = app.listen(port, '192.168.1.114', () => {
-  console.log(`✅ Taxi SMS backend listening on http://192.168.1.114:${port}`);
-  console.log(`✅ Access from phone at: http://192.168.1.114:${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`✅ Taxi SMS backend listening on http://192.168.1.109:${port}`);
+  console.log(`✅ Access from network at: http://192.168.1.109:${port}`);
   console.log(`📱 API endpoints:`);
   console.log(`   - POST /sms/otp - Send OTP`);
   console.log(`   - POST /sms/verify - Verify OTP`);
@@ -111,6 +111,10 @@ const server = app.listen(port, '192.168.1.114', () => {
   console.log(`   - POST /admin/delete-user - Delete user`);
   console.log(`   - POST /admin/update-admin-phone - Update admin phone`);
   console.log(`   - GET /admin/user/:userId - Get user info`);
+  console.log(`   - PUT /admin/approve-vendor/:vendorId - Approve vendor`);
+  console.log(`   - PUT /admin/reject-vendor/:vendorId - Reject vendor`);
+  console.log(`   - PUT /admin/approve-vendor-document/:userId/:documentType - Approve vendor document`);
+  console.log(`   - PUT /admin/approve-driver/:driverId - Approve driver`);
   console.log(`   - POST /api/storage-migration/migrate-documents - Migrate docs to storage`);
   console.log(`   - POST /api/storage-migration/migrate-avatars - Migrate avatars to storage`);
   console.log(`   - GET /api/storage-migration/status - Migration status`);

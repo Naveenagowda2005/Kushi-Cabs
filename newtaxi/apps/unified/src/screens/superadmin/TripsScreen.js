@@ -10,7 +10,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../hooks/useTheme';
-import { COLORS } from '../../constants';
+import { COLORS, API_CONFIG } from '../../constants';
 
 // Zoomable Image Component with simple zoom controls
 function ZoomableImage({ imageUrl, title, onClose }) {
@@ -237,7 +237,7 @@ export default function SuperAdminTripsScreen() {
       params.append('limit', TRIPS_PER_PAGE);
 
       // Call backend API instead of direct Supabase query
-      const response = await fetch(`http://192.168.1.114:4000/api/trips/list?${params.toString()}`);
+      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/api/trips/list?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

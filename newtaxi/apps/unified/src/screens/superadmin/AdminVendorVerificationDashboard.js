@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../hooks/useTheme';
-import { COLORS } from '../../constants';
+import { COLORS, API_CONFIG } from '../../constants';
 import DocumentViewer from '../../components/DocumentViewer';
 import { getPendingVerifications, getDriverAllDocuments, getVendorAllDocuments } from '../../services/documentService';
 
@@ -237,19 +237,20 @@ const AdminVendorVerificationDashboard = () => {
           onPress: async () => {
             try {
               setActionLoading(true);
+              const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'https://kushi-cabs-27p8.onrender.com';
 
-              // Use RPC to bypass RLS
-              const { error: updateError } = await supabase
-                .rpc('update_vendor_verification', {
-                  p_vendor_id: vendorId,
-                  p_overall_status: 'approved',
-                });
-              if (updateError) throw updateError;
-
-              await supabase.rpc('update_user_verification_status', {
-                p_user_id: userId,
-                p_status: 'approved',
+              // Use backend API instead of RPC for faster performance
+              const response = await fetch(`${backendUrl}/admin/approve-vendor/${vendorId}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
               });
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Approval failed: ${response.status}`);
+              }
 
               Alert.alert('Success', 'Vendor approved successfully');
               await loadVendorVerifications();
@@ -323,6 +324,7 @@ const AdminVendorVerificationDashboard = () => {
 
     try {
       setActionLoading(true);
+      const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'https://kushi-cabs-27p8.onrender.com';
 
       if (selectedVendor?.rejectingDocType) {
         const docType = selectedVendor.rejectingDocType;
@@ -347,16 +349,21 @@ const AdminVendorVerificationDashboard = () => {
 
         Alert.alert('Success', `${getDocumentLabel(docType)} rejected`);
       } else {
-        await supabase.rpc('update_vendor_verification', {
-          p_vendor_id: selectedVendor.vendor_id,
-          p_overall_status: 'rejected',
-          p_rejection_reason: rejectionReason,
+        // Use backend API instead of RPC for faster rejection
+        const response = await fetch(`${backendUrl}/admin/reject-vendor/${selectedVendor.vendor_id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            rejectionReason: rejectionReason,
+          }),
         });
 
-        await supabase.rpc('update_user_verification_status', {
-          p_user_id: selectedVendor.user_id,
-          p_status: 'rejected',
-        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Rejection failed: ${response.status}`);
+        }
 
         setPendingVendors((prevVendors) =>
           prevVendors.filter((v) => v.user_id !== selectedVendor.user_id)
@@ -493,41 +500,28 @@ const AdminVendorVerificationDashboard = () => {
                             onPress={async () => {
                               try {
                                 setActionLoading(true);
+                                const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'https://kushi-cabs-27p8.onrender.com';
 
-                                // Update document status to approved using RPC
-                                const updatedDocs = { ...vendor.documents };
-                                updatedDocs[docType] = {
-                                  ...updatedDocs[docType],
-                                  status: 'approved',
-                                  approved_at: new Date().toISOString(),
-                                };
-
-                                const { error: docUpdateError } = await supabase
-                                  .rpc('update_vendor_document_status', {
-                                    p_user_id: vendor.user_id,
-                                    p_documents: updatedDocs,
-                                  });
-
-                                if (docUpdateError) throw docUpdateError;
-
-                                // Check if ALL REQUIRED documents are now approved
-                                const REQUIRED_DOCS = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
-                                const allApproved = REQUIRED_DOCS.every(
-                                  (dt) => updatedDocs[dt]?.status === 'approved'
+                                // Use backend API for faster document approval
+                                const response = await fetch(
+                                  `${backendUrl}/admin/approve-vendor-document/${vendor.user_id}/${docType}`,
+                                  {
+                                    method: 'PUT',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                  }
                                 );
 
-                                if (allApproved) {
-                                  // All docs approved — approve the vendor
-                                  await supabase.rpc('update_vendor_verification', {
-                                    p_vendor_id: vendor.vendor_id,
-                                    p_overall_status: 'approved',
-                                  });
+                                if (!response.ok) {
+                                  const errorData = await response.json().catch(() => ({}));
+                                  throw new Error(errorData.error || `Approval failed: ${response.status}`);
+                                }
 
-                                  await supabase.rpc('update_user_verification_status', {
-                                    p_user_id: vendor.user_id,
-                                    p_status: 'approved',
-                                  });
+                                const result = await response.json();
 
+                                if (result.vendorApproved) {
+                                  // All docs approved — vendor fully approved
                                   Alert.alert('Success', `${getDocumentLabel(docType)} approved — Vendor fully approved!`, [
                                     {
                                       text: 'OK',
@@ -539,7 +533,14 @@ const AdminVendorVerificationDashboard = () => {
                                     },
                                   ]);
                                 } else {
-                                  // Partial approval — update local state only
+                                  // Partial approval — update local state
+                                  const updatedDocs = { ...vendor.documents };
+                                  updatedDocs[docType] = {
+                                    ...updatedDocs[docType],
+                                    status: 'approved',
+                                    approved_at: new Date().toISOString(),
+                                  };
+
                                   setPendingVendors((prevVendors) =>
                                     prevVendors.map((v) =>
                                       v.user_id === vendor.user_id
@@ -547,9 +548,10 @@ const AdminVendorVerificationDashboard = () => {
                                         : v
                                     )
                                   );
-                                  Alert.alert('Success', `${getDocumentLabel(docType)} approved`);
+                                  Alert.alert('Success', `${getDocumentLabel(docType)} approved (${result.approvedCount}/${result.totalRequired})`);
                                 }
                               } catch (error) {
+                                console.error('Error approving document:', error);
                                 Alert.alert('Error', error.message);
                               } finally {
                                 setActionLoading(false);
@@ -870,7 +872,7 @@ const AdminVendorVerificationDashboard = () => {
                         setActionLoading(true);
 
                         // Update driver verification status via backend API
-                        const approveResponse = await fetch('http://192.168.1.114:4000/admin/approve-driver/' + driver.user_id, {
+                        const approveResponse = await fetch(`${API_CONFIG.ADMIN_API_URL}/admin/approve-driver/` + driver.user_id, {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                         });

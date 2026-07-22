@@ -230,46 +230,13 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
             uploaded_at: null,
           };
         });
-        // Then update the current one being uploaded
-        // Upload to storage bucket ONLY
-        console.log('handleUploadDocument: Uploading', documentType, 'to storage bucket for vendor:', vendorId);
         
-        // Convert base64 to binary
-        const binaryString = atob(imageData.base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: imageData.type || 'image/jpeg' });
+        // Store base64 data directly in database (NO storage bucket upload for vendors)
+        console.log('handleUploadDocument: Storing', documentType, 'base64 data in database for vendor:', vendorId);
         
-        // Upload to storage
-        const fileName = `${documentType}_${Date.now()}.jpg`;
-        const storagePath = `${vendorId}/${fileName}`;
-        
-        const { data: storageData, error: storageError } = await supabase.storage
-          .from('vendor-documents')
-          .upload(storagePath, blob, {
-            contentType: imageData.type || 'image/jpeg',
-            upsert: false,
-          });
-        
-        if (storageError) {
-          console.error('handleUploadDocument: ❌ Storage upload failed:', storageError.message);
-          throw storageError;
-        }
-        
-        // Get public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('vendor-documents')
-          .getPublicUrl(storagePath);
-        
-        console.log('handleUploadDocument: ✅ Uploaded to storage:', publicUrlData.publicUrl);
-        
-        // Store metadata ONLY in database (no base64)
         currentDocs[documentType] = {
           status: 'pending',
-          storage_path: storagePath,
-          document_url: publicUrlData.publicUrl,
+          document_data: imageData.base64, // Store base64 directly
           uploaded_at: new Date().toISOString(),
         };
 
@@ -307,45 +274,12 @@ const VendorDocumentUploadScreen = ({ navigation }) => {
         const currentDocs = existingDocs.documents || {};
         console.log('handleUploadDocument: Current document keys before update:', Object.keys(currentDocs));
         
-        // Upload to storage bucket ONLY
-        console.log('handleUploadDocument: Uploading', documentType, 'to storage bucket for vendor:', vendorId);
+        // Store base64 data directly in database (NO storage bucket upload for vendors)
+        console.log('handleUploadDocument: Storing', documentType, 'base64 data in database for vendor:', vendorId);
         
-        // Convert base64 to binary
-        const binaryString = atob(imageData.base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: imageData.type || 'image/jpeg' });
-        
-        // Upload to storage
-        const fileName = `${documentType}_${Date.now()}.jpg`;
-        const storagePath = `${vendorId}/${fileName}`;
-        
-        const { data: storageData, error: storageError } = await supabase.storage
-          .from('vendor-documents')
-          .upload(storagePath, blob, {
-            contentType: imageData.type || 'image/jpeg',
-            upsert: false,
-          });
-        
-        if (storageError) {
-          console.error('handleUploadDocument: ❌ Storage upload failed:', storageError.message);
-          throw storageError;
-        }
-        
-        // Get public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('vendor-documents')
-          .getPublicUrl(storagePath);
-        
-        console.log('handleUploadDocument: ✅ Uploaded to storage:', publicUrlData.publicUrl);
-        
-        // Store metadata ONLY in database (no base64)
         currentDocs[documentType] = {
           status: 'pending',
-          storage_path: storagePath,
-          document_url: publicUrlData.publicUrl,
+          document_data: imageData.base64, // Store base64 directly
           uploaded_at: new Date().toISOString(),
         };
 

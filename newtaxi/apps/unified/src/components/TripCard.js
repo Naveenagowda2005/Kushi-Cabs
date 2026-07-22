@@ -307,8 +307,8 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </View>
       )}
 
-      {/* Car Details Row - Hidden */}
-      {false && (carType || seaterType || fuelType) && (
+      {/* Car Details Row */}
+      {(carType || seaterType || fuelType) && (
         <View style={styles.carDetailsRow}>
           {carType && (
             <View style={styles.carDetail}>

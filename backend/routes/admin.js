@@ -1246,4 +1246,218 @@ router.put('/approve-driver/:driverId', async (req, res) => {
   }
 });
 
+/**
+ * PUT /approve-vendor/:vendorId
+ * Approve a vendor by updating their vendor_verification_status to 'approved'
+ * Also updates user verification_status
+ */
+router.put('/approve-vendor/:vendorId', async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    if (!vendorId) {
+      return res.status(400).json({ error: 'Vendor ID is required' });
+    }
+
+    console.log(`✅ Approving vendor: ${vendorId}`);
+
+    // First, get the vendor to find their user_id
+    const { data: vendorData, error: vendorFetchError } = await supabaseAdmin
+      .from('vendor_verification_status')
+      .select('user_id')
+      .eq('vendor_id', vendorId)
+      .single();
+
+    if (vendorFetchError) {
+      console.error('Error fetching vendor:', vendorFetchError);
+      return res.status(400).json({ error: 'Vendor not found' });
+    }
+
+    const userId = vendorData.user_id;
+
+    // Update vendor_verification_status to approved
+    const { error: updateVendorError } = await supabaseAdmin
+      .from('vendor_verification_status')
+      .update({
+        overall_status: 'approved',
+        approved_at: new Date().toISOString(),
+      })
+      .eq('vendor_id', vendorId);
+
+    if (updateVendorError) {
+      console.error('Error updating vendor verification status:', updateVendorError);
+      return res.status(500).json({ error: 'Failed to update vendor verification status' });
+    }
+
+    // Update user verification_status to approved
+    const { error: updateUserError } = await supabaseAdmin
+      .from('users')
+      .update({
+        verification_status: 'approved',
+      })
+      .eq('id', userId);
+
+    if (updateUserError) {
+      console.error('Error updating user verification status:', updateUserError);
+      // Don't fail - user update is secondary
+    }
+
+    console.log(`✅ Vendor ${vendorId} approved successfully`);
+    res.json({ success: true, message: 'Vendor approved' });
+
+  } catch (error) {
+    console.error('❌ APPROVE VENDOR ERROR:', error);
+    res.status(500).json({
+      error: 'Failed to approve vendor',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /reject-vendor/:vendorId
+ * Reject a vendor by updating their vendor_verification_status to 'rejected'
+ */
+router.put('/reject-vendor/:vendorId', async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { rejectionReason } = req.body;
+
+    if (!vendorId) {
+      return res.status(400).json({ error: 'Vendor ID is required' });
+    }
+
+    console.log(`❌ Rejecting vendor: ${vendorId}, reason: ${rejectionReason}`);
+
+    // Update vendor_verification_status to rejected
+    const { error: updateError } = await supabaseAdmin
+      .from('vendor_verification_status')
+      .update({
+        overall_status: 'rejected',
+        rejection_reason: rejectionReason || 'No reason provided',
+        verified_at: new Date().toISOString(),
+      })
+      .eq('vendor_id', vendorId);
+
+    if (updateError) {
+      console.error('Error rejecting vendor:', updateError);
+      return res.status(500).json({ error: 'Failed to reject vendor' });
+    }
+
+    console.log(`✅ Vendor ${vendorId} rejected successfully`);
+    res.json({ success: true, message: 'Vendor rejected' });
+
+  } catch (error) {
+    console.error('❌ REJECT VENDOR ERROR:', error);
+    res.status(500).json({
+      error: 'Failed to reject vendor',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /approve-vendor-document/:userId/:documentType
+ * Approve a single vendor document and update status in vendor_documents table
+ */
+router.put('/approve-vendor-document/:userId/:documentType', async (req, res) => {
+  try {
+    const { userId, documentType } = req.params;
+
+    if (!userId || !documentType) {
+      return res.status(400).json({ error: 'User ID and document type are required' });
+    }
+
+    console.log(`✅ Approving vendor document: ${documentType} for user: ${userId}`);
+
+    // Get current vendor_documents record
+    const { data: vendorDocData, error: fetchError } = await supabaseAdmin
+      .from('vendor_documents')
+      .select('documents')
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching vendor documents:', fetchError);
+      return res.status(400).json({ error: 'Vendor documents not found' });
+    }
+
+    // Update the specific document status to approved
+    const updatedDocs = vendorDocData.documents || {};
+    updatedDocs[documentType] = {
+      ...updatedDocs[documentType],
+      status: 'approved',
+      approved_at: new Date().toISOString(),
+    };
+
+    // Update vendor_documents table
+    const { error: updateError } = await supabaseAdmin
+      .from('vendor_documents')
+      .update({
+        documents: updatedDocs,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId);
+
+    if (updateError) {
+      console.error('Error updating vendor document:', updateError);
+      return res.status(500).json({ error: 'Failed to approve document' });
+    }
+
+    // Check if ALL REQUIRED documents are now approved
+    const REQUIRED_DOCS = ['AADHAR', 'PAN_CARD', 'BANK_PASSBOOK_FRONT', 'VENDOR_SELFIE'];
+    const allApproved = REQUIRED_DOCS.every((dt) => updatedDocs[dt]?.status === 'approved');
+
+    let vendorApproved = false;
+
+    if (allApproved) {
+      console.log(`✅ All required documents approved for user ${userId}. Approving vendor...`);
+
+      // Get vendor_id from vendor_verification_status
+      const { data: verificationData, error: verifyFetchError } = await supabaseAdmin
+        .from('vendor_verification_status')
+        .select('vendor_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (!verifyFetchError && verificationData) {
+        // Update vendor_verification_status to approved
+        const { error: vendorUpdateError } = await supabaseAdmin
+          .from('vendor_verification_status')
+          .update({
+            overall_status: 'approved',
+            approved_at: new Date().toISOString(),
+          })
+          .eq('vendor_id', verificationData.vendor_id);
+
+        if (!vendorUpdateError) {
+          // Update user verification_status to approved
+          await supabaseAdmin
+            .from('users')
+            .update({ verification_status: 'approved' })
+            .eq('id', userId);
+
+          vendorApproved = true;
+        }
+      }
+    }
+
+    console.log(`✅ Document ${documentType} approved for user ${userId}`);
+    res.json({
+      success: true,
+      message: 'Document approved',
+      vendorApproved: vendorApproved,
+      approvedCount: REQUIRED_DOCS.filter((dt) => updatedDocs[dt]?.status === 'approved').length,
+      totalRequired: REQUIRED_DOCS.length,
+    });
+
+  } catch (error) {
+    console.error('❌ APPROVE VENDOR DOCUMENT ERROR:', error);
+    res.status(500).json({
+      error: 'Failed to approve document',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

@@ -273,7 +273,7 @@ export const COLORS = new Proxy({}, {
 const getApiUrl = () => {
   // Use environment variable from .env, fallback to production
   const envUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
-  const productionUrl = 'https://kushi-cabs-27p8.onrender.com';
+  const productionUrl = 'https://kushi-cabs-27p8.onrender.com';  // PRODUCTION
   
   // Priority: env variable > production
   const url = envUrl || productionUrl;
