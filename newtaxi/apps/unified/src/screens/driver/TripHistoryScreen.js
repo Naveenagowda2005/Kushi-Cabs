@@ -23,17 +23,26 @@ export default function DriverTripHistoryScreen({ navigation }) {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*, booking_id_seq, creator:created_by(full_name, phone, roles(name)), segment:segment_id(name)')
+        .select('id, booking_id_seq, status, fare_amount, commission_amount, pickup_location, dropoff_location, return_location, passenger_name, created_at, accepted_at, completed_at, accepted_by, driver_id, created_by, segment_id, start_km, end_km, notes')
         .or(`accepted_by.eq.${user.id},driver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (error) throw error;
-      console.log('📋 TripHistory fetched trips:', {
-        total: data?.length,
-        completed: data?.filter(t => t.status === 'completed').length,
-        trips: data?.map(t => ({ id: t.id, status: t.status, fare: t.fare_amount }))
-      });
-      setTrips(data || []);
+
+      // Enrich with segment names
+      const rawTrips = data || [];
+      if (rawTrips.length > 0) {
+        const segIds = [...new Set(rawTrips.map(t => t.segment_id).filter(Boolean))];
+        if (segIds.length > 0) {
+          const { data: segs } = await supabase.from('trip_segments').select('id, name').in('id', segIds);
+          const segMap = {};
+          (segs || []).forEach(s => { segMap[s.id] = s.name; });
+          rawTrips.forEach(t => { t.segment_name = segMap[t.segment_id] || 'One-way'; });
+        }
+      }
+
+      setTrips(rawTrips);
     } catch (err) {
       console.error('TripHistory error:', err.message);
     } finally {
@@ -58,23 +67,11 @@ export default function DriverTripHistoryScreen({ navigation }) {
   };
 
   function handleCallCreator(trip) {
-    const creator = trip.creator;
-    const phone = creator?.phone;
-    const name = creator?.full_name || 'Trip Creator';
-    const role = creator?.roles?.name;
-
-    if (!phone) {
-      Alert.alert('No Contact', 'Contact information is not available for this trip.');
-      return;
-    }
-
+    // creator details not available without nested join — show booking ID instead
     Alert.alert(
-      'Contact Trip Creator',
-      `👤 ${name}\n📞 ${phone}\nRole: ${role === 'super_admin' ? 'Super Admin' : 'Vendor'}`,
-      [
-        { text: `Call ${name}`, onPress: () => Linking.openURL(`tel:${phone}`) },
-        { text: 'Cancel', style: 'cancel' },
-      ]
+      'Trip Info',
+      `Booking: KUSH-B-${trip.booking_id_seq || 1}\nStatus: ${trip.status}`,
+      [{ text: 'OK' }]
     );
   }
 
@@ -107,7 +104,7 @@ export default function DriverTripHistoryScreen({ navigation }) {
           </View>
           <View style={styles.tripTypeBadge}>
             <Text style={styles.tripTypeText}>
-              {item.segment?.name?.toUpperCase() || 'ONE WAY'}
+              {item.segment_name?.toUpperCase() || 'ONE WAY'}
             </Text>
           </View>
           <Text style={styles.fare}>₹{(item.fare_amount - (item.commission_amount || 0)).toFixed(2)}</Text>

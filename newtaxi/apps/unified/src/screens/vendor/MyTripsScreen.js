@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
   RefreshControl, Alert, ActivityIndicator, Modal, ScrollView,
@@ -8,6 +8,218 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../constants';
+
+// ===== TRIP ITEM COMPONENT - EXTRACTED TO PREVENT RE-CREATION =====
+const TripItem = React.memo(({ item, navigation, publishing, onPublish, onUnpublish, onDelete, onSelectTrip }) => {
+  const [segmentName, setSegmentName] = useState(null);
+
+  useEffect(() => {
+    const fetchSegment = async () => {
+      if (item.segment_id) {
+        try {
+          const { data } = await supabase
+            .from('trip_segments')
+            .select('name')
+            .eq('id', item.segment_id)
+            .maybeSingle();
+          if (data) {
+            setSegmentName(data.name);
+          }
+        } catch (error) {
+          console.error('Error fetching segment:', error);
+        }
+      }
+    };
+    fetchSegment();
+  }, [item.segment_id]);
+
+  // Format booking ID
+  const getFormattedBookingId = (bookingIdSeq) => {
+    const serial = (bookingIdSeq || 1).toString();
+    return `KUSH-B-${serial}`;
+  };
+  const bookingId = getFormattedBookingId(item.booking_id_seq);
+
+  return (
+  <TouchableOpacity
+    style={styles.tripCard}
+    onPress={() => onSelectTrip(item)}
+    activeOpacity={0.8}
+  >
+    {/* Booking ID and Trip Type Badge */}
+    <View style={styles.headerBadgeRow}>
+      <View style={styles.bookingIdBadge}>
+        <Text style={styles.bookingIdLabel}>Booking ID:</Text>
+        <Text style={styles.bookingIdValue}>{bookingId}</Text>
+      </View>
+    </View>
+
+    <View style={styles.tripHeader}>
+      <View style={styles.tripInfo}>
+        {/* Pickup and Dropoff on separate rows */}
+        <View style={styles.locationsColumn}>
+          {/* Pickup Row */}
+          <View style={styles.locationRow}>
+            <Ionicons name="location" size={12} color="#4caf50" />
+            <View style={styles.locationContent}>
+              <Text style={styles.locationLabel}>Pickup</Text>
+              <Text style={styles.tripLocations} numberOfLines={2}>{item.pickup_location}</Text>
+            </View>
+          </View>
+          
+          {/* Dropoff Row */}
+          <View style={styles.locationRow}>
+            <Ionicons name="flag" size={12} color="#e94560" />
+            <View style={styles.locationContent}>
+              <Text style={styles.locationLabel}>Dropoff</Text>
+              <Text style={styles.tripLocations} numberOfLines={2}>{item.dropoff_location}</Text>
+            </View>
+          </View>
+        </View>
+        {item.return_location && (
+          <View style={styles.returnLocationRow}>
+            <Ionicons name="location-outline" size={12} color="#2196f3" />
+            <Text style={styles.tripReturnLocation} numberOfLines={1}>
+              Return: {item.return_location}
+            </Text>
+          </View>
+        )}
+        <Text style={styles.tripDate}>
+          Departure: {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : 'ASAP'}
+        </Text>
+        {item.return_date && (
+          <Text style={styles.tripReturnDate}>
+            Return: {new Date(item.return_date).toLocaleDateString()}
+          </Text>
+        )}
+      </View>
+      <View style={styles.tripRight}>
+        <Text style={styles.tripFare}>₹{item.fare_amount}</Text>
+        <View style={[
+          styles.statusBadge,
+          item.is_published ? styles.publishedBadge : styles.draftBadge
+        ]}>
+          <Text style={styles.statusText}>
+            {item.is_published ? 'Published' : 'Draft'}
+          </Text>
+        </View>
+        {/* Extra KM Charge Badge */}
+        {item.extra_km_charge && item.extra_km_charge > 0 && (
+          <View style={styles.extraKmChargeBadge}>
+            <Ionicons name="trending-up-outline" size={12} color="#fff" />
+            <Text style={styles.extraKmChargeBadgeText}>₹{item.extra_km_charge}/km</Text>
+          </View>
+        )}
+      </View>
+    </View>
+
+    <View style={styles.tripDetails}>
+      <View style={styles.detailRow}>
+        <Ionicons name="map-outline" size={14} color="#2196f3" />
+        <Text style={styles.detailText}>{item.fixed_km || 'N/A'} km</Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Ionicons name="car-outline" size={14} color="#2196f3" />
+        <Text style={styles.detailText}>{item.car_type || 'N/A'}</Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Ionicons name="people-outline" size={14} color="#2196f3" />
+        <Text style={styles.detailText}>{item.seater_type || 'N/A'}</Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Ionicons name="flame-outline" size={14} color="#2196f3" />
+        <Text style={styles.detailText}>{item.fuel_type || 'N/A'}</Text>
+      </View>
+    </View>
+
+    {/* Extra Charges Display */}
+    <View style={styles.extraChargesContainer}>
+      <View style={styles.extraChargesRow}>
+        <View style={styles.chargeBadge}>
+          <Ionicons name="cash-outline" size={12} color="#fff" />
+          <Text style={styles.chargeBadgeText}>
+            Toll: {item.toll_included ? 'Included' : 'Excluded'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.extraChargesRow}>
+        <View style={styles.chargeBadge}>
+          <Ionicons name="document-text-outline" size={12} color="#fff" />
+          <Text style={styles.chargeBadgeText}>
+            Tax: {item.state_tax_included ? 'Included' : 'Excluded'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.extraChargesRow}>
+        <View style={styles.chargeBadge}>
+          <Ionicons name="paw-outline" size={12} color="#fff" />
+          <Text style={styles.chargeBadgeText}>
+            Pet: {item.pet_travelling ? 'Allowed' : 'Not Allowed'}
+          </Text>
+        </View>
+      </View>
+    </View>
+
+    {/* Notes Display */}
+    {item.notes && item.notes.trim() && (
+      <View style={styles.notesPreview}>
+        <Ionicons name="document-text-outline" size={12} color="#2196f3" />
+        <Text style={styles.notesPreviewText} numberOfLines={2}>
+          {item.notes}
+        </Text>
+      </View>
+    )}
+
+    <View style={styles.tripFooter}>
+      <Text style={styles.commissionText}>
+        Commission: ₹{item.commission_amount}
+      </Text>
+      <View style={styles.actionButtons}>
+        {item.status !== 'completed' && !item.is_published && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => navigation.navigate('CreateTrip', { trip: item, editMode: true })}
+          >
+            <Ionicons name="pencil-outline" size={14} color="#2196f3" />
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+        )}
+        {item.is_published ? (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.unpublishBtn]}
+            onPress={() => onUnpublish(item.id)}
+            disabled={publishing === item.id}
+          >
+            {publishing === item.id ? (
+              <ActivityIndicator size="small" color="#ff9800" />
+            ) : (
+              <>
+                <Ionicons name="eye-off-outline" size={14} color="#ff9800" />
+                <Text style={styles.unpublishBtnText}>Unpublish</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.publishBtn]}
+            onPress={() => onPublish(item.id)}
+            disabled={publishing === item.id}
+          >
+            {publishing === item.id ? (
+              <ActivityIndicator size="small" color="#4caf50" />
+            ) : (
+              <>
+                <Ionicons name="eye-outline" size={14} color="#4caf50" />
+                <Text style={styles.publishBtnText}>Publish</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  </TouchableOpacity>
+  );
+});
 
 export default function VendorMyTripsScreen({ navigation }) {
   const { user } = useAuth();
@@ -24,7 +236,7 @@ export default function VendorMyTripsScreen({ navigation }) {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*, booking_id_seq')
+        .select('*, booking_id_seq, is_published')
         .eq('created_by', user.id)
         .in('status', ['pending', 'accepted', 'in_progress'])
         .order('created_at', { ascending: false });
@@ -33,7 +245,7 @@ export default function VendorMyTripsScreen({ navigation }) {
       setTrips(data || []);
       console.log('✅ Trips fetched:', data?.length);
       if (data && data.length > 0) {
-        console.log('📝 First trip notes field:', data[0].notes);
+        console.log('📝 First trip is_published:', data[0].is_published);
         console.log('📝 Sample trip data:', JSON.stringify(data[0], null, 2));
       }
       return true;
@@ -58,7 +270,7 @@ export default function VendorMyTripsScreen({ navigation }) {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*, booking_id_seq')
+        .select('*, booking_id_seq, is_published')
         .eq('created_by', user.id)
         .in('status', ['pending', 'accepted', 'in_progress'])
         .order('created_at', { ascending: false });
@@ -71,64 +283,86 @@ export default function VendorMyTripsScreen({ navigation }) {
   };
 
   const handlePublish = async (tripId) => {
+    console.log(`🔵 Publishing trip: ${tripId}`);
+    console.log(`Current trips state:`, trips);
     setPublishing(tripId);
     try {
-      // Immediately update local state FIRST for instant UI feedback
-      const newTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: true } : trip
-      );
-      setTrips(newTrips);
-
-      // Then update database
-      const { error } = await supabase
+      // Update database first (more reliable)
+      console.log(`📤 Sending update to database for trip: ${tripId}`);
+      const { data, error } = await supabase
         .from('trips')
         .update({ is_published: true })
-        .eq('id', tripId);
+        .eq('id', tripId)
+        .select();
 
-      if (error) throw error;
+      console.log(`✅ Update response:`, { data, error });
+      
+      if (error) {
+        console.error(`❌ Update error:`, error);
+        throw error;
+      }
+
+      // Update local state with fresh data from response
+      if (data && data.length > 0) {
+        const updatedTrip = data[0];
+        const updatedTrips = trips.map(trip => 
+          trip.id === tripId ? updatedTrip : trip
+        );
+        setTrips(updatedTrips);
+        console.log(`✅ Local state updated with database response`);
+      }
 
       setSuccessMessage('✅ Published - Trip is now visible to all drivers');
       setShowSuccessModal(true);
+      console.log(`✅ Published trip: ${tripId} successfully`);
     } catch (err) {
-      console.error('Error publishing trip:', err.message);
-      // Revert if error
-      const revertedTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: false } : trip
-      );
-      setTrips(revertedTrips);
-      Alert.alert('Error', 'Failed to publish trip');
+      console.error('❌ Error publishing trip:', err.message);
+      // Revert if error - fetch fresh data
+      fetchMyTrips();
+      Alert.alert('Error', 'Failed to publish trip: ' + err.message);
     } finally {
       setPublishing(null);
     }
   };
 
   const handleUnpublish = async (tripId) => {
+    console.log(`🔵 Unpublishing trip: ${tripId}`);
+    console.log(`Current trips state:`, trips);
     setPublishing(tripId);
     try {
-      // Immediately update local state FIRST for instant UI feedback
-      const newTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: false } : trip
-      );
-      setTrips(newTrips);
-
-      // Then update database
-      const { error } = await supabase
+      // Update database first (more reliable)
+      console.log(`📤 Sending update to database for trip: ${tripId}`);
+      const { data, error } = await supabase
         .from('trips')
         .update({ is_published: false })
-        .eq('id', tripId);
+        .eq('id', tripId)
+        .select();
 
-      if (error) throw error;
+      console.log(`✅ Update response:`, { data, error });
+      
+      if (error) {
+        console.error(`❌ Update error:`, error);
+        throw error;
+      }
+
+      // Update local state with fresh data from response
+      if (data && data.length > 0) {
+        const updatedTrip = data[0];
+        const updatedTrips = trips.map(trip => 
+          trip.id === tripId ? updatedTrip : trip
+        );
+        setTrips(updatedTrips);
+        console.log(`✅ Local state updated with database response`);
+      }
 
       setSuccessMessage('✅ Unpublished - Trip is no longer visible to drivers');
       setShowSuccessModal(true);
+      console.log(`✅ Unpublished trip: ${tripId} successfully`);
     } catch (err) {
-      console.error('Error unpublishing trip:', err.message);
-      // Revert if error
-      const revertedTrips = trips.map(trip =>
-        trip.id === tripId ? { ...trip, is_published: true } : trip
-      );
-      setTrips(revertedTrips);
-      Alert.alert('Error', 'Failed to unpublish trip');
+      console.error('❌ Error unpublishing trip:', err.message);
+      // Revert if error - fetch fresh data
+      fetchMyTrips();
+      Alert.alert('Error', 'Failed to unpublish trip: ' + err.message);
     } finally {
       setPublishing(null);
     }
@@ -164,226 +398,30 @@ export default function VendorMyTripsScreen({ navigation }) {
     );
   };
 
-  const TripItem = ({ item }) => {
-    const [segmentName, setSegmentName] = useState(null);
-
-    useEffect(() => {
-      const fetchSegment = async () => {
-        if (item.segment_id) {
-          try {
-            const { data } = await supabase
-              .from('trip_segments')
-              .select('name')
-              .eq('id', item.segment_id)
-              .maybeSingle();
-            if (data) {
-              setSegmentName(data.name);
-            }
-          } catch (error) {
-            console.error('Error fetching segment:', error);
-          }
-        }
-      };
-      fetchSegment();
-    }, [item.segment_id]);
-
-    // Format booking ID
-    const getFormattedBookingId = (bookingIdSeq) => {
-      const serial = (bookingIdSeq || 1).toString();
-      return `KUSH-B-${serial}`;
-    };
-    const bookingId = getFormattedBookingId(item.booking_id_seq);
-
-    return (
-    <TouchableOpacity
-      style={styles.tripCard}
-      onPress={() => {
-        setSelectedTrip(item);
-        setShowModal(true);
-      }}
-      activeOpacity={0.8}
-    >
-      {/* Booking ID and Trip Type Badge */}
-      <View style={styles.headerBadgeRow}>
-        <View style={styles.bookingIdBadge}>
-          <Text style={styles.bookingIdLabel}>Booking ID:</Text>
-          <Text style={styles.bookingIdValue}>{bookingId}</Text>
-        </View>
-      </View>
-
-      <View style={styles.tripHeader}>
-        <View style={styles.tripInfo}>
-          {/* Pickup and Dropoff on separate rows */}
-          <View style={styles.locationsColumn}>
-            {/* Pickup Row */}
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={12} color="#4caf50" />
-              <View style={styles.locationContent}>
-                <Text style={styles.locationLabel}>Pickup</Text>
-                <Text style={styles.tripLocations} numberOfLines={2}>{item.pickup_location}</Text>
-              </View>
-            </View>
-            
-            {/* Dropoff Row */}
-            <View style={styles.locationRow}>
-              <Ionicons name="flag" size={12} color="#e94560" />
-              <View style={styles.locationContent}>
-                <Text style={styles.locationLabel}>Dropoff</Text>
-                <Text style={styles.tripLocations} numberOfLines={2}>{item.dropoff_location}</Text>
-              </View>
-            </View>
-          </View>
-          {item.return_location && (
-            <View style={styles.returnLocationRow}>
-              <Ionicons name="location-outline" size={12} color="#2196f3" />
-              <Text style={styles.tripReturnLocation} numberOfLines={1}>
-                Return: {item.return_location}
-              </Text>
-            </View>
-          )}
-          <Text style={styles.tripDate}>
-            Departure: {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : 'ASAP'}
-          </Text>
-          {item.return_date && (
-            <Text style={styles.tripReturnDate}>
-              Return: {new Date(item.return_date).toLocaleDateString()}
-            </Text>
-          )}
-        </View>
-        <View style={styles.tripRight}>
-          <Text style={styles.tripFare}>₹{item.fare_amount}</Text>
-          <View style={[
-            styles.statusBadge,
-            item.is_published ? styles.publishedBadge : styles.draftBadge
-          ]}>
-            <Text style={styles.statusText}>
-              {item.is_published ? 'Published' : 'Draft'}
-            </Text>
-          </View>
-          {/* Extra KM Charge Badge */}
-          {item.extra_km_charge && item.extra_km_charge > 0 && (
-            <View style={styles.extraKmChargeBadge}>
-              <Ionicons name="trending-up-outline" size={12} color="#fff" />
-              <Text style={styles.extraKmChargeBadgeText}>₹{item.extra_km_charge}/km</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.tripDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="map-outline" size={14} color="#2196f3" />
-          <Text style={styles.detailText}>{item.fixed_km || 'N/A'} km</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="car-outline" size={14} color="#2196f3" />
-          <Text style={styles.detailText}>{item.car_type || 'N/A'}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="people-outline" size={14} color="#2196f3" />
-          <Text style={styles.detailText}>{item.seater_type || 'N/A'}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="flame-outline" size={14} color="#2196f3" />
-          <Text style={styles.detailText}>{item.fuel_type || 'N/A'}</Text>
-        </View>
-      </View>
-
-      {/* Extra Charges Display */}
-      <View style={styles.extraChargesContainer}>
-        <View style={styles.extraChargesRow}>
-          <View style={styles.chargeBadge}>
-            <Ionicons name="cash-outline" size={12} color="#fff" />
-            <Text style={styles.chargeBadgeText}>
-              Toll: {item.toll_included ? 'Included' : 'Excluded'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.extraChargesRow}>
-          <View style={styles.chargeBadge}>
-            <Ionicons name="document-text-outline" size={12} color="#fff" />
-            <Text style={styles.chargeBadgeText}>
-              Tax: {item.state_tax_included ? 'Included' : 'Excluded'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.extraChargesRow}>
-          <View style={styles.chargeBadge}>
-            <Ionicons name="paw-outline" size={12} color="#fff" />
-            <Text style={styles.chargeBadgeText}>
-              Pet: {item.pet_travelling ? 'Allowed' : 'Not Allowed'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Notes Display */}
-      {item.notes && item.notes.trim() && (
-        <View style={styles.notesPreview}>
-          <Ionicons name="document-text-outline" size={12} color="#2196f3" />
-          <Text style={styles.notesPreviewText} numberOfLines={2}>
-            {item.notes}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.tripFooter}>
-        <Text style={styles.commissionText}>
-          Commission: ₹{item.commission_amount}
-        </Text>
-        <View style={styles.actionButtons}>
-          {item.status !== 'completed' && !item.is_published && (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.editBtn]}
-              onPress={() => navigation.navigate('CreateTrip', { trip: item, editMode: true })}
-            >
-              <Ionicons name="pencil-outline" size={14} color="#2196f3" />
-              <Text style={styles.editBtnText}>Edit</Text>
-            </TouchableOpacity>
-          )}
-          {item.is_published ? (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.unpublishBtn]}
-              onPress={() => handleUnpublish(item.id)}
-              disabled={publishing === item.id}
-            >
-              {publishing === item.id ? (
-                <ActivityIndicator size="small" color="#ff9800" />
-              ) : (
-                <>
-                  <Ionicons name="eye-off-outline" size={14} color="#ff9800" />
-                  <Text style={styles.unpublishBtnText}>Unpublish</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.publishBtn]}
-              onPress={() => handlePublish(item.id)}
-              disabled={publishing === item.id}
-            >
-              {publishing === item.id ? (
-                <ActivityIndicator size="small" color="#4caf50" />
-              ) : (
-                <>
-                  <Ionicons name="eye-outline" size={14} color="#4caf50" />
-                  <Text style={styles.publishBtnText}>Publish</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-    );
-  };
+  // Memoized callback handlers for TripItem
+  const handlePublishCallback = useCallback((tripId) => handlePublish(tripId), [trips]);
+  const handleUnpublishCallback = useCallback((tripId) => handleUnpublish(tripId), [trips]);
+  const handleSelectTrip = useCallback((trip) => {
+    setSelectedTrip(trip);
+    setShowModal(true);
+  }, []);
 
   return (
     <View style={styles.container}>
       <FlatList
         data={trips}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <TripItem item={item} />}
+        renderItem={({ item }) => (
+          <TripItem 
+            item={item}
+            navigation={navigation}
+            publishing={publishing}
+            onPublish={handlePublishCallback}
+            onUnpublish={handleUnpublishCallback}
+            onDelete={handleDelete}
+            onSelectTrip={handleSelectTrip}
+          />
+        )}
         contentContainerStyle={styles.list}
         extraData={trips}
         ListEmptyComponent={

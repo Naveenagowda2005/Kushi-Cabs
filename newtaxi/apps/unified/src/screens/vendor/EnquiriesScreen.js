@@ -40,9 +40,16 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
   const [fuelTypeName, setFuelTypeName] = useState(null);
   const [creatorName, setCreatorName] = useState(null);
   const [creatorPhone, setCreatorPhone] = useState(null);
+  const [isPublished, setIsPublished] = useState(item.is_published);
 
   // Get segment name directly from enriched data
   const segmentName = item.segment_name || 'ONE WAY';
+
+  // Sync item.is_published with local state
+  // This ensures whenever the trip data is refreshed from server, we update the UI
+  useEffect(() => {
+    setIsPublished(item.is_published);
+  }, [item.is_published, item.id]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -303,29 +310,32 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
         <TouchableOpacity
           style={[
             styles.publishBtn,
-            item.is_published && styles.publishBtnActive
+            isPublished && styles.publishBtnActive
           ]}
           onPress={() => {
             Alert.alert(
-              item.is_published ? 'Unpublish Trip' : 'Publish Trip',
-              item.is_published 
+              isPublished ? 'Unpublish Trip' : 'Publish Trip',
+              isPublished 
                 ? 'This trip will no longer be visible to drivers. You can republish it later.'
                 : 'Make this trip visible to all drivers so they can accept it.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                  text: item.is_published ? 'Unpublish' : 'Publish',
+                  text: isPublished ? 'Unpublish' : 'Publish',
                   onPress: async () => {
                     try {
                       const { error } = await supabase
                         .from('trips')
-                        .update({ is_published: !item.is_published })
+                        .update({ is_published: !isPublished })
                         .eq('id', item.id);
 
                       if (error) throw error;
                       
+                      // Update local state immediately for UI feedback
+                      setIsPublished(!isPublished);
+                      
                       // Show different message based on current published state
-                      const successMsg = item.is_published 
+                      const successMsg = isPublished 
                         ? 'Trip unpublished successfully' 
                         : 'Trip published to drivers';
                       Alert.alert('Success', successMsg);
@@ -340,17 +350,19 @@ function MyTripCard({ item, navigation, onCancel, onDelete, onPublish }) {
             );
           }}
         >
-          <Ionicons 
-            name={item.is_published ? 'eye-outline' : 'eye-off-outline'} 
-            size={16} 
-            color={item.is_published ? '#4caf50' : '#ff9800'} 
-          />
-          <Text style={[
-            styles.publishBtnText,
-            item.is_published && styles.publishBtnTextActive
-          ]}>
-            {item.is_published ? 'Published' : 'Publish to Drivers'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons 
+              name={isPublished ? 'eye-outline' : 'eye-off-outline'} 
+              size={16} 
+              color={isPublished ? '#4caf50' : '#ff9800'} 
+            />
+            <Text style={[
+              styles.publishBtnText,
+              isPublished && styles.publishBtnTextActive
+            ]}>
+              {isPublished ? 'Published' : 'Publish to Drivers'}
+            </Text>
+          </View>
         </TouchableOpacity>
       )}
 
@@ -820,7 +832,9 @@ export default function VendorEnquiriesScreen({ navigation }) {
           handleDeleteTrip(item.id);
           refetchTrips();
         }}
-        onPublish={() => {
+        onPublish={async () => {
+          // Add small delay to ensure database update is persisted
+          await new Promise(resolve => setTimeout(resolve, 500));
           refetchTrips();
         }}
       />

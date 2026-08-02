@@ -65,14 +65,6 @@ export async function acceptTrip(tripId, userId) {
  * Starts a trip — sets status to in_progress, saves start odometer.
  */
 export async function startTrip({ tripId, startOdometerUrl, startKm, userId }) {
-  // Save document record
-  await supabase.from('documents').insert({
-    user_id:     userId,
-    trip_id:     tripId,
-    doc_type:    'start_odometer',
-    storage_url: startOdometerUrl,
-  });
-
   const { error } = await supabase
     .from('trips')
     .update({
@@ -92,15 +84,7 @@ export async function startTrip({ tripId, startOdometerUrl, startKm, userId }) {
  * Wallet is only used for paying commission to accept trips.
  */
 export async function completeTrip({ tripId, endOdometerUrl, endKm, userId }) {
-  // 1. Save end odometer document
-  await supabase.from('documents').insert({
-    user_id:     userId,
-    trip_id:     tripId,
-    doc_type:    'end_odometer',
-    storage_url: endOdometerUrl,
-  });
-
-  // 2. Mark trip completed
+  // 1. Mark trip completed
   const { error: tripError } = await supabase
     .from('trips')
     .update({
@@ -113,7 +97,7 @@ export async function completeTrip({ tripId, endOdometerUrl, endKm, userId }) {
 
   if (tripError) throw tripError;
 
-  // 3. Free the driver
+  // 2. Free the driver
   const { error: driverError } = await supabase
     .from('drivers')
     .update({ is_available: true, current_trip_id: null })

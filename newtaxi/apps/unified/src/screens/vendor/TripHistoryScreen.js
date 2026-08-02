@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, Dimensions,
+  RefreshControl, Dimensions, Modal, Image, Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,40 +17,85 @@ export default function VendorTripHistoryScreen({ navigation }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [odometerData, setOdometerData] = useState({});
+  const [loadingOdometer, setLoadingOdometer] = useState({});
 
   const fetchTrips = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
-      // Get vendor row id
-      const { data: vendorRow } = await supabase
-        .from('vendors')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      let query = supabase
+      console.log('🔍 Fetching trips directly from Supabase for vendor:', user.id);
+      
+      // Fetch trips created or accepted by this vendor - WITHOUT odometer URLs to avoid timeout
+      const { data, error } = await supabase
         .from('trips')
-        .select('*, booking_id_seq, accepted_by_user:accepted_by(full_name, phone), driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
+        .select('id,booking_id_seq,status,fare_amount,commission_amount,pickup_location,dropoff_location,return_location,scheduled_at,return_date,created_at,completed_at,created_by,accepted_by,driver_id,passenger_name,passenger_phone,car_type,seater_type,fuel_type,segment_id,package_id,fixed_km,extra_km_charge,toll_included,pet_travelling,state_tax_included,hills_included,notes,customer_pre_advance,start_km,end_km')
+        .or(`created_by.eq.${user.id},accepted_by.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
-      if (vendorRow?.id) {
-        query = query.or(`accepted_by.eq.${user.id},vendor_id.eq.${vendorRow.id},created_by.eq.${user.id}`);
-      } else {
-        query = query.or(`accepted_by.eq.${user.id},created_by.eq.${user.id}`);
+      if (error) {
+        console.error('❌ Supabase error:', error.message);
+        throw error;
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      console.log(`✅ Fetched ${data?.length || 0} trips directly from Supabase`);
       setTrips(data || []);
     } catch (err) {
-      console.error('TripHistory fetch error:', err.message);
+      console.error('❌ TripHistory fetch error:', err.message);
+      Alert.alert('Error', 'Failed to fetch trips: ' + err.message);
     } finally {
       setLoading(false);
     }
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { fetchTrips(); }, [fetchTrips]));
+
+  // Fetch odometer images for a trip directly from Supabase
+  const fetchOdometerImages = useCallback(async (tripId) => {
+    if (odometerData[tripId]) {
+      // Already loaded
+      return;
+    }
+
+    setLoadingOdometer(prev => ({ ...prev, [tripId]: true }));
+    try {
+      console.log('🔍 Fetching odometer URLs for trip:', tripId);
+      
+      // Fetch the trip's odometer URL fields directly from Supabase
+      const { data: tripData, error } = await supabase
+        .from('trips')
+        .select('id, start_odometer_url, end_odometer_url')
+        .eq('id', tripId)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching odometer data:', error.message);
+        return;
+      }
+
+      if (tripData && (tripData.start_odometer_url || tripData.end_odometer_url)) {
+        console.log('✅ Odometer data fetched:', {
+          start: tripData.start_odometer_url ? 'YES' : 'NO',
+          end: tripData.end_odometer_url ? 'YES' : 'NO'
+        });
+        setOdometerData(prev => ({
+          ...prev,
+          [tripId]: {
+            start_odometer_url: tripData.start_odometer_url,
+            end_odometer_url: tripData.end_odometer_url
+          }
+        }));
+      } else {
+        console.warn('❌ No odometer data found for trip');
+      }
+    } catch (err) {
+      console.error('Error fetching odometer images:', err.message);
+    } finally {
+      setLoadingOdometer(prev => ({ ...prev, [tripId]: false }));
+    }
+  }, [odometerData]);
 
   const filteredTrips = trips.filter(t => {
     if (activeTab === 0) return true;
@@ -72,6 +117,8 @@ export default function VendorTripHistoryScreen({ navigation }) {
       return `KUSH-B-${bookingIdSeq || 1}`;
     };
     const bookingId = getFormattedBookingId(item.booking_id_seq);
+    const tripOdometerData = odometerData[item.id];
+    const hasImages = tripOdometerData && (tripOdometerData.start_odometer_url || tripOdometerData.end_odometer_url);
 
     return (
       <View style={styles.card}>
@@ -113,48 +160,128 @@ export default function VendorTripHistoryScreen({ navigation }) {
 
         <Text style={styles.date}>{new Date(item.created_at).toLocaleString()}</Text>
 
-        {/* View Details Button */}
-        <TouchableOpacity
-          style={styles.viewDetailsBtn}
-          onPress={() => {
-            if (item.status === 'completed') {
-              navigation.navigate('CompletedTripDetail', { trip: item });
-            } else {
-              navigation.navigate('EnquiryDetail', { trip: item, readOnly: true });
-            }
-          }}
-        >
-          <Ionicons name="eye-outline" size={16} color="#fff" />
-          <Text style={styles.viewDetailsBtnText}>View Details</Text>
-        </TouchableOpacity>
+        {/* Odometer Images Section */}
+        {hasImages && (
+          <View style={styles.odometerSection}>
+            <View style={styles.odometerImagesRow}>
+              {tripOdometerData.start_odometer_url && (
+                <TouchableOpacity
+                  style={styles.odometerImageWrapper}
+                  onPress={() => {
+                    setSelectedImage(tripOdometerData.start_odometer_url);
+                    setImageModalVisible(true);
+                  }}
+                >
+                  <Image
+                    source={{ uri: tripOdometerData.start_odometer_url }}
+                    style={styles.odometerImage}
+                  />
+                  <Text style={styles.odometerLabel}>Start</Text>
+                </TouchableOpacity>
+              )}
+              {tripOdometerData.end_odometer_url && (
+                <TouchableOpacity
+                  style={styles.odometerImageWrapper}
+                  onPress={() => {
+                    setSelectedImage(tripOdometerData.end_odometer_url);
+                    setImageModalVisible(true);
+                  }}
+                >
+                  <Image
+                    source={{ uri: tripOdometerData.end_odometer_url }}
+                    style={styles.odometerImage}
+                  />
+                  <Text style={styles.odometerLabel}>End</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.buttonRow}>
+          {/* View Odometer Images Button */}
+          {item.status === 'completed' && (
+            <TouchableOpacity
+              style={[styles.viewOdometerButton, { marginRight: 8 }]}
+              onPress={() => fetchOdometerImages(item.id)}
+              disabled={loadingOdometer[item.id]}
+            >
+              <Ionicons name="camera-outline" size={16} color="#fff" />
+              <Text style={styles.viewOdometerButtonText}>
+                {loadingOdometer[item.id] ? 'Loading...' : 'View Odometer'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* View Details Button */}
+          <TouchableOpacity
+            style={[styles.viewDetailsBtn, { flex: 1 }]}
+            onPress={() => {
+              if (item.status === 'completed') {
+                navigation.navigate('CompletedTripDetail', { trip: item });
+              } else {
+                navigation.navigate('EnquiryDetail', { trip: item, readOnly: true });
+              }
+            }}
+          >
+            <Ionicons name="eye-outline" size={16} color="#fff" />
+            <Text style={styles.viewDetailsBtnText}>View Details</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {/* Image Modal */}
+      <Modal
+        visible={imageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.imageModalOverlay}>
+          <View style={styles.imageModalContent}>
+            <TouchableOpacity
+              style={styles.imageModalCloseButton}
+              onPress={() => setImageModalVisible(false)}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            {selectedImage && (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Trip History</Text>
-        <Text style={styles.subtitle}>{stats.total} total trips</Text>
+        <Text style={styles.subtitle}>{trips.length} recent trips</Text>
       </View>
 
       {/* Stats row */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.total}</Text>
+          <Text style={styles.statValue}>{trips.length}</Text>
           <Text style={styles.statLabel}>Total</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: '#2196f3' }]}>{stats.active}</Text>
+          <Text style={[styles.statValue, { color: '#2196f3' }]}>{trips.filter(t => t.status === 'accepted' || t.status === 'in_progress').length}</Text>
           <Text style={styles.statLabel}>Active</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: '#4caf50' }]}>{stats.completed}</Text>
+          <Text style={[styles.statValue, { color: '#4caf50' }]}>{trips.filter(t => t.status === 'completed').length}</Text>
           <Text style={styles.statLabel}>Completed</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: '#ff9800' }]}>{stats.pending}</Text>
+          <Text style={[styles.statValue, { color: '#ff9800' }]}>{trips.filter(t => t.status === 'pending').length}</Text>
           <Text style={styles.statLabel}>Pending</Text>
         </View>
       </View>
@@ -286,6 +413,53 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     fontFamily: 'monospace',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  viewOdometerButton: {
+    backgroundColor: '#2196f3',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  viewOdometerButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  odometerSection: {
+    marginVertical: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  odometerImagesRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  odometerImageWrapper: {
+    alignItems: 'center',
+    width: 100,
+  },
+  odometerImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 6,
+  },
+  odometerLabel: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   viewDetailsBtn: {
     backgroundColor: '#2196f3',
     borderRadius: 8,
@@ -295,12 +469,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 12,
+    flex: 1,
   },
   viewDetailsBtnText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  imageModalCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 100,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  fullImage: {
+    width: '90%',
+    height: '90%',
   },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyText: { color: '#888', fontSize: 16, marginTop: 12 },

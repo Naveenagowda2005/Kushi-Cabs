@@ -72,12 +72,14 @@ export function useVendorTrips(userId) {
 
       console.log('🔍 Fetching trips for vendor:', { userId, vendorId: vendorRow?.id });
 
-      // Run queries in parallel instead of complex OR
+      // Run queries in parallel — flat select only, no nested joins (avoids RLS timeout)
+      const TRIP_COLS = 'id, booking_id_seq, status, fare_amount, commission_amount, pickup_location, dropoff_location, return_location, passenger_name, created_at, accepted_at, completed_at, accepted_by, driver_id, vendor_id, created_by, segment_id, start_km, end_km, is_admin_trip, admin_assigned_drivers, notes, customer_pre_advance, fixed_km, car_type, seater_type, scheduled_at, is_published, toll_included, state_tax_included, pet_travelling, extra_km_charge, return_date, fuel_type';
+
       const queries = [
         // Trips created by this user (active trips)
         supabase
           .from('trips')
-          .select('*, driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
+          .select(TRIP_COLS)
           .eq('created_by', userId)
           .in('status', ['pending', 'accepted', 'in_progress'])
           .order('created_at', { ascending: false })
@@ -86,7 +88,7 @@ export function useVendorTrips(userId) {
         // Trips accepted by this user (active trips)
         supabase
           .from('trips')
-          .select('*, driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
+          .select(TRIP_COLS)
           .eq('accepted_by', userId)
           .in('status', ['pending', 'accepted', 'in_progress'])
           .order('created_at', { ascending: false })
@@ -95,7 +97,7 @@ export function useVendorTrips(userId) {
         // Trips assigned to this vendor (active trips)
         vendorRow?.id ? supabase
           .from('trips')
-          .select('*, driver:driver_id(vehicle_number, license_number, users(full_name, phone))')
+          .select(TRIP_COLS)
           .eq('vendor_id', vendorRow.id)
           .in('status', ['pending', 'accepted', 'in_progress'])
           .order('created_at', { ascending: false })

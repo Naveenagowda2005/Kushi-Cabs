@@ -10,7 +10,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../hooks/useTheme';
-import { COLORS, API_CONFIG } from '../../constants';
+import { COLORS } from '../../constants';
 
 // Zoomable Image Component with simple zoom controls
 function ZoomableImage({ imageUrl, title, onClose }) {
@@ -93,6 +93,13 @@ function OdometerImageThumbnail({ imageUrl, tripId, imageType, onPress, isError,
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
+  // Log the URL for debugging
+  useEffect(() => {
+    if (displayUrl) {
+      console.log(`🖼️ OdometerImageThumbnail received URL (${imageType}): ${displayUrl.substring(0, 100)}...`);
+    }
+  }, [displayUrl, imageType]);
+
   // Handle image load completion
   const handleImageLoad = () => {
     console.log(`✅ Image loaded successfully: ${tripId}-${imageType}`);
@@ -164,8 +171,12 @@ export default function SuperAdminTripsScreen() {
   
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('pending'); // Default to pending instead of 'all'
-  const [filterAdminCreated, setFilterAdminCreated] = useState('all'); // New filter
+  const [filterStatus, setFilterStatus] = useState('pending');
+  const [filterAdminCreated, setFilterAdminCreated] = useState('all');
+  const [filterStartDate, setFilterStartDate] = useState(null);
+  const [filterEndDate, setFilterEndDate] = useState(null);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [imageLoadErrors, setImageLoadErrors] = useState({});
@@ -218,46 +229,124 @@ export default function SuperAdminTripsScreen() {
   const [currentPage, setCurrentPage] = useState(0);
   const TRIPS_PER_PAGE = 50;
 
+  // Batch-enrich a list of trips with creator and driver user details
+  const enrichTripsWithUsers = async (tripList) => {
+    if (!tripList || tripList.length === 0) return tripList;
+
+    const userIds = new Set();
+    tripList.forEach(t => {
+      if (t.created_by) userIds.add(t.created_by);
+      if (t.accepted_by) userIds.add(t.accepted_by);
+      if (Array.isArray(t.admin_assigned_drivers)) {
+        t.admin_assigned_drivers.forEach(id => userIds.add(id));
+      }
+    });
+
+    if (userIds.size === 0) return tripList;
+
+    try {
+      const { data: usersData, error } = await supabase
+        .from('users')
+        .select('id, full_name, phone, role_id')
+        .in('id', [...userIds]);
+
+      if (error) throw error;
+
+      const userMap = {};
+      (usersData || []).forEach(u => { userMap[u.id] = u; });
+
+      return tripList.map(t => ({
+        ...t,
+        creator: t.created_by ? (userMap[t.created_by] || null) : null,
+        driver: t.accepted_by ? (userMap[t.accepted_by] || null) : null,
+        latestAdminAssignedDriver: (Array.isArray(t.admin_assigned_drivers) && t.admin_assigned_drivers.length > 0)
+          ? (userMap[t.admin_assigned_drivers[t.admin_assigned_drivers.length - 1]] || null)
+          : null,
+      }));
+    } catch (err) {
+      console.warn('⚠️ Failed to enrich trips with user details:', err.message);
+      return tripList;
+    }
+  };
+
+  // Fetch trips directly from Supabase
   const fetchTrips = useCallback(async () => {
     setLoading(true);
     try {
       console.log(`📄 Fetching trips (status: ${filterStatus}, admin: ${filterAdminCreated}, page: ${currentPage + 1})...`);
+      const offset = currentPage * TRIPS_PER_PAGE;
 
-      // Build query parameters
-      const params = new URLSearchParams();
-      if (filterStatus !== 'all') {
-        params.append('status', filterStatus);
-      }
-      if (filterAdminCreated === 'admin') {
-        params.append('is_admin_trip', 'true');
-      } else if (filterAdminCreated === 'vendor') {
-        params.append('is_admin_trip', 'false');
-      }
-      params.append('page', currentPage);
-      params.append('limit', TRIPS_PER_PAGE);
+      const TRIP_LIST_COLUMNS = [
+        'id', 'booking_id_seq', 'status', 'fare_amount', 'commission_amount',
+        'pickup_location', 'dropoff_location', 'return_location',
+        'scheduled_at', 'return_date', 'created_at',
+        'accepted_at', 'started_at', 'completed_at',
+        'created_by', 'accepted_by', 'driver_id',
+        'is_admin_trip', 'is_published', 'segment_id', 'package_id',
+        'car_type', 'seater_type', 'fuel_type',
+        'fixed_km', 'extra_km_charge', 'toll_included', 'pet_travelling',
+        'notes', 'customer_pre_advance',
+        'admin_assigned_drivers', 'vendor_read_at',
+        'start_km', 'end_km',
+      ].join(', ');
 
-      // Call backend API instead of direct Supabase query
-      const response = await fetch(`${API_CONFIG.ADMIN_API_URL}/api/trips/list?${params.toString()}`);
+      let query = supabase
+        .from('trips')
+        .select(TRIP_LIST_COLUMNS)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + TRIPS_PER_PAGE - 1);
+
+      if (filterStatus !== 'all') query = query.eq('status', filterStatus);
+      if (filterAdminCreated === 'admin') query = query.eq('is_admin_trip', true);
+      else if (filterAdminCreated === 'vendor') query = query.eq('is_admin_trip', false);
+
+      if (filterStatus === 'completed' || filterStatus === 'cancelled') {
+        if (filterStartDate) query = query.gte('created_at', filterStartDate.toISOString());
+        if (filterEndDate) {
+          const endOfDay = new Date(filterEndDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          query = query.lte('created_at', endOfDay.toISOString());
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const rawTrips = data || [];
+
+      // Enrich with segment names
+      if (rawTrips.length > 0) {
+        const segmentIds = [...new Set(rawTrips.map(t => t.segment_id).filter(Boolean))];
+        if (segmentIds.length > 0) {
+          const { data: segments } = await supabase
+            .from('trip_segments')
+            .select('id, name')
+            .in('id', segmentIds);
+          const segMap = {};
+          (segments || []).forEach(s => { segMap[s.id] = s; });
+          rawTrips.forEach(t => {
+            t.trip_segments = segMap[t.segment_id] || { id: t.segment_id, name: 'Trip' };
+            t.segment_name = t.trip_segments?.name || 'ONE WAY';
+          });
+        }
+      }
+
+      console.log(`✅ ${rawTrips.length} trips loaded`);
+      const enriched = await enrichTripsWithUsers(rawTrips);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.status !== 'success') {
-        throw new Error(result.message || 'Failed to fetch trips');
-      }
-
-      console.log(`✅ ${result.data?.length || 0} trips loaded (page ${currentPage + 1}, total: ${result.pagination?.total})`);
-      setTrips(result.data || []);
+      // Skip fetching odometer URLs on list - too slow due to RLS
+      // They can be fetched in the detail view if needed
+      console.log(`📸 Odometer images will load in detail view (skipped on list to avoid RLS timeout)`);
+      
+      
+      setTrips(enriched);
     } catch (err) {
       console.error('❌ Error fetching trips:', err.message);
       Alert.alert('Error', 'Failed to fetch trips: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterAdminCreated, currentPage]);
+  }, [filterStatus, filterAdminCreated, currentPage, filterStartDate, filterEndDate]);
 
   useFocusEffect(useCallback(() => { fetchTrips(); }, [fetchTrips]));
 
@@ -841,6 +930,37 @@ export default function SuperAdminTripsScreen() {
     };
     const bookingId = getFormattedBookingId(item.booking_id_seq);
 
+    // Fetch odometer URLs when "View" button is pressed
+    const handleViewOdometerImages = async () => {
+      console.log(`📸 View button pressed - Loading odometer URLs for trip ${item.id}`);
+      try {
+        const response = await fetch(`http://192.168.1.114:4000/api/trips/odometer-urls?trip_ids=${item.id}`);
+        const result = await response.json();
+        
+        if (result.status === 'success' && result.data && result.data.length > 0) {
+          const data = result.data[0];
+          console.log(`📸 Got URLs: start=${data.start_odometer_url ? 'YES' : 'NO'}, end=${data.end_odometer_url ? 'YES' : 'NO'}`);
+          
+          // Update the trips array to trigger re-render
+          const updatedTrips = trips.map(t => {
+            if (t.id === item.id) {
+              return {
+                ...t,
+                start_odometer_url: data.start_odometer_url,
+                end_odometer_url: data.end_odometer_url,
+                _showOdometer: true // Flag to show odometer section
+              };
+            }
+            return t;
+          });
+          setTrips(updatedTrips);
+          console.log(`✅ Updated trip ${item.id} with odometer URLs`);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching odometer URLs:', error.message);
+      }
+    };
+
     return (
       <View style={styles.tripCard}>
         {/* Top Info Box - Booking ID and Trip Type */}
@@ -924,12 +1044,18 @@ export default function SuperAdminTripsScreen() {
           </View>
         )}
 
-        {/* Creator/Vendor Info - Only show if NOT created by super admin */}
-        {item.creator && !isSuperAdminCreatedTrip(item) && (
+        {/* Creator Info */}
+        {item.creator && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Created By (Vendor)</Text>
+            <Text style={styles.sectionTitle}>
+              {isSuperAdminCreatedTrip(item) ? 'Created By (Admin)' : 'Created By (Vendor)'}
+            </Text>
             <View style={styles.infoRow}>
-              <Ionicons name="person-circle-outline" size={16} color="#4caf50" />
+              <Ionicons
+                name="person-circle-outline"
+                size={16}
+                color={isSuperAdminCreatedTrip(item) ? '#9c27b0' : '#4caf50'}
+              />
               <Text style={styles.infoText}>{item.creator.full_name}</Text>
             </View>
             {item.creator.phone && (
@@ -998,8 +1124,21 @@ export default function SuperAdminTripsScreen() {
           </View>
         </View>
 
-        {/* Odometer Images */}
-        {(item.start_odometer_url || item.end_odometer_url) && (
+        {/* View Odometer Images Button - Only show if trip is completed */}
+        {item.status === 'completed' && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.viewOdometerButton}
+              onPress={handleViewOdometerImages}
+            >
+              <Ionicons name="camera-outline" size={18} color="#fff" />
+              <Text style={styles.viewOdometerButtonText}>View Odometer Images</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Odometer Images - Only show after button is clicked */}
+        {item._showOdometer && (item.start_odometer_url || item.end_odometer_url) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Odometer Images</Text>
             <View style={styles.odometerContainer}>
@@ -1031,25 +1170,34 @@ export default function SuperAdminTripsScreen() {
           </View>
         )}
 
-        {/* Timestamps */}
-        {(item.accepted_at || item.started_at || item.completed_at) && (
+        {/* Timestamps - always show for completed/cancelled */}
+        {(item.status === 'completed' || item.status === 'cancelled' || item.accepted_at || item.started_at || item.completed_at) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Timeline</Text>
-            {item.accepted_at && (
-              <Text style={styles.timestamp}>
-                ✓ Accepted: {new Date(item.accepted_at).toLocaleString()}
+            <View style={styles.timelineRow}>
+              <Ionicons name="checkmark-circle-outline" size={14} color={item.accepted_at ? '#2196f3' : '#ccc'} />
+              <Text style={[styles.timestamp, !item.accepted_at && styles.timestampMissing]}>
+                Accepted: {item.accepted_at
+                  ? new Date(item.accepted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  : '—'}
               </Text>
-            )}
-            {item.started_at && (
-              <Text style={styles.timestamp}>
-                ✓ Started: {new Date(item.started_at).toLocaleString()}
+            </View>
+            <View style={styles.timelineRow}>
+              <Ionicons name="play-circle-outline" size={14} color={item.started_at ? '#ff9800' : '#ccc'} />
+              <Text style={[styles.timestamp, !item.started_at && styles.timestampMissing]}>
+                Started: {item.started_at
+                  ? new Date(item.started_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  : '—'}
               </Text>
-            )}
-            {item.completed_at && (
-              <Text style={styles.timestamp}>
-                ✓ Completed: {new Date(item.completed_at).toLocaleString()}
+            </View>
+            <View style={styles.timelineRow}>
+              <Ionicons name="flag-outline" size={14} color={item.completed_at ? '#4caf50' : '#ccc'} />
+              <Text style={[styles.timestamp, !item.completed_at && styles.timestampMissing]}>
+                Completed: {item.completed_at
+                  ? new Date(item.completed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  : '—'}
               </Text>
-            )}
+            </View>
           </View>
         )}
 
@@ -1066,61 +1214,65 @@ export default function SuperAdminTripsScreen() {
                   <Text style={styles.editButtonText}>Edit</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity
-                style={[styles.reassignButton, { flex: item.status === 'pending' ? 1 : 1.5, marginHorizontal: 4 }]}
-                onPress={() => {
-                  if (item.status !== 'pending') {
-                    Alert.alert('Cannot Reassign', 'Trip can only be reassigned if it is pending');
-                    return;
-                  }
-                  fetchAllDrivers();
-                  setReassigningTrip(item);
-                  setSelectedDriver(null);
-                  setReassignModalVisible(true);
-                }}
-              >
-                <Ionicons name="swap-horizontal-outline" size={16} color="#fff" />
-                <Text style={styles.reassignButtonText}>Reassign</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.deleteButton, { flex: item.status === 'pending' ? 1 : 1.5, marginLeft: 4 }]}
-                onPress={() => {
-                  Alert.alert(
-                    '⚠️ Delete Trip',
-                    'Are you sure you want to delete this trip? This action cannot be undone.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Delete',
-                        style: 'destructive',
-                        onPress: async () => {
-                          try {
-                            const { error } = await supabase
-                              .from('trips')
-                              .delete()
-                              .eq('id', item.id);
-
-                            if (error) throw error;
-
-                            // Remove from local state
-                            setTrips(prevTrips =>
-                              prevTrips.filter(trip => trip.id !== item.id)
-                            );
-
-                            Alert.alert('✅ Success', 'Trip deleted successfully');
-                          } catch (err) {
-                            console.error('Error deleting trip:', err.message);
-                            Alert.alert('Error', 'Failed to delete trip: ' + err.message);
-                          }
-                        }
+              {item.status !== 'completed' && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.reassignButton, { flex: item.status === 'pending' ? 1 : 1.5, marginHorizontal: 4 }]}
+                    onPress={() => {
+                      if (item.status !== 'pending') {
+                        Alert.alert('Cannot Reassign', 'Trip can only be reassigned if it is pending');
+                        return;
                       }
-                    ]
-                  );
-                }}
-              >
-                <Ionicons name="trash-outline" size={16} color="#fff" />
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
+                      fetchAllDrivers();
+                      setReassigningTrip(item);
+                      setSelectedDriver(null);
+                      setReassignModalVisible(true);
+                    }}
+                  >
+                    <Ionicons name="swap-horizontal-outline" size={16} color="#fff" />
+                    <Text style={styles.reassignButtonText}>Reassign</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.deleteButton, { flex: item.status === 'pending' ? 1 : 1.5, marginLeft: 4 }]}
+                    onPress={() => {
+                      Alert.alert(
+                        '⚠️ Delete Trip',
+                        'Are you sure you want to delete this trip? This action cannot be undone.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                const { error } = await supabase
+                                  .from('trips')
+                                  .delete()
+                                  .eq('id', item.id);
+
+                                if (error) throw error;
+
+                                // Remove from local state
+                                setTrips(prevTrips =>
+                                  prevTrips.filter(trip => trip.id !== item.id)
+                                );
+
+                                Alert.alert('✅ Success', 'Trip deleted successfully');
+                              } catch (err) {
+                                console.error('Error deleting trip:', err.message);
+                                Alert.alert('Error', 'Failed to delete trip: ' + err.message);
+                              }
+                            }
+                          }
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#fff" />
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         )}
@@ -1216,6 +1368,19 @@ export default function SuperAdminTripsScreen() {
     { label: 'Vendor Created', value: 'vendor' },
   ];
 
+  const showDateFilter = filterStatus === 'completed' || filterStatus === 'cancelled';
+
+  const clearDateFilters = () => {
+    setFilterStartDate(null);
+    setFilterEndDate(null);
+    setCurrentPage(0);
+  };
+
+  const formatDateDisplay = (date) => {
+    if (!date) return 'Select Date';
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -1279,6 +1444,71 @@ export default function SuperAdminTripsScreen() {
           showsHorizontalScrollIndicator={false}
         />
       </View>
+
+      {/* Date Range Filter — only for completed/cancelled */}
+      {showDateFilter && (
+        <View style={styles.dateFilterContainer}>
+          <View style={styles.dateFilterRow}>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => setShowStartDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.datePickerText}>{formatDateDisplay(filterStartDate)}</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.dateRangeSeparator}>to</Text>
+
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => setShowEndDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.datePickerText}>{formatDateDisplay(filterEndDate)}</Text>
+            </TouchableOpacity>
+
+            {(filterStartDate || filterEndDate) && (
+              <TouchableOpacity
+                style={styles.clearDateButton}
+                onPress={clearDateFilters}
+              >
+                <Ionicons name="close-circle" size={24} color="#f44336" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Date Pickers */}
+      {showStartDatePicker && (
+        <DateTimePicker
+          value={filterStartDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowStartDatePicker(false);
+            if (selectedDate) {
+              setFilterStartDate(selectedDate);
+              setCurrentPage(0);
+            }
+          }}
+        />
+      )}
+
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={filterEndDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowEndDatePicker(false);
+            if (selectedDate) {
+              setFilterEndDate(selectedDate);
+              setCurrentPage(0);
+            }
+          }}
+        />
+      )}
 
       {/* Trips List */}
       <FlatList
@@ -1926,6 +2156,46 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  dateFilterContainer: {
+    backgroundColor: COLORS.background,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  dateFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  datePickerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 8,
+  },
+  datePickerText: {
+    fontSize: 13,
+    color: COLORS.text,
+    fontWeight: '500',
+    flex: 1,
+  },
+  dateRangeSeparator: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    paddingHorizontal: 4,
+  },
+  clearDateButton: {
+    padding: 4,
+  },
   filterButton: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -2151,9 +2421,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   timestamp: {
-    color: COLORS.success,
+    color: COLORS.text,
     fontSize: 12,
     marginBottom: 4,
+    flex: 1,
+  },
+  timestampMissing: {
+    color: COLORS.textSecondary,
+    opacity: 0.5,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
   },
   publishButton: {
     flexDirection: 'row',
@@ -2639,6 +2920,23 @@ const styles = StyleSheet.create({
     borderColor: COLORS.info,
   },
   editButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  viewOdometerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#2196f3',
+    borderWidth: 1,
+    borderColor: '#2196f3',
+  },
+  viewOdometerButtonText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',

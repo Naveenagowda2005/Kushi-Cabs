@@ -10,6 +10,7 @@ import { useActiveTrip } from '../../hooks/useTrips';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import NavigationMap from '../../components/NavigationMap';
 import { startTrip } from '../../services/tripService';
+import { uploadOdometerImage } from '../../services/uploadService';
 import { TRIP_STATUS } from '../../constants';
 import { supabase } from '../../lib/supabase';
 
@@ -111,7 +112,8 @@ export default function DriverActiveTripScreen({ route, navigation }) {
         mediaTypes: ['images'],
         allowsEditing: false,
         aspect: [16, 9],
-        quality: 0.8,
+        quality: 0.6,
+        base64: true,
       });
 
       const timeoutPromise = new Promise((_, reject) => 
@@ -163,7 +165,8 @@ export default function DriverActiveTripScreen({ route, navigation }) {
           mediaTypes: ['images'],
           allowsEditing: false,
           aspect: [16, 9],
-          quality: 0.8,
+          quality: 0.6,
+          base64: true,
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -188,27 +191,11 @@ export default function DriverActiveTripScreen({ route, navigation }) {
     }
   };
 
-  const uploadOdometerImage = async (imageUri, tripId, type) => {
-    try {
-      // Read image as base64
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
-      // Convert blob to base64
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          // Extract base64 part (remove data:image/jpeg;base64, prefix)
-          const base64 = reader.result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Error uploading odometer image:', error);
-      throw error;
-    }
+  const uploadOdometerImageLocal = async (imageAsset, tripId, type) => {
+    // Use the uploadService which uploads to Supabase Storage bucket
+    // imageAsset has { uri, base64 } from ImagePicker
+    const publicUrl = await uploadOdometerImage(imageAsset, tripId, type);
+    return publicUrl;
   };
 
   async function handleStartTrip() {
@@ -224,23 +211,13 @@ export default function DriverActiveTripScreen({ route, navigation }) {
 
     setUploading(true);
     try {
-      // Upload odometer image as base64
-      const base64Image = await uploadOdometerImage(startOdometerImage.uri, activeTrip.id, 'start');
-      
-      // Store in documents table
-      await supabase
-        .from('documents')
-        .insert({
-          user_id: user.id,
-          trip_id: activeTrip.id,
-          doc_type: 'start_odometer',
-          storage_url: `data:image/jpeg;base64,${base64Image}`,
-        });
+      // Upload to Supabase Storage bucket — returns public URL
+      const publicUrl = await uploadOdometerImageLocal(startOdometerImage, activeTrip.id, 'start');
 
-      // Start trip with the base64 stored
+      // Start trip with the bucket URL (not base64)
       await startTrip({
         tripId: activeTrip.id,
-        startOdometerUrl: `data:image/jpeg;base64,${base64Image}`,
+        startOdometerUrl: publicUrl,
         startKm: parseFloat(startKm),
         userId: user.id,
       });
@@ -268,24 +245,14 @@ export default function DriverActiveTripScreen({ route, navigation }) {
 
     setUploading(true);
     try {
-      // Upload odometer image as base64
-      const base64Image = await uploadOdometerImage(endOdometerImage.uri, activeTrip.id, 'end');
-      
-      // Store in documents table
-      await supabase
-        .from('documents')
-        .insert({
-          user_id: user.id,
-          trip_id: activeTrip.id,
-          doc_type: 'end_odometer',
-          storage_url: `data:image/jpeg;base64,${base64Image}`,
-        });
+      // Upload to Supabase Storage bucket — returns public URL
+      const publicUrl = await uploadOdometerImageLocal(endOdometerImage, activeTrip.id, 'end');
 
-      // Update trip with end odometer image and end KM
+      // Update trip with end odometer URL and end KM — store URL not base64
       const { error: updateError } = await supabase
         .from('trips')
         .update({
-          end_odometer_url: `data:image/jpeg;base64,${base64Image}`,
+          end_odometer_url: publicUrl,
           end_km: parseFloat(endKm) || null,
         })
         .eq('id', activeTrip.id);

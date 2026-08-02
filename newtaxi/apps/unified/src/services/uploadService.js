@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
-import { STORAGE_BUCKETS } from '../constants';
+import { STORAGE_BUCKETS, API_CONFIG } from '../constants';
 
 export async function pickOdometerImage(useCamera = false) {
   if (useCamera) {
@@ -37,41 +37,42 @@ export async function pickOdometerImage(useCamera = false) {
  * Returns the public URL.
  */
 export async function uploadOdometerImage(imageData, tripId, type) {
-  // imageData can be { uri, base64 } from pickOdometerImage
-  // or just a uri string (legacy)
   const base64 = typeof imageData === 'object' ? imageData.base64 : null;
   const uri    = typeof imageData === 'object' ? imageData.uri : imageData;
 
   const ext = uri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
-  const fileName = `${tripId}/${type}_${Date.now()}.${ext}`;
-  const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-  let uploadData;
+  // Use backend to upload (bypasses Supabase RLS — OTP users have no real JWT)
+  const backendUrl = `${API_CONFIG.SMS_API_URL}/api/upload/odometer`;
 
-  if (base64) {
-    // Decode base64 string to Uint8Array
-    const byteCharacters = atob(base64);
-    const byteArray = new Uint8Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteArray[i] = byteCharacters.charCodeAt(i);
-    }
-    uploadData = byteArray;
-  } else {
-    // Fallback: fetch from URI
+  let base64Data = base64;
+
+  // If no base64, fetch from URI
+  if (!base64Data) {
     const response = await fetch(uri);
     const blob = await response.blob();
-    uploadData = blob;
+    base64Data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
-  const { error } = await supabase.storage
-    .from(STORAGE_BUCKETS.ODOMETER)
-    .upload(fileName, uploadData, { contentType, upsert: true });
+  console.log(`📤 Uploading odometer via backend: ${backendUrl}`);
 
-  if (error) throw new Error(`Upload failed: ${error.message}`);
+  const response = await fetch(backendUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tripId, type, base64Data, mimeType }),
+  });
 
-  const { data } = supabase.storage
-    .from(STORAGE_BUCKETS.ODOMETER)
-    .getPublicUrl(fileName);
+  const result = await response.json();
 
-  return data.publicUrl;
+  if (!response.ok || !result.success) {
+    throw new Error(`Upload failed: ${result.error || 'Unknown error'}`);
+  }
+
+  return result.url;
 }

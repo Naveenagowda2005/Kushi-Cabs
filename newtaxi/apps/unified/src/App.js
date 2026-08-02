@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './context/AuthContext';
 import { AlertProvider } from './context/AlertContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { FloatingBubbleProvider } from './context/FloatingBubbleContext';
 import RootNavigator from './navigation/RootNavigator';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -50,13 +51,15 @@ function AppContent() {
   console.log('App.js: AppContent rendering...');
   
   return (
-    <AlertProvider>
-      <ThemeProvider>
-        <AuthProviderWrapper>
-          <NavigationContainerWrapper />
-        </AuthProviderWrapper>
-      </ThemeProvider>
-    </AlertProvider>
+    <FloatingBubbleProvider>
+      <AlertProvider>
+        <ThemeProvider>
+          <AuthProviderWrapper>
+            <NavigationContainerWrapper />
+          </AuthProviderWrapper>
+        </ThemeProvider>
+      </AlertProvider>
+    </FloatingBubbleProvider>
   );
 }
 

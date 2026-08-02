@@ -13,26 +13,26 @@ export function useAvailableTrips() {
     try {
       setError(null);
       
-      // Get vendor-published trips (pending only - not yet accepted)
+      // Get vendor-published trips (pending AND accepted within 5-minute window for seal stamp)
       const { data: vendorTrips, error: vendorError } = await supabase
         .from('trips')
         .select('id, pickup_location, dropoff_location, fare_amount, commission_amount, commission_paid, customer_pre_advance, scheduled_at, created_at, status, car_type, car_model, seater_type, fuel_type, segment_id, package_id, return_location, return_date, created_by, passenger_name, passenger_phone, toll_included, state_tax_included, pet_travelling, hills_included, fixed_km, extra_km_charge, notes, is_admin_trip, driver_id, accepted_at, accepted_by, booking_id_seq')
-        .eq('status', TRIP_STATUS.PENDING)
+        .in('status', [TRIP_STATUS.PENDING, TRIP_STATUS.ACCEPTED])
         .eq('is_published', true)
         .eq('is_admin_trip', false)
         .order('created_at', { ascending: false });
 
       if (vendorError) throw vendorError;
       
-      // Filter vendor trips: include all pending trips PLUS in_progress trips within 5-minute window
+      // Filter vendor trips: include all pending trips PLUS accepted trips within 5-minute window
       const now = new Date();
       const FIVE_MIN_MS = 5 * 60 * 1000;
       const filteredVendorTrips = (vendorTrips || []).filter(trip => {
         if (trip.status === TRIP_STATUS.PENDING) {
           return true; // All pending trips are visible
         }
-        if (trip.status === TRIP_STATUS.IN_PROGRESS && trip.accepted_at) {
-          // Include in_progress trips that were accepted within last 5 minutes
+        if (trip.status === TRIP_STATUS.ACCEPTED && trip.accepted_at) {
+          // Include accepted trips that were accepted within last 5 minutes
           const acceptedTime = new Date(trip.accepted_at).getTime();
           const elapsedMs = now.getTime() - acceptedTime;
           return elapsedMs < FIVE_MIN_MS;

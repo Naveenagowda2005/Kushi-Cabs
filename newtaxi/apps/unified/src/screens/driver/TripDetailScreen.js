@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator,
+  TouchableOpacity, Alert, ActivityIndicator, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -20,6 +20,8 @@ export default function DriverTripDetailScreen({ route, navigation }) {
   const { settings } = useSystemSettings();
   const [paying, setPaying] = useState(false);
   const [tripData, setTripData] = useState(trip);
+  const [isAcceptedRecently, setIsAcceptedRecently] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(0);
 
   // Has this driver already paid commission for this trip?
   const commissionPaid = tripData.commission_paid && tripData.accepted_by === user?.id;
@@ -34,6 +36,44 @@ export default function DriverTripDetailScreen({ route, navigation }) {
     ? settings.minimumWalletBalance 
     : 500;
   const hasMinimumBalance = (wallet?.balance || 0) >= minWalletBalance;
+
+  // Check if trip was just accepted (seal stamp display logic)
+  useEffect(() => {
+    if (!tripData.accepted_at) {
+      setIsAcceptedRecently(false);
+      return;
+    }
+
+    const acceptedTime = new Date(tripData.accepted_at).getTime();
+    const now = new Date().getTime();
+    const elapsedMs = now - acceptedTime;
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+    if (elapsedMs < FIVE_MINUTES_MS) {
+      setIsAcceptedRecently(true);
+      setTimeRemaining(Math.ceil((FIVE_MINUTES_MS - elapsedMs) / 1000));
+    } else {
+      setIsAcceptedRecently(false);
+      setTimeRemaining(0);
+    }
+  }, [tripData.accepted_at]);
+
+  // Update timer every second
+  useEffect(() => {
+    if (!isAcceptedRecently || timeRemaining <= 0) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          setIsAcceptedRecently(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isAcceptedRecently, timeRemaining]);
 
   // ── Accept trip after payment ──────────────
   async function acceptTripAfterPayment() {
@@ -50,6 +90,15 @@ export default function DriverTripDetailScreen({ route, navigation }) {
     if (!result.success) {
       throw new Error(result.error || 'Failed to accept trip');
     }
+
+    // Update local state with acceptance info for seal stamp display
+    setTripData(prev => ({
+      ...prev,
+      status: TRIP_STATUS.ACCEPTED,
+      accepted_by: user.id,
+      accepted_at: new Date().toISOString(),
+      commission_paid: true,
+    }));
 
     return result;
   }
@@ -209,6 +258,28 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* SEAL STAMP for Recently Accepted Trips - Visible for 5 minutes */}
+      {isAcceptedRecently && (
+        <View style={styles.sealStampContainer}>
+          <View style={styles.sealStamp}>
+            {/* Outer ring */}
+            <View style={styles.sealRingOuter}>
+              <Text style={styles.sealTextTop}>KUSHI CABS</Text>
+            </View>
+            
+            {/* Center circle */}
+            <View style={styles.sealCenter}>
+              <Text style={styles.sealMainText}>TRIP</Text>
+              <Text style={styles.sealMainText}>ACCEPTED</Text>
+              <Text style={styles.sealTimerText}>{timeRemaining}s</Text>
+            </View>
+            
+            {/* Star decorations */}
+            <Text style={styles.sealStar}>✦</Text>
+            <Text style={[styles.sealStar, { bottom: 8, top: 'auto' }]}>✦</Text>
+          </View>
+        </View>
+      )}
       <ScrollView contentContainerStyle={styles.scroll} style={{ backgroundColor: '#ffffff' }}>
 
         {/* Fare card */}
@@ -346,7 +417,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: '#ffffff', overflow: 'visible' },
   scroll: { padding: 20, paddingBottom: 20 },
 
   fareCard: { backgroundColor: '#f5f5f5', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#e0e0e0' },
@@ -391,4 +462,72 @@ const styles = StyleSheet.create({
   startBtn: { backgroundColor: '#4caf50', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   startBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
   btnDisabled: { backgroundColor: '#999' },
+  
+  // SEAL STAMP STYLES
+  sealStampContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 200,
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+    pointerEvents: 'none',
+    marginTop: -100,
+    marginLeft: -100,
+  },
+  sealStamp: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 3,
+    borderColor: '#ff9800',
+    backgroundColor: '#fff8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderStyle: 'solid',
+    position: 'relative',
+  },
+  sealRingOuter: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sealTextTop: {
+    color: '#ff9800',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 2,
+    position: 'absolute',
+    top: 18,
+  },
+  sealCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  sealMainText: {
+    color: '#ff9800',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 20,
+  },
+  sealTimerText: {
+    color: '#ff9800',
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  sealStar: {
+    position: 'absolute',
+    fontSize: 12,
+    color: '#ff9800',
+    top: 8,
+    right: 8,
+  },
 });

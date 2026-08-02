@@ -12,11 +12,13 @@ import { useDriverStatus } from '../../hooks/useDriverStatus';
 import { useWallet } from '../../hooks/useDriverWallet';
 import { useRealtimeTrips } from '../../hooks/useRealtimeTrips';
 import { useViewedTrips } from '../../hooks/useViewedTrips';
+import { useFloatingBubble } from '../../context/FloatingBubbleContext';
 import { supabase } from '../../lib/supabase';
 import TripCard from '../../components/TripCard';
 import WalletBanner from '../../components/WalletBanner';
 import { COLORS } from '../../constants';
 import { playLoopingAlert } from '../../services/soundService';
+import FloatingBubble from '../../components/FloatingBubble';
 
 export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const { user, signOut } = useAuth();
@@ -27,6 +29,7 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const { wallet } = useWallet(user?.id);
   const { trip: activeTrip, refetch: refetchActiveTrip } = useActiveTrip(user?.id);
   const { isNewTrip, markAllAsViewed } = useViewedTrips(user?.id);
+  const { activeTrip: bubbleTrip, visible: bubbleVisible, showBubble, hideBubble } = useFloatingBubble();
   const [activeTab, setActiveTab] = useState(0);
   const [completedTrips, setCompletedTrips] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -133,23 +136,15 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
     const currentTripCount = displayTrips.length;
     const previousTripCount = prevTripCountRef.current;
 
-    console.log(`📊 Trip count change: ${previousTripCount} → ${currentTripCount}`);
+    console.log(`📊 Trip count change: ${previousTripCount} → ${currentTripCount}`, {
+      isScreenFocused: isScreenFocusRef.current,
+      hasInitialized: hasPlayedInitialSoundRef.current,
+      isOnline,
+    });
 
-    // Only play sound if:
-    // 1. Trips increased (new trips available)
-    // 2. Driver is online
-    // 3. Not the initial load (hasPlayedInitialSoundRef prevents first load sound)
-    // 4. Not a screen focus refetch (isScreenFocusRef prevents sound on tab switch)
-    if (
-      currentTripCount > previousTripCount &&
-      isOnline &&
-      hasPlayedInitialSoundRef.current &&
-      !isScreenFocusRef.current  // Don't play on screen focus
-    ) {
-      const newTripsCount = currentTripCount - previousTripCount;
-      console.log(`🔊 Playing sound alert: ${newTripsCount} new trip(s) available`);
-      playLoopingAlert(3); // Play 3 times
-    }
+    // IMPORTANT: Check before updating prevTripCountRef so we can detect the change
+    const tripCountIncreased = currentTripCount > previousTripCount;
+    const screenFocusedJustNow = isScreenFocusRef.current;
 
     // Mark that we've processed at least one count change
     if (!hasPlayedInitialSoundRef.current && currentTripCount >= 0) {
@@ -157,13 +152,35 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
       console.log('✅ Initial trip count loaded, sound alerts now enabled');
     }
 
-    // Update previous count for next comparison
+    // Only play sound if:
+    // 1. Trips increased (new trips available)
+    // 2. Driver is online
+    // 3. Not the initial load (hasPlayedInitialSoundRef prevents first load sound)
+    // 4. Not during screen focus (don't play when just switched to available tab)
+    if (
+      tripCountIncreased &&
+      isOnline &&
+      hasPlayedInitialSoundRef.current &&
+      !screenFocusedJustNow  // Don't play immediately on screen focus
+    ) {
+      const newTripsCount = currentTripCount - previousTripCount;
+      console.log(`🔊 PLAYING SOUND! ${newTripsCount} new trip(s) available`);
+      playLoopingAlert(3); // Play 3 times
+    } else if (tripCountIncreased && screenFocusedJustNow) {
+      console.log('⏭️ Trip count increased but screen just focused, skipping sound (likely from refetch)');
+    }
+
+    // Update previous count for next comparison (AFTER checking tripCountIncreased)
     prevTripCountRef.current = currentTripCount;
 
-    // Reset screen focus flag after processing
-    if (isScreenFocusRef.current) {
-      console.log('🔄 Screen focus refetch completed, resetting flag');
-      isScreenFocusRef.current = false;
+    // Reset screen focus flag AFTER this effect completes
+    // Use a timeout to allow the sound logic above to complete first
+    if (screenFocusedJustNow) {
+      const resetTimer = setTimeout(() => {
+        isScreenFocusRef.current = false;
+        console.log('🔄 Screen focus flag reset');
+      }, 100);
+      return () => clearTimeout(resetTimer);
     }
   }, [displayTrips.length, isOnline]);
 
@@ -176,37 +193,111 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
     }
   }, [activeTrip, navigation, activeTab]);
   
-  // Setup realtime subscriptions
+  // Setup realtime subscriptions - use stable callbacks
+  const handleNewTrip = useCallback((trip) => {
+    console.log('🔔 New trip available via real-time:', trip.id);
+    
+    // Add to display trips immediately for instant count update
+    setDisplayTrips((prev) => {
+      // Check if trip already exists
+      if (prev.find((t) => t.id === trip.id)) {
+        console.log(`⏭️ Trip ${trip.id} already in list, skipping`);
+        return prev;
+      }
+      // Add new trip to front
+      const updated = [{ ...trip, isNew: true }, ...prev];
+      console.log(`✅ Added new trip. Total: ${updated.length}`);
+      return updated;
+    });
+    // Also refetch to ensure sync with backend
+    refetch();
+  }, [refetch]);
+
+  const handleTripTaken = useCallback((tripId) => {
+    console.log('Trip taken by someone else:', tripId);
+    // Instead of removing immediately, update the trip with accepted_at timestamp to show seal stamp
+    setDisplayTrips((prev) => {
+      const updated = prev.map(t => {
+        if (t.id === tripId) {
+          return {
+            ...t,
+            accepted_at: new Date().toISOString(),
+          };
+        }
+        return t;
+      });
+      console.log(`Trip marked as taken (with seal stamp). Total still visible: ${updated.length}`);
+      return updated;
+    });
+    
+    // After 5 minutes (300 seconds), remove the trip from the list (seal stamp displays for full 5 minute cycle)
+    setTimeout(() => {
+      setDisplayTrips((prev) => {
+        const updated = prev.filter((t) => t.id !== tripId);
+        console.log(`Trip removed after 5 minute seal display. Total: ${updated.length}`);
+        return updated;
+      });
+    }, 300000); // 5 minutes = 300,000 ms
+    
+    refetch();
+  }, [refetch]);
+
+  const handleTripUpdated = useCallback((trip) => {
+    console.log('Trip updated via real-time:', trip.id, 'status:', trip.status);
+    // If this driver's trip was accepted or assigned by vendor, refetch active trip
+    if (
+      (trip.status === 'accepted' || trip.status === 'in_progress') &&
+      (trip.accepted_by === user?.id || trip.driver_id === user?.id)
+    ) {
+      console.log('✅ Driver assigned trip detected! Refetching active trip...');
+      refetchActiveTrip();
+    } else {
+      refetch();
+    }
+  }, [user?.id, refetch, refetchActiveTrip]);
+
+  // Show/hide floating bubble based on active trip
+  useEffect(() => {
+    if (activeTrip?.status === 'in_progress') {
+      console.log('🫧 Active trip detected, showing floating bubble');
+      showBubble(activeTrip);
+    } else {
+      console.log('🫧 No active trip, hiding floating bubble');
+      hideBubble();
+    }
+  }, [activeTrip, showBubble, hideBubble]);
+
   useRealtimeTrips({
     userId: user?.id,
-    onNewTrip: (trip) => {
-      console.log('🔔 New trip available:', trip);
-      refetch();
-    },
-    onTripTaken: (tripId) => {
-      console.log('Trip taken by someone else:', tripId);
-      refetch();
-    },
-    onTripUpdated: (trip) => {
-      console.log('Trip updated:', trip);
-      // If this driver's trip was accepted or assigned by vendor, refetch active trip
-      if (
-        (trip.status === 'accepted' || trip.status === 'in_progress') &&
-        (trip.accepted_by === user?.id || trip.driver_id === user?.id)
-      ) {
-        console.log('✅ Driver assigned trip detected! Refetching active trip...');
-        refetchActiveTrip();
-      } else {
-        refetch();
-      }
-    },
+    onNewTrip: handleNewTrip,
+    onTripTaken: handleTripTaken,
+    onTripUpdated: handleTripUpdated,
   });
 
   const TripCardComponent = ({ item }) => (
     <TripCard 
       trip={item} 
       onPress={() => navigation.navigate('TripDetail', { trip: item })}
-      onAccept={(trip) => navigation.navigate('TripDetail', { trip })}
+      onAccept={(trip) => {
+        // Update displayTrips to set accepted_at immediately so seal stamp shows
+        setDisplayTrips((prev) => {
+          const updated = prev.map(t => {
+            if (t.id === trip.id) {
+              return {
+                ...t,
+                accepted_at: new Date().toISOString(),
+              };
+            }
+            return t;
+          });
+          return updated;
+        });
+        
+        // Navigate to TripDetail after a delay to show seal stamp
+        setTimeout(() => {
+          navigation.navigate('TripDetail', { trip });
+        }, 2500);
+      }}
       onCancel={() => {
         console.log('Skipped trip:', item.id);
         setDisplayTrips(displayTrips.filter(t => t.id !== item.id));
@@ -429,6 +520,13 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
           }
         />
       )}
+
+      {/* Floating Bubble */}
+      <FloatingBubble
+        trip={bubbleTrip}
+        visible={bubbleVisible}
+        onPress={() => navigation.navigate('ActiveTrip', { trip: bubbleTrip })}
+      />
     </View>
   );
 }

@@ -174,7 +174,7 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
           <View style={styles.sealStamp}>
             {/* Outer ring */}
             <View style={styles.sealRingOuter}>
-              <Text style={styles.sealTextTop}>TAXIBAZAAR</Text>
+              <Text style={styles.sealTextTop}>KUSHI CABS</Text>
             </View>
             
             {/* Center circle */}
@@ -397,25 +397,27 @@ export default function TripCard({ trip, onPress, onAccept, onCancel }) {
         </Text>
       </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionRow}>
-        <TouchableOpacity 
-          style={styles.cancelBtn} 
-          onPress={() => onCancel?.()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="close-circle-outline" size={16} color="#f44336" />
-          <Text style={styles.cancelBtnText}>Skip</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.acceptBtn} 
-          onPress={() => onAccept?.(trip)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-          <Text style={styles.acceptBtnText}>Accept Trip</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Action Buttons - Hidden when trip is recently accepted */}
+      {!isAcceptedRecently && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity 
+            style={styles.cancelBtn} 
+            onPress={() => onCancel?.()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close-circle-outline" size={16} color="#f44336" />
+            <Text style={styles.cancelBtnText}>Skip</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.acceptBtn} 
+            onPress={() => onAccept?.(trip)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+            <Text style={styles.acceptBtnText}>Accept Trip</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -428,6 +430,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: '#ff9800',
+    overflow: 'visible',
   },
   topBookingIdRow: {
     marginBottom: 0,
@@ -1071,25 +1074,26 @@ const styles = StyleSheet.create({
   // SEAL STAMP STYLES
   sealStampContainer: {
     position: 'absolute',
-    top: -20,
-    right: -20,
+    top: '50%',
+    left: '50%',
     width: 200,
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
     pointerEvents: 'none',
+    marginTop: -100,
+    marginLeft: -100,
   },
   sealStamp: {
     width: 160,
     height: 160,
     borderRadius: 80,
     borderWidth: 3,
-    borderColor: '#d32f2f',
-    backgroundColor: 'transparent',
+    borderColor: '#ff9800',
+    backgroundColor: '#fff8f0',
     justifyContent: 'center',
     alignItems: 'center',
-    transform: [{ rotate: '-45deg' }],
     borderStyle: 'solid',
     position: 'relative',
   },
@@ -1102,12 +1106,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sealTextTop: {
-    color: '#d32f2f',
-    fontSize: 11,
+    color: '#ff9800',
+    fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     position: 'absolute',
-    top: 12,
+    top: 18,
   },
   sealCenter: {
     justifyContent: 'center',
@@ -1115,22 +1119,22 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   sealMainText: {
-    color: '#d32f2f',
-    fontSize: 16,
+    color: '#ff9800',
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 0.5,
-    lineHeight: 18,
+    letterSpacing: 0.8,
+    lineHeight: 20,
   },
   sealTimerText: {
-    color: '#d32f2f',
-    fontSize: 13,
-    fontWeight: '700',
+    color: '#ff9800',
+    fontSize: 16,
+    fontWeight: '900',
     marginTop: 4,
   },
   sealStar: {
     position: 'absolute',
     fontSize: 12,
-    color: '#d32f2f',
+    color: '#ff9800',
     top: 8,
     right: 8,
   },

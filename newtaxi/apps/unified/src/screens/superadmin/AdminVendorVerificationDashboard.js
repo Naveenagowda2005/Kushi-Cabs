@@ -237,7 +237,7 @@ const AdminVendorVerificationDashboard = () => {
           onPress: async () => {
             try {
               setActionLoading(true);
-              const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'https://kushi-cabs-27p8.onrender.com';
+              const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
 
               // Use backend API instead of RPC for faster performance
               const response = await fetch(`${backendUrl}/admin/approve-vendor/${vendorId}`, {
@@ -324,7 +324,7 @@ const AdminVendorVerificationDashboard = () => {
 
     try {
       setActionLoading(true);
-      const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'https://kushi-cabs-27p8.onrender.com';
+      const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
 
       if (selectedVendor?.rejectingDocType) {
         const docType = selectedVendor.rejectingDocType;
@@ -500,7 +500,7 @@ const AdminVendorVerificationDashboard = () => {
                             onPress={async () => {
                               try {
                                 setActionLoading(true);
-                                const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'https://kushi-cabs-27p8.onrender.com';
+                                const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
 
                                 // Use backend API for faster document approval
                                 const response = await fetch(
@@ -1443,3 +1443,4 @@ const styles = StyleSheet.create({
 });
 
 export default AdminVendorVerificationDashboard;
+

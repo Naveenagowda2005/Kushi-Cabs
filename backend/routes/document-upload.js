@@ -173,6 +173,58 @@ router.post('/upload-avatar', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/upload/odometer
+ * Upload odometer image via backend (bypasses client RLS - uses service role key)
+ */
+router.post('/odometer', async (req, res) => {
+  try {
+    const { tripId, type, base64Data, mimeType } = req.body;
+
+    if (!tripId || !type || !base64Data) {
+      return res.status(400).json({ error: 'Missing required fields: tripId, type, base64Data' });
+    }
+
+    if (!supabase) {
+      return res.status(500).json({ error: 'Backend not configured' });
+    }
+
+    let uploadData = base64Data;
+    if (uploadData.includes(',')) {
+      uploadData = uploadData.split(',')[1];
+    }
+
+    const buffer = Buffer.from(uploadData, 'base64');
+    const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+    const fileName = `${tripId}/${type}_${Date.now()}.${ext}`;
+
+    console.log(`📤 Odometer upload: ${fileName}`);
+
+    const { error } = await supabase.storage
+      .from('odometer-images')
+      .upload(fileName, buffer, {
+        contentType: mimeType || 'image/jpeg',
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('❌ Odometer upload error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('odometer-images')
+      .getPublicUrl(fileName);
+
+    console.log(`✅ Odometer uploaded: ${publicUrlData.publicUrl}`);
+    res.json({ success: true, url: publicUrlData.publicUrl });
+
+  } catch (error) {
+    console.error('❌ Odometer upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/list-documents/:driverId', async (req, res) => {
   try {
     const { driverId } = req.params;
