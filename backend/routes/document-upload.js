@@ -287,7 +287,7 @@ router.get('/list-documents/:driverId', async (req, res) => {
     console.log('📝 Database documents:', Object.keys(dbDocMap));
 
     // Step 3: Filter out directories and hidden files, then map with database info
-    const documents = (files || [])
+    let documents = (files || [])
       .filter(file => {
         // Skip directories (they don't have 'id' field or have id=null)
         // Only process actual files
@@ -324,6 +324,27 @@ router.get('/list-documents/:driverId', async (req, res) => {
           rejection_reason: dbInfo?.rejection_reason || null
         };
       });
+
+    // If no files in storage but database has documents, include database documents
+    if (documents.length === 0 && Object.keys(dbDocMap).length > 0) {
+      console.log('⚠️  No files in storage, including documents from database');
+      const documentTypesInStorage = new Set(documents.map(d => d.document_type));
+      
+      // Add database documents that aren't in storage
+      for (const [documentType, dbInfo] of Object.entries(dbDocMap)) {
+        if (!documentTypesInStorage.has(documentType)) {
+          console.log(`  - ${documentType}: from database (status: ${dbInfo.status})`);
+          documents.push({
+            document_type: documentType,
+            document_url: null,  // No URL in storage, but document exists in database
+            file_name: `${documentType}.jpg`,
+            uploaded_at: dbInfo.uploaded_at || null,
+            status: dbInfo.status,
+            rejection_reason: dbInfo.rejection_reason || null
+          });
+        }
+      }
+    }
 
     console.log(`✅ Mapped ${documents.length} documents with database status`);
 

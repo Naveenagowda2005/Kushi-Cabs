@@ -54,10 +54,19 @@ export default function SuperAdminDriversScreen({ navigation }) {
           const { data: driverProfile } = await supabase.from('drivers').select('*').eq('user_id', user.id).single();
           const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
           
+          // Get driver verification status from driver_verification_status table
+          const { data: verificationStatus } = await supabase
+            .from('driver_verification_status')
+            .select('overall_status')
+            .eq('driver_id', user.id)
+            .maybeSingle();
+          
           return { 
             ...user, 
             drivers: driverProfile ? [driverProfile] : [], 
-            wallets: wallet ? [wallet] : [], 
+            wallets: wallet ? [wallet] : [],
+            // Override verification_status with actual driver verification status if available
+            verification_status: verificationStatus?.overall_status || user.verification_status,
             documentPhoto: null  // Don't load document photo on list view
           };
         })
@@ -71,15 +80,18 @@ export default function SuperAdminDriversScreen({ navigation }) {
       
       const approvedCount = nonDummyDrivers.filter(d => d.verification_status === 'approved').length;
       const rejectedCount = nonDummyDrivers.filter(d => d.verification_status === 'rejected').length;
+      // Pending = drivers that are neither approved nor rejected (pending_review, pending, or no status)
+      const pendingCount = nonDummyDrivers.filter(d => d.verification_status !== 'approved' && d.verification_status !== 'rejected').length;
       
       console.log('📋 DRIVER COUNTS:');
       console.log('  Total drivers:', driversWithDetails.length);
       console.log('  Dummy drivers:', dummyDrivers.length);
       console.log('  Non-dummy drivers:', nonDummyDrivers.length);
       console.log('  Approved:', approvedCount);
+      console.log('  Pending:', pendingCount);
       console.log('  Rejected:', rejectedCount);
       
-      setPendingDriverCount(0); // Remove pending count completely
+      setPendingDriverCount(pendingCount);
     } catch (error) {
       console.error('Error fetching drivers:', error);
       Alert.alert('Error', 'Failed to load drivers');

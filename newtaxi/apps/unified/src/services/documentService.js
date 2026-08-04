@@ -98,7 +98,10 @@ export const uploadDocumentImage = async (driverId, documentType, imageData) => 
     console.log('📤 Using backend API for upload (service role key supports upsert)');
 
     // Always use backend API with service role key for reliable upsert behavior
-    const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
+    const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
+    if (!backendUrl) {
+      throw new Error('SMS_API_URL not configured in environment');
+    }
     
     const response = await fetch(`${backendUrl}/api/upload/upload-document`, {
       method: 'POST',
@@ -426,7 +429,10 @@ export const getDriverAllDocuments = async (driverId) => {
     console.log('getDriverAllDocuments: Fetching documents for driver:', driverId);
     
     // Call backend API to list documents (uses service role key, no RLS restrictions)
-    const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
+    const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
+    if (!backendUrl) {
+      throw new Error('SMS_API_URL not configured in environment');
+    }
     const url = `${backendUrl}/api/upload/list-documents/${driverId}`;
     
     console.log('getDriverAllDocuments: Calling backend API:', url);
@@ -635,7 +641,10 @@ export const getVendorAllDocuments = async (userId) => {
     console.log('getVendorAllDocuments: Fetching documents for vendor user:', userId);
     
     // Call backend API to fetch vendor documents from database table
-    const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
+    const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
+    if (!backendUrl) {
+      throw new Error('SMS_API_URL not configured in environment');
+    }
     const url = `${backendUrl}/api/upload/list-vendor-documents/${userId}`;
     
     console.log('getVendorAllDocuments: Calling backend API:', url);

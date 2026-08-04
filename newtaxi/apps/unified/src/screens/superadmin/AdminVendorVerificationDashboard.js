@@ -237,7 +237,10 @@ const AdminVendorVerificationDashboard = () => {
           onPress: async () => {
             try {
               setActionLoading(true);
-              const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
+              const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
+              if (!backendUrl) {
+                throw new Error('SMS_API_URL not configured');
+              }
 
               // Use backend API instead of RPC for faster performance
               const response = await fetch(`${backendUrl}/admin/approve-vendor/${vendorId}`, {
@@ -324,7 +327,10 @@ const AdminVendorVerificationDashboard = () => {
 
     try {
       setActionLoading(true);
-      const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
+      const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
+      if (!backendUrl) {
+        throw new Error('SMS_API_URL not configured');
+      }
 
       if (selectedVendor?.rejectingDocType) {
         const docType = selectedVendor.rejectingDocType;
@@ -500,7 +506,10 @@ const AdminVendorVerificationDashboard = () => {
                             onPress={async () => {
                               try {
                                 setActionLoading(true);
-                                const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL || 'http://192.168.1.114:4000';
+                                const backendUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
+                                if (!backendUrl) {
+                                  throw new Error('SMS_API_URL not configured');
+                                }
 
                                 // Use backend API for faster document approval
                                 const response = await fetch(

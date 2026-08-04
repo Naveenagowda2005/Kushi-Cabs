@@ -1,8 +1,25 @@
 const path = require('path');
+const os = require('os');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 console.log('🔧 Environment loaded');
 console.log(`ℹ️  SUPABASE_URL: ${process.env.SUPABASE_URL ? '✓ loaded' : '✗ missing'}`);
 console.log(`ℹ️  SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ loaded' : '✗ missing'}`);
+
+// Get local IP address
+function getLocalIpAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      // Skip internal and non-IPv4 addresses
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
+const localIp = getLocalIpAddress();
 
 const express = require('express');
 console.log('📦 Express loaded');
@@ -98,8 +115,8 @@ app.use((err, req, res, next) => {
 
 // Start server
 const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`✅ Taxi SMS backend listening on http://192.168.1.114:${port}`);
-  console.log(`✅ Access from network at: http://192.168.1.114:${port}`);
+  console.log(`✅ Taxi SMS backend listening on http://${localIp}:${port}`);
+  console.log(`✅ Access from network at: http://${localIp}:${port}`);
   console.log(`📱 API endpoints:`);
   console.log(`   - POST /sms/otp - Send OTP`);
   console.log(`   - POST /sms/verify - Verify OTP`);

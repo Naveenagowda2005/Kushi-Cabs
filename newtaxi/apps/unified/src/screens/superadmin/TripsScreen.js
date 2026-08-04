@@ -10,7 +10,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../hooks/useTheme';
-import { COLORS } from '../../constants';
+import { COLORS, API_CONFIG } from '../../constants';
 
 // Zoomable Image Component with simple zoom controls
 function ZoomableImage({ imageUrl, title, onClose }) {
@@ -934,7 +934,7 @@ export default function SuperAdminTripsScreen() {
     const handleViewOdometerImages = async () => {
       console.log(`📸 View button pressed - Loading odometer URLs for trip ${item.id}`);
       try {
-        const response = await fetch(`http://192.168.1.114:4000/api/trips/odometer-urls?trip_ids=${item.id}`);
+        const response = await fetch(`${API_CONFIG.SMS_API_URL}/api/trips/odometer-urls?trip_ids=${item.id}`);
         const result = await response.json();
         
         if (result.status === 'success' && result.data && result.data.length > 0) {

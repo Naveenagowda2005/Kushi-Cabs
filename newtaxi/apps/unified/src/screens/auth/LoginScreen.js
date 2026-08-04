@@ -10,6 +10,7 @@ import { COLORS, ROLES, API_CONFIG } from '../../constants';
 import { wp, hp, getResponsiveFontSize, getResponsivePadding } from '../../utils/responsive';
 import { glassStyles } from '../../styles/glassomorphism';
 import { useAnimatedBorder } from '../../hooks/useAnimatedBorder';
+import { supabase } from '../../lib/supabase';
 
 export default function LoginScreen({ navigation }) {
   const { signIn, signOut, loading, selectedRole, resetRoleSelection, hasSession } = useAuth();
@@ -497,6 +498,90 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
+
+    const phoneDigits = form.identifier.replace(/[^0-9]/g, '');
+
+    // Check if this is a dummy driver or dummy vendor (skip OTP for dummy accounts)
+    if (selectedRole === ROLES.DRIVER) {
+      try {
+        console.log('🤖 Checking if this is a dummy driver:', phoneDigits);
+        
+        // Query Supabase to check if driver has license_number starting with DUMMY-
+        const { data: driverData, error: driverError } = await supabase
+          .from('drivers')
+          .select('user_id')
+          .eq('license_number', `DUMMY-${phoneDigits}`)
+          .maybeSingle();
+
+        if (!driverError && driverData) {
+          console.log('✅ Dummy driver detected - skipping OTP, logging in directly');
+          
+          // Direct login for dummy driver - no OTP needed
+          const { data, error } = await signIn(phoneDigits, '', selectedRole);
+          
+          if (error) {
+            console.error('Unified LoginScreen: Dummy driver login failed:', error.message);
+            Alert.alert('Login Failed', error.message);
+          } else {
+            console.log('Unified LoginScreen: Dummy driver login successful');
+            setShowOtpField(false);
+            setOtp('');
+            setOtpSent(false);
+          }
+          return;
+        }
+      } catch (err) {
+        console.log('⚠️ Could not check for dummy driver, proceeding with OTP:', err.message);
+        // Continue with normal OTP flow if check fails
+      }
+    }
+
+    // Check if this is a dummy vendor (skip OTP for dummy vendors)
+    if (selectedRole === ROLES.VENDOR) {
+      try {
+        console.log('🏢 Checking if this is a dummy vendor:', phoneDigits);
+        
+        // Query Supabase to check if vendor exists with user having phone number and company_name starting with DUMMY
+        const { data: vendorData, error: vendorError } = await supabase
+          .from('vendors')
+          .select('user_id')
+          .ilike('company_name', 'DUMMY%')
+          .limit(100);
+
+        if (!vendorError && vendorData && vendorData.length > 0) {
+          // Now check if any of these vendors have the matching phone number
+          const vendorUserIds = vendorData.map(v => v.user_id);
+          
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id, phone')
+            .in('id', vendorUserIds)
+            .eq('phone', phoneDigits)
+            .maybeSingle();
+
+          if (!userError && userData) {
+            console.log('✅ Dummy vendor detected - skipping OTP, logging in directly');
+            
+            // Direct login for dummy vendor - no OTP needed
+            const { data, error } = await signIn(phoneDigits, '', selectedRole);
+            
+            if (error) {
+              console.error('Unified LoginScreen: Dummy vendor login failed:', error.message);
+              Alert.alert('Login Failed', error.message);
+            } else {
+              console.log('Unified LoginScreen: Dummy vendor login successful');
+              setShowOtpField(false);
+              setOtp('');
+              setOtpSent(false);
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        console.log('⚠️ Could not check for dummy vendor, proceeding with OTP:', err.message);
+        // Continue with normal OTP flow if check fails
+      }
+    }
     
     // Show OTP field
     if (!showOtpField) {
@@ -606,7 +691,6 @@ export default function LoginScreen({ navigation }) {
 
     console.log('Unified LoginScreen: Attempting login with role:', selectedRole, 'phone:', form.identifier);
 
-    const phoneDigits = form.identifier.replace(/[^0-9]/g, '');
     const { data, error } = await signIn(phoneDigits, '', selectedRole);
     
     if (error) {
