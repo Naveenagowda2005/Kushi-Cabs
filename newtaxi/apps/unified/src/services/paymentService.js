@@ -1,214 +1,337 @@
-import { Linking, Platform } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { API_CONFIG } from '../constants';
 
-// Safely import RazorpayCheckout — not available in Expo Go
-let RazorpayCheckout = null;
-try {
-  RazorpayCheckout = require('react-native-razorpay').default;
-} catch (e) {
-  console.warn('react-native-razorpay not available (Expo Go). Payment will be disabled.');
-}
+/**
+ * PhonePe Payment Service (Official Android SDK Integration)
+ * Implements OAuth token flow with PhonePe official API
+ * Handles wallet recharge via PhonePe UPI payments
+ */
 
-// Replace with your Razorpay Key ID from dashboard.razorpay.com
-const RAZORPAY_KEY_ID = 'rzp_test_SknzQ9p24mWj7T';
-
-// PhonePe merchant UPI ID - MUST be in format: username@bankname (e.g., merchant@okhdfcbank)
-// Current value might need verification if payment screen shows blank/generic UPI screen
-const PHONEPE_UPI_ID = 'M18UH4EERGY0';  // TODO: Verify this is a valid UPI ID in format username@bankname
-const PHONEPE_MERCHANT_NAME = 'KUSHI CABS';
-
-const PAYMENT_GATEWAYS = {
-  RAZORPAY: 'razorpay',
-  PHONEPE: 'phonepe',
+/**
+ * Generate unique merchant transaction ID
+ * Format: PREFIX_USERID_TIMESTAMP_RANDOM
+ */
+const generateMerchantTransactionId = (userId) => {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 10000);
+  return `TXN_${userId}_${timestamp}_${random}`;
 };
 
-async function startPhonePeCheckout({ amount, orderId }) {
-  const amountValue = Number(amount).toFixed(2);
-  
-  // Validate inputs
-  if (!PHONEPE_UPI_ID) {
-    throw new Error('PhonePe UPI ID not configured. Please check merchant settings.');
-  }
-  
-  if (!amountValue || isNaN(amountValue) || parseFloat(amountValue) <= 0) {
-    throw new Error('Invalid payment amount');
-  }
-  
-  // Warn if UPI ID doesn't look like a valid format (should have @ symbol)
-  if (!PHONEPE_UPI_ID.includes('@')) {
-    console.warn('[PhonePe] ⚠️  WARNING: UPI ID does not contain @ symbol. Valid format is: username@bankname');
-    console.warn('[PhonePe] Current UPI ID:', PHONEPE_UPI_ID);
-    console.warn('[PhonePe] Payment may open but show blank screen. If this happens, please verify the UPI ID configuration.');
-  }
-  
-  console.log('[PhonePe] Payment Details:', {
-    upiId: PHONEPE_UPI_ID,
-    merchantName: PHONEPE_MERCHANT_NAME,
-    amount: amountValue,
-    orderId: orderId,
-  });
+// ============================================================
+// OAuth Token Management
+// ============================================================
 
-  // Standard UPI deep link format that all UPI apps (including PhonePe) support
-  // Reference: https://www.npci.org.in/UPI-Current-Transaction-Types
-  const upiParams = [
-    `pa=${encodeURIComponent(PHONEPE_UPI_ID)}`,           // Payee address (UPI ID)
-    `pn=${encodeURIComponent(PHONEPE_MERCHANT_NAME)}`,    // Payee name
-    `tr=${encodeURIComponent(orderId)}`,                  // Transaction reference ID
-    `tn=${encodeURIComponent('Trip Commission')}`,        // Transaction note
-    `am=${encodeURIComponent(amountValue)}`,              // Amount
-    'cu=INR',                                              // Currency
-  ].join('&');
+let cachedAuthToken = null;
+let tokenExpirationTime = null;
 
-  const upiUrl = `upi://pay?${upiParams}`;
-  
-  console.log('[PhonePe] Full UPI URL length:', upiUrl.length);
-  console.log('[PhonePe] Opening UPI URL...');
-
+/**
+ * Get PhonePe OAuth Access Token
+ * Tokens are cached and reused until expiration
+ * @returns {Promise<string>} Access token
+ */
+export const getPhonePeAuthToken = async () => {
   try {
-    // Check if device can open UPI URLs
-    const canOpen = await Linking.canOpenURL(upiUrl);
-    console.log(`[PhonePe] Can open UPI URL: ${canOpen}`);
-    
-    if (!canOpen) {
-      throw new Error('No UPI app available');
+    // Check if we have a valid cached token
+    if (cachedAuthToken && tokenExpirationTime && Date.now() < tokenExpirationTime) {
+      console.log(`🔐 Using cached auth token (expires in ${Math.floor((tokenExpirationTime - Date.now()) / 1000)}s)`);
+      return cachedAuthToken;
     }
-    
-    // Open the UPI URL - PhonePe will intercept it
-    await Linking.openURL(upiUrl);
-    console.log('[PhonePe] UPI URL opened successfully');
-    
-    return { success: true, pending: true };
-  } catch (err) {
-    console.error('[PhonePe] Error opening UPI URL:', {
-      message: err.message,
-      code: err.code,
-      url: upiUrl.substring(0, 100),
+
+    console.log(`🔐 Requesting new PhonePe auth token...`);
+
+    const response = await fetch(`${API_CONFIG.SMS_API_URL}/api/phonepe/auth-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
-    
-    if (err.message.includes('No UPI app available')) {
-      throw new Error('No UPI app found. Please install PhonePe, Google Pay, Paytm, or any UPI app on your device.');
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('❌ Auth token error:', data);
+      throw new Error(data.error || 'Failed to get auth token');
     }
-    
-    throw new Error('Could not open payment app. Make sure a UPI app is installed.');
+
+    console.log('✅ Auth token received');
+    console.log(`   Type: ${data.data.tokenType}`);
+    console.log(`   Expires in: ${data.data.expiresIn}s`);
+
+    // Cache the token
+    cachedAuthToken = data.data.accessToken;
+    tokenExpirationTime = Date.now() + (data.data.expiresIn * 1000) - 60000; // Refresh 1 min before expiry
+
+    return cachedAuthToken;
+  } catch (error) {
+    console.error('❌ Auth token error:', error.message);
+    throw error;
   }
-}
+};
 
 /**
- * Initiates a wallet deposit flow.
- * 1. Creates a payment order record in DB via RPC
- * 2. Opens the selected gateway flow (Razorpay or PhonePe)
- * 3. On success, credits wallet via RPC or leaves a pending PhonePe order for confirmation
+ * Create PhonePe Payment Order
+ * @param {string} userId - User ID
+ * @param {number} amount - Amount in rupees
+ * @param {string} userType - 'driver', 'vendor', or 'super_admin'
+ * @returns {Promise<{merchantOrderId, transactionId, amount, payload, signature, paymentEndpoint, orderData}>}
  */
-export async function initiateDeposit({ userId, amount, userEmail, userName, gateway = PAYMENT_GATEWAYS.RAZORPAY, minAmount = 100 }) {
-  if (!amount || amount < minAmount) {
-    throw new Error(`Minimum deposit amount is ₹${minAmount}`);
+export const createPhonePeOrder = async (userId, amount, userType = 'driver') => {
+  try {
+    console.log(`📱 Creating PhonePe order...`);
+    console.log(`   User: ${userId}`);
+    console.log(`   Amount: ₹${amount}`);
+
+    // Get auth token
+    const authToken = await getPhonePeAuthToken();
+
+    const merchantOrderId = generateMerchantTransactionId(userId);
+
+    // Create order
+    const response = await fetch(`${API_CONFIG.SMS_API_URL}/api/phonepe/create-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        userId,
+        amount,
+        merchantOrderId,
+        userType,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('❌ Order creation failed:', data);
+      throw new Error(data.error || 'Failed to create order');
+    }
+
+    console.log('✅ Order created successfully');
+    console.log(`   Order ID: ${data.data.merchantOrderId}`);
+    console.log(`   Transaction ID: ${data.data.transactionId}`);
+    console.log(`   Checkout URL: ${data.data.checkoutUrl}`);
+
+    return {
+      merchantOrderId: data.data.merchantOrderId,
+      transactionId: data.data.transactionId,
+      amount: data.data.amount,
+      token: data.data.token,
+      checkoutUrl: data.data.checkoutUrl,
+      phonePeOrderId: data.data.phonePeOrderId,
+      state: data.data.state,
+    };
+  } catch (error) {
+    console.error('❌ Order creation error:', error.message);
+    throw error;
   }
+};
 
-  // 1. Create order record in DB via RPC (bypasses RLS)
-  const phonepeOrderId = gateway === PAYMENT_GATEWAYS.PHONEPE ? `phonepe_${Date.now()}` : null;
-  
-  const { data: orderId, error: rpcErr } = await supabase.rpc('insert_payment_order', {
-    p_user_id: userId,
-    p_type: 'deposit',
-    p_amount: amount,
-    p_gateway: gateway,
-    p_phonepe_order_id: phonepeOrderId,
-  });
+/**
+ * Verify PhonePe Payment (Check order status)
+ * @param {string} merchantOrderId - Merchant order ID
+ * @returns {Promise<{state, responseCode, transactionId, amount}>}
+ */
+export const verifyPhonePePayment = async (merchantOrderId) => {
+  try {
+    console.log(`📊 Verifying PhonePe payment: ${merchantOrderId}`);
 
-  if (rpcErr) {
-    console.error('RPC insert_payment_order error:', rpcErr);
-    throw new Error('Failed to create payment order: ' + rpcErr.message);
-  }
+    // Get auth token
+    const authToken = await getPhonePeAuthToken();
 
-  // 2. Handle PhonePe payment
-  if (gateway === PAYMENT_GATEWAYS.PHONEPE) {
-    try {
-      const result = await startPhonePeCheckout({ amount, orderId: orderId });
-      if (result.pending) {
-        return {
-          success: true,
-          pending: true,
-          message: 'PhonePe payment started. Complete payment in your PhonePe app, then return to confirm.',
-        };
+    const response = await fetch(
+      `${API_CONFIG.SMS_API_URL}/api/phonepe/order-status/${merchantOrderId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
       }
-    } catch (err) {
-      // Update order as failed
-      await supabase.from('payment_orders').update({ status: 'failed' }).eq('id', orderId);
-      throw err;  // Re-throw to let caller handle it
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('❌ Status verification failed:', data);
+      throw new Error(data.error || 'Failed to verify payment');
     }
+
+    console.log('✅ Payment verified');
+    console.log(`   State: ${data.data.state}`);
+    console.log(`   Response Code: ${data.data.responseCode}`);
+
+    return {
+      state: data.data.state,
+      responseCode: data.data.responseCode,
+      transactionId: data.data.transactionId,
+      amount: data.data.amount,
+    };
+  } catch (error) {
+    console.error('❌ Verification error:', error.message);
+    throw error;
   }
+};
 
-  // 3. Handle Razorpay payment (default)
-  const options = {
-    description:  'Wallet Deposit',
-    image:        'https://your-logo-url.png',
-    currency:     'INR',
-    key:          RAZORPAY_KEY_ID,
-    amount:       amount * 100,  // Razorpay uses paise
-    name:         'Taxi Service',
-    order_id:     `order_${Date.now()}`,
-    prefill: {
-      email: userEmail ?? '',
-      name:  userName  ?? '',
-    },
-    theme: { color: '#1a1a2e' },
-  };
-
-  return new Promise((resolve, reject) => {
-    if (!RazorpayCheckout) {
-      reject(new Error('Razorpay is not available in this build. Please use the production app.'));
-      return;
-    }
-    RazorpayCheckout.open(options)
-      .then(async (paymentData) => {
-        // Payment successful — credit wallet
-        const { data, error } = await supabase.rpc('verify_and_credit_deposit', {
-          p_user_id:    userId,
-          p_order_id:   options.order_id,
-          p_payment_id: paymentData.razorpay_payment_id,
-          p_amount:     amount,
-        });
-
-        if (error) return reject(new Error(error.message));
-        if (!data.success) return reject(new Error('Payment verification failed'));
-
-        resolve({ success: true, newBalance: data.new_balance });
-      })
-      .catch((error) => {
-        // User cancelled or payment failed
-        supabase.from('payment_orders')
-          .update({ status: 'failed' })
-          .eq('id', orderId);
-
-        reject(new Error(error.description ?? 'Payment cancelled'));
-      });
-  });
-}
+// ============================================================
+// High-level Payment Initiation
+// ============================================================
 
 /**
- * Submits a withdrawal request.
- * Actual bank transfer is done manually by admin.
+ * Initiate Deposit (Alias for initiatePhonePePayment for backward compatibility)
+ * @param {object} depositData - {userId, amount, paymentGateway}
+ * @returns {Promise<{success: boolean, data: {merchantOrderId, transactionId}, error: string}>}
  */
-export async function requestWithdrawal({ userId, amount, method, details }) {
-  // Use existing atomic withdrawal RPC
-  const { data, error } = await supabase.rpc('request_withdrawal', {
-    p_user_id: userId,
-    p_amount:  amount,
-  });
+export const initiateDeposit = async (depositData) => {
+  try {
+    const { userId, amount, paymentGateway = 'phonepe' } = depositData;
 
-  if (error) throw error;
-  if (!data.success) throw new Error(data.error);
+    if (paymentGateway !== 'phonepe') {
+      throw new Error(`Payment gateway ${paymentGateway} not supported`);
+    }
 
-  // Record withdrawal request with bank details
-  await supabase.from('payment_orders').insert({
-    user_id:      userId,
-    type:         'withdrawal',
-    amount,
-    status:       'pending',
-    bank_account: method === 'bank' ? details.accountNumber : null,
-    ifsc_code:    method === 'bank' ? details.ifsc : null,
-    upi_id:       method === 'upi'  ? details.upiId : null,
-  });
+    return await initiatePhonePePayment(userId, amount, 'driver');
+  } catch (error) {
+    console.error('❌ Deposit initiation error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
 
-  return { success: true, newBalance: data.new_balance };
-}
+/**
+ * Initiate PhonePe payment (high-level wrapper)
+ * @param {string} userId - User ID
+ * @param {number} amount - Amount in rupees
+ * @param {string} userType - 'driver', 'vendor', or 'super_admin'
+ * @returns {Promise<{success: boolean, data: {merchantOrderId, transactionId, payload, signature, paymentEndpoint, orderData}, error: string}>}
+ */
+export const initiatePhonePePayment = async (userId, amount, userType = 'driver') => {
+  try {
+    if (!userId || !amount || amount < 1) {
+      throw new Error('Invalid parameters: userId and amount (minimum ₹1) required');
+    }
+
+    console.log(`💳 Initiating PhonePe payment`);
+    console.log(`   User: ${userId}`);
+    console.log(`   Amount: ₹${amount}`);
+    console.log(`   Type: ${userType}`);
+
+    // Create order via OAuth flow
+    const orderResult = await createPhonePeOrder(userId, amount, userType);
+
+    console.log('✅ Payment initiated successfully');
+    console.log(`   Transaction ID: ${orderResult.transactionId}`);
+
+    return {
+      success: true,
+      data: {
+        merchantOrderId: orderResult.merchantOrderId,
+        transactionId: orderResult.transactionId,
+        token: orderResult.token,
+        checkoutUrl: orderResult.checkoutUrl,
+        phonePeOrderId: orderResult.phonePeOrderId,
+        state: orderResult.state,
+      },
+    };
+  } catch (error) {
+    console.error('❌ PhonePe initiation error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Check payment status
+ * @param {string} transactionId - Merchant transaction ID or order ID
+ * @returns {Promise<{success: boolean, data: {state, responseCode}, error: string}>}
+ */
+export const checkPhonePePaymentStatus = async (transactionId) => {
+  try {
+    if (!transactionId) {
+      throw new Error('Transaction ID required');
+    }
+
+    console.log(`📊 Checking PhonePe payment status: ${transactionId}`);
+
+    const statusResult = await verifyPhonePePayment(transactionId);
+
+    console.log(`✅ Payment status: ${statusResult.state}`);
+
+    return {
+      success: true,
+      data: {
+        state: statusResult.state,
+        responseCode: statusResult.responseCode,
+        transactionId: statusResult.transactionId,
+        amount: statusResult.amount,
+      },
+    };
+  } catch (error) {
+    console.error('❌ Status check error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Format amount for display
+ * @param {number} amount - Amount in rupees
+ * @returns {string} Formatted string
+ */
+const formatPaymentAmount = (amount) => {
+  return `₹${amount.toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
+/**
+ * Get payment status display text
+ * @param {string} state - Payment state
+ * @returns {string} Display text
+ */
+const getPaymentStatusDisplay = (state) => {
+  const stateMap = {
+    'COMPLETED': 'Payment Successful',
+    'INITIATED': 'Payment Initiated',
+    'FAILED': 'Payment Failed',
+    'PENDING': 'Pending',
+  };
+  return stateMap[state] || state;
+};
+
+/**
+ * Validate payment amount
+ * @param {number} amount - Amount to validate
+ * @returns {object} {valid: boolean, error: string}
+ */
+const validatePaymentAmount = (amount) => {
+  if (!amount || isNaN(amount)) {
+    return { valid: false, error: 'Amount must be a number' };
+  }
+
+  const numAmount = parseFloat(amount);
+
+  if (numAmount < 1) {
+    return { valid: false, error: 'Minimum amount is ₹1' };
+  }
+
+  if (numAmount > 100000) {
+    return { valid: false, error: 'Maximum amount is ₹100,000' };
+  }
+
+  return { valid: true };
+};
+
+// Export all functions at once
+export {
+  formatPaymentAmount,
+  getPaymentStatusDisplay,
+  validatePaymentAmount,
+};

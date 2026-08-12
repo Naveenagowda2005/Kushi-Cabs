@@ -4,6 +4,8 @@ import { Vibration } from 'react-native';
 
 let soundObject = null;
 let isPlayingAlert = false;
+let playingAlertStartedAt = 0;
+const MAX_ALERT_DURATION_MS = 30000; // Safety: max 30s before releasing lock
 
 /**
  * Trigger vibration that lasts for 2 seconds
@@ -216,13 +218,15 @@ export const playLoopingAlert = async (loops = 2) => {
   let localSoundObject = null;
   
   try {
-    // If already playing, don't restart
-    if (isPlayingAlert) {
+    // If already playing AND it started recently (within safety window), skip
+    const now = Date.now();
+    if (isPlayingAlert && (now - playingAlertStartedAt) < MAX_ALERT_DURATION_MS) {
       console.log('🔊 Alert already playing, skipping restart');
       return;
     }
 
     isPlayingAlert = true;
+    playingAlertStartedAt = Date.now();
     console.log(`📢 Starting ${loops} alert rings`);
 
     // STEP 1: Set audio mode ONCE at the beginning

@@ -6,6 +6,7 @@
     "icon": "./app-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "scheme": "kushicabs",
     "splash": {
       "image": "./app-icon.png",
       "resizeMode": "contain",

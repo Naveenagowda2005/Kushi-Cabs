@@ -19,6 +19,17 @@ import WalletBanner from '../../components/WalletBanner';
 import { COLORS } from '../../constants';
 import { playLoopingAlert } from '../../services/soundService';
 import FloatingBubble from '../../components/FloatingBubble';
+import TripCountBubble from '../../components/TripCountBubble';
+import {
+  requestOverlayPermission,
+  setupAppStateListener,
+  hideFloatingBubble,
+} from '../../services/floatingBubbleService';
+import {
+  setupTripNotifications,
+  showTripNotification,
+  cancelTripNotification,
+} from '../../services/tripNotificationService';
 
 export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const { user, signOut } = useAuth();
@@ -36,9 +47,40 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   const [displayTrips, setDisplayTrips] = useState([]);
   
   // Track previous trip count to detect when count increases
-  const prevTripCountRef = useRef(0);
-  const hasPlayedInitialSoundRef = useRef(false);
-  const isScreenFocusRef = useRef(false);  // Track if we just focused the screen
+  const prevTripCountRef = useRef(null); // null = not yet initialized
+  const isInitializedRef = useRef(false); // true once first trip list has been received
+  const continuousAlertIntervalRef = useRef(null); // interval for continuous alert
+
+  // Keep latest tripCount + isOnline in a ref so AppState listener can read without stale closure
+  const tripStateRef = useRef({ tripCount: 0, isOnline: false });
+
+  // Request overlay permission once on mount (only does something in dev build)
+  useEffect(() => {
+    requestOverlayPermission();
+  }, []);
+
+  // Setup trip notifications (request permission + auto-cancel on foreground)
+  useEffect(() => {
+    let cleanupNotif = () => {};
+    setupTripNotifications().then((cleanup) => {
+      cleanupNotif = cleanup;
+    });
+    return () => {
+      cleanupNotif();
+      cancelTripNotification();
+    };
+  }, []);
+
+  // Setup AppState listener: show native bubble when app backgrounds, hide when foregrounded
+  useEffect(() => {
+    const cleanup = setupAppStateListener(() => tripStateRef.current);
+    return cleanup;
+  }, []);
+
+  // Hide native bubble when screen unmounts (e.g. driver navigates away)
+  useEffect(() => {
+    return () => hideFloatingBubble();
+  }, []);
 
   // Sync available trips and online status to AlertContext
   useEffect(() => {
@@ -46,6 +88,8 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
       trips: displayTrips.length,
       isDriverOnline: isOnline,
     });
+    // Keep ref in sync for native overlay AppState listener
+    tripStateRef.current = { tripCount: displayTrips.length, isOnline };
   }, [displayTrips.length, isOnline, updateAlertData]);
 
   // Fetch all trips with creator details (including in_progress, completed, cancelled, etc.)
@@ -73,7 +117,6 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
   useFocusEffect(
     useCallback(() => {
       console.log('DashboardScreen focused - refetching active trip');
-      isScreenFocusRef.current = true;  // Mark that we're doing a screen focus refetch
       refetchActiveTrip();
       // Also fetch completed trips for history tab
       fetchCompletedTrips();
@@ -122,66 +165,75 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
         return new Date(b.created_at) - new Date(a.created_at);
       });
     setDisplayTrips(sorted);
-
-    // Initialize prevTripCountRef only on first load or significant changes
-    // (avoid resetting on every navigation)
-    if (prevTripCountRef.current === 0 && sorted.length > 0) {
-      prevTripCountRef.current = sorted.length;
-      console.log(`✅ Initialized trip count: ${sorted.length}`);
-    }
   }, [availableTrips, isNewTrip]);
 
-  // 🔊 Play sound alert only when trip count INCREASES (not on initial load or decrease)
+  // 🔊 Sound alert logic:
+  // - On first load: just record the baseline count (no sound)
+  // - When trip count INCREASES: play sound immediately
+  // - While trips > 0 and driver is online: play continuous alert every 30 seconds
   useEffect(() => {
-    const currentTripCount = displayTrips.length;
-    const previousTripCount = prevTripCountRef.current;
+    const currentCount = displayTrips.length;
 
-    console.log(`📊 Trip count change: ${previousTripCount} → ${currentTripCount}`, {
-      isScreenFocused: isScreenFocusRef.current,
-      hasInitialized: hasPlayedInitialSoundRef.current,
-      isOnline,
-    });
-
-    // IMPORTANT: Check before updating prevTripCountRef so we can detect the change
-    const tripCountIncreased = currentTripCount > previousTripCount;
-    const screenFocusedJustNow = isScreenFocusRef.current;
-
-    // Mark that we've processed at least one count change
-    if (!hasPlayedInitialSoundRef.current && currentTripCount >= 0) {
-      hasPlayedInitialSoundRef.current = true;
-      console.log('✅ Initial trip count loaded, sound alerts now enabled');
+    // First time we receive any trip data — set baseline, start/stop continuous alert
+    if (prevTripCountRef.current === null) {
+      prevTripCountRef.current = currentCount;
+      isInitializedRef.current = true;
+      console.log(`✅ Initialized trip count baseline: ${currentCount}`);
+      // Start continuous alert immediately if there are trips
+      if (currentCount > 0 && isOnline) {
+        console.log('🔊 Starting continuous alert (initial trips found)');
+        playLoopingAlert(1);
+      }
+      return;
     }
 
-    // Only play sound if:
-    // 1. Trips increased (new trips available)
-    // 2. Driver is online
-    // 3. Not the initial load (hasPlayedInitialSoundRef prevents first load sound)
-    // 4. Not during screen focus (don't play when just switched to available tab)
-    if (
-      tripCountIncreased &&
-      isOnline &&
-      hasPlayedInitialSoundRef.current &&
-      !screenFocusedJustNow  // Don't play immediately on screen focus
-    ) {
-      const newTripsCount = currentTripCount - previousTripCount;
-      console.log(`🔊 PLAYING SOUND! ${newTripsCount} new trip(s) available`);
-      playLoopingAlert(3); // Play 3 times
-    } else if (tripCountIncreased && screenFocusedJustNow) {
-      console.log('⏭️ Trip count increased but screen just focused, skipping sound (likely from refetch)');
+    const previousCount = prevTripCountRef.current;
+    console.log(`📊 Trip count: ${previousCount} → ${currentCount}, isOnline: ${isOnline}`);
+
+    // New trip(s) arrived — play alert immediately
+    if (currentCount > previousCount && isOnline) {
+      console.log(`🔊 NEW TRIP(S)! Playing alert (${previousCount} → ${currentCount})`);
+      playLoopingAlert(2);
+      // Also fire a heads-up notification if app is in background
+      showTripNotification(currentCount);
     }
 
-    // Update previous count for next comparison (AFTER checking tripCountIncreased)
-    prevTripCountRef.current = currentTripCount;
-
-    // Reset screen focus flag AFTER this effect completes
-    // Use a timeout to allow the sound logic above to complete first
-    if (screenFocusedJustNow) {
-      const resetTimer = setTimeout(() => {
-        isScreenFocusRef.current = false;
-        console.log('🔄 Screen focus flag reset');
-      }, 100);
-      return () => clearTimeout(resetTimer);
+    // No trips left — cancel any notification
+    if (currentCount === 0) {
+      cancelTripNotification();
     }
+
+    prevTripCountRef.current = currentCount;
+  }, [displayTrips.length, isOnline]);
+
+  // 🔁 Continuous alert: play every 30 seconds while trips are available and driver is online
+  useEffect(() => {
+    // Clear any existing interval first
+    if (continuousAlertIntervalRef.current) {
+      clearInterval(continuousAlertIntervalRef.current);
+      continuousAlertIntervalRef.current = null;
+    }
+
+    if (displayTrips.length > 0 && isOnline) {
+      console.log(`🔁 Starting continuous 30s alert interval (${displayTrips.length} trips available)`);
+      continuousAlertIntervalRef.current = setInterval(() => {
+        const tripCount = prevTripCountRef.current;
+        if (tripCount > 0) {
+          console.log(`🔊 Continuous alert ping — ${tripCount} trip(s) still waiting`);
+          playLoopingAlert(1);
+        }
+      }, 30000); // every 30 seconds
+    } else {
+      console.log('🔇 No trips or offline — continuous alert stopped');
+    }
+
+    return () => {
+      if (continuousAlertIntervalRef.current) {
+        clearInterval(continuousAlertIntervalRef.current);
+        continuousAlertIntervalRef.current = null;
+        console.log('🛑 Continuous alert interval cleared');
+      }
+    };
   }, [displayTrips.length, isOnline]);
 
   // If driver already has an active/in-progress trip, redirect to ActiveTrip screen
@@ -521,11 +573,20 @@ export default function DriverDashboardScreen({ navigation, onSwitchTab }) {
         />
       )}
 
-      {/* Floating Bubble */}
+      {/* Floating Bubble - active trip */}
       <FloatingBubble
         trip={bubbleTrip}
         visible={bubbleVisible}
         onPress={() => navigation.navigate('ActiveTrip', { trip: bubbleTrip })}
+      />
+
+      {/* Trip Count Bubble - draggable circle showing available trips */}
+      <TripCountBubble
+        tripCount={displayTrips.length}
+        isOnline={isOnline}
+        onPress={() => {
+          setActiveTab(0); // switch to Available tab
+        }}
       />
     </View>
   );

@@ -45,6 +45,9 @@ console.log('📦 Database optimization router loaded');
 const tripsRouter = require('./routes/trips');
 console.log('📦 Trips router loaded');
 
+const phonePeRouter = require('./routes/phonepe-payment');
+console.log('📦 PhonePe payment router loaded');
+
 const app = express();
 const port = process.env.PORT || 4000;
 console.log(`🔧 Configured port: ${port}`);
@@ -102,6 +105,11 @@ app.use('/api/trips', (req, res, next) => {
   next();
 }, tripsRouter);
 
+app.use('/api/phonepe', (req, res, next) => {
+  console.log(`📱 PhonePe Request: ${req.method} ${req.path}`);
+  next();
+}, phonePeRouter);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found', path: req.path });
@@ -144,6 +152,10 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(`   - GET /api/trips/list - Get paginated trips`);
   console.log(`   - GET /api/trips/count-by-status - Get trip counts by status`);
   console.log(`   - GET /api/trips/quick-count - Get total trip count`);
+  console.log(`   - POST /api/phonepe/auth-token - Get PhonePe OAuth token`);
+  console.log(`   - POST /api/phonepe/create-order - Create payment order`);
+  console.log(`   - GET /api/phonepe/order-status/:merchantOrderId - Check order status`);
+  console.log(`   - POST /api/phonepe/callback - PhonePe payment webhook`);
   console.log(`🟢 SERVICE READY FOR REQUESTS`);
 });
 
