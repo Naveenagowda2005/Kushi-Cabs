@@ -13,6 +13,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "node": "20.12.2",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://cqfsirfjwfxvwggjkrvd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxZnNpcmZqd2Z4dndnZ2prcnZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNTIyNDAsImV4cCI6MjA5ODgyODI0MH0.BhAbkuYzJ4KEmLM-7ItjaF2WmP4UuSZFqIaZ8ypNBEM",
