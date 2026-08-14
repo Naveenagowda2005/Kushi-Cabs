@@ -311,7 +311,7 @@ export default function DriverTripDetailScreen({ route, navigation }) {
           )}
           {commissionToPay === 0 && commissionAmount > 0 && (
             <View style={styles.coveredBadge}>
-              <Ionicons name="checkmark-circle-outline" size={14} color="#fff" />
+              <Ionicons name="checkmark-circle-outline" size={14} color="#4caf50" />
               <Text style={styles.coveredBadgeText}>
                 Commission fully covered by pre-advance
               </Text>
@@ -429,8 +429,8 @@ const styles = StyleSheet.create({
   adminBadgeText: { color: '#000', fontSize: 13, fontWeight: '700' },
   paymentBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ff9800', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8 },
   paymentBadgeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  coveredBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#4caf50', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8 },
-  coveredBadgeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  coveredBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8, borderWidth: 1, borderColor: '#4caf50' },
+  coveredBadgeText: { color: '#4caf50', fontSize: 13, fontWeight: '600' },
 
   section: { backgroundColor: '#f5f5f5', borderRadius: 14, padding: 16, marginBottom: 14, gap: 14, borderWidth: 1, borderColor: '#e0e0e0' },
   sectionLocked: { borderWidth: 1, borderColor: '#ff980040' },

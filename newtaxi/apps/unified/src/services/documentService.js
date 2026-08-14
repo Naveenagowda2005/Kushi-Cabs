@@ -501,6 +501,36 @@ export const approveDocument = async (driverId, documentType) => {
       .eq('document_type', documentType);
 
     if (error) throw error;
+
+    // After approving, check if ALL required documents are now approved
+    // If yes, update overall_status to 'approved' so the driver can access the app
+    const { data: allDocs } = await supabase
+      .from('driver_documents')
+      .select('document_type, status')
+      .eq('driver_id', driverId);
+
+    if (allDocs && areAllDocumentsApproved(allDocs)) {
+      console.log('✅ approveDocument: All documents approved — updating overall_status to approved for driver:', driverId);
+      const { error: statusError } = await supabase
+        .from('driver_verification_status')
+        .upsert({
+          driver_id: driverId,
+          overall_status: 'approved',
+          all_documents_submitted: true,
+          approved_at: new Date().toISOString(),
+          submitted_at: new Date().toISOString(),
+        }, { onConflict: 'driver_id' });
+
+      if (statusError) {
+        console.error('approveDocument: Failed to update overall_status:', statusError);
+      }
+
+      // Also update users.verification_status for legacy support
+      await supabase
+        .from('users')
+        .update({ verification_status: 'approved' })
+        .eq('id', driverId);
+    }
   } catch (error) {
     console.error('Error approving document:', error);
     throw error;

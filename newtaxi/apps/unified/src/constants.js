@@ -273,10 +273,11 @@ export const COLORS = new Proxy({}, {
 const getApiUrl = () => {
   // Use environment variable from .env, fallback to production URL
   const envUrl = process.env.EXPO_PUBLIC_SMS_API_URL;
-  const developmentUrl = 'https://kushi-cabs-27p8.onrender.com';  // PRODUCTION BACKEND
+  // PRODUCTION: Render URL for Play Store
+  const productionUrl = 'https://kushi-cabs-27p8.onrender.com';
   
   // Priority: env variable > production URL
-  const url = envUrl || developmentUrl;
+  const url = envUrl || productionUrl;
   console.log('🔌 Using SMS API URL:', url);
   return url;
 };

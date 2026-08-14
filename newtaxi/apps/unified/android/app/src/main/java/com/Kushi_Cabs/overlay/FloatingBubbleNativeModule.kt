@@ -9,22 +9,43 @@ import com.facebook.react.bridge.*
 class FloatingBubbleNativeModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     override fun getName() = "FloatingBubble"
 
-    // Called by JS: FloatingBubble.show(tripCount, isOnline)
-    @ReactMethod fun show(tripCount: Int, isOnline: Boolean) {
-        reactApplicationContext.startService(Intent(reactApplicationContext, FloatingBubbleService::class.java).apply {
-            putExtra("action", "show"); putExtra("tripCount", tripCount)
-        })
+    // Called by JS: FloatingBubble.show(tripCount, isOnline, tripsJson)
+    @ReactMethod
+    fun show(tripCount: Int, isOnline: Boolean, tripsJson: String) {
+        reactApplicationContext.startService(
+            Intent(reactApplicationContext, FloatingBubbleService::class.java).apply {
+                putExtra("action", "show")
+                putExtra("tripCount", tripCount)
+                putExtra("tripsJson", tripsJson)
+            }
+        )
+    }
+
+    // Called by JS: FloatingBubble.update(tripCount, tripsJson)
+    @ReactMethod
+    fun update(tripCount: Int, tripsJson: String) {
+        reactApplicationContext.startService(
+            Intent(reactApplicationContext, FloatingBubbleService::class.java).apply {
+                putExtra("action", "update")
+                putExtra("tripCount", tripCount)
+                putExtra("tripsJson", tripsJson)
+            }
+        )
     }
 
     // Called by JS: FloatingBubble.hide()
-    @ReactMethod fun hide() {
-        reactApplicationContext.startService(Intent(reactApplicationContext, FloatingBubbleService::class.java).apply {
-            putExtra("action", "hide")
-        })
+    @ReactMethod
+    fun hide() {
+        reactApplicationContext.startService(
+            Intent(reactApplicationContext, FloatingBubbleService::class.java).apply {
+                putExtra("action", "hide")
+            }
+        )
     }
 
     // Called by JS: FloatingBubble.hasPermission(callback)
-    @ReactMethod fun hasPermission(callback: Callback) {
+    @ReactMethod
+    fun hasPermission(callback: Callback) {
         val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
             Settings.canDrawOverlays(reactApplicationContext)
         else true
@@ -32,12 +53,14 @@ class FloatingBubbleNativeModule(reactContext: ReactApplicationContext) : ReactC
     }
 
     // Called by JS: FloatingBubble.requestPermission()
-    @ReactMethod fun requestPermission() {
+    @ReactMethod
+    fun requestPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             reactApplicationContext.startActivity(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:${reactApplicationContext.packageName}"))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${reactApplicationContext.packageName}")
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         }
     }
