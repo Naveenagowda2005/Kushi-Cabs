@@ -1,0 +1,338 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                   🫧 FLOATING BUBBLE - SIMPLE VISUAL GUIDE                    ║
+║                                                                                ║
+║                            WHAT YOU WILL SEE                                  ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+
+1️⃣  COLLAPSED STATE (Default when app goes to background)
+═════════════════════════════════════════════════════════════════════════════════
+
+    PHONE SCREEN:                      ZOOM IN ON BUBBLE:
+    ┌─────────────────────┐            ┌───────────────────┐
+    │ Other App           │            │   ╱─────────╲     │
+    │ (Maps, Messages...) │            │  │           │    │
+    │                     │            │  │ Kushi [1] │    │
+    │                     │            │  │ Cabs    ▼ │    │
+    │                     │            │  │           │    │
+    │                 ┌─┐ │            │   ╲─────────╱     │
+    │                 │ │ │            │                   │
+    │                 └─┘ │            └───────────────────┘
+    └─────────────────────┘
+      ↑ Floating bubble
+        in corner
+
+   WHAT YOU SEE:
+   • White circle with blue border
+   • "Kushi Cabs" text inside (centered, blue)
+   • Red badge showing "1" (top right - trip count)
+   • Blue dropdown arrow ▼ (top right corner)
+   • Soft shadow beneath
+
+
+2️⃣  EXPANDED STATE (After tapping dropdown arrow)
+═════════════════════════════════════════════════════════════════════════════════
+
+    PHONE SCREEN:                      DETAIL VIEW:
+    ┌─────────────────────┐            ┌───────────────────┐
+    │ Other App           │            │ ╱─────────╲       │
+    │ (Maps, Messages...) │            ││ Kushi [1] ▲       │
+    │                 ┌─┐ │            ││ Cabs              │
+    │                 │ │ │            │╰────────────────────
+    │             ┌───┼─┼───┐          │┌──────────────────┐
+    │             │   │ │   │          ││ ACTIVE │  ₹500   │
+    │             │ • │ │ • │          ││ ───────────────── │
+    │             │   │ │   │          ││ 📍 Pickup Point  │
+    │             │ • │ │ • │          ││    Connaught Pl. │
+    │             │   │ │   │          ││ ───────────────── │
+    │             └───┼─┼───┘          ││ 📍 Dropoff Pt.   │
+    │                 └─┘              ││    Airport Road  │
+    │                                   ││ ───────────────── │
+    │                                   ││ Tap to view     │
+    │                                   │└──────────────────┘
+    └─────────────────────┘            └───────────────────┘
+
+   WHAT YOU SEE:
+   • Bubble still visible at top
+   • Arrow now pointing up ▲ (was pointing down ▼)
+   • Dropdown menu below showing:
+     - Status: "ACTIVE" (red badge)
+     - Fare: "₹500" (blue text)
+     - Pickup location with 📍 icon (red)
+     - Dropoff location with 📍 icon (green)
+     - "Tap to view details" text
+   • White background with subtle shadow
+
+
+3️⃣  AFTER TAPPING BUBBLE (App Opens)
+═════════════════════════════════════════════════════════════════════════════════
+
+    PHONE SCREEN:
+    ┌─────────────────────┐
+    │ Active Trip Screen  │
+    │                     │
+    │ From: Pickup Pt.    │
+    │ To: Dropoff Pt.     │
+    │ Fare: ₹500          │
+    │                     │
+    │ [Call] [Chat] [Map] │
+    │                     │
+    │ Status: Ongoing     │
+    │ ETA: 10 minutes     │
+    │                     │
+    │ (No bubble visible) │
+    └─────────────────────┘
+
+   WHAT YOU SEE:
+   • App opens to Active Trip screen
+   • Floating bubble disappears
+   • Full trip details visible
+   • Can call driver, chat, navigate, etc.
+
+
+═════════════════════════════════════════════════════════════════════════════════
+SIZE COMPARISON
+═════════════════════════════════════════════════════════════════════════════════
+
+    BUBBLE CIRCLE SIZE:
+    
+    360px × 360px (360 device-independent pixels)
+    
+    Imagine a circle roughly the size of:
+    • A golf ball seen from 30cm away
+    • A large coin (but circular)
+    • A watch face
+    
+    TEXT SIZE INSIDE:
+    
+    "Kushi"  → 14px (medium-large text)
+    "Cabs"   → 12px (slightly smaller)
+    
+    BADGE SIZE:
+    
+    28px × 28px (about the size of a thumbtack)
+    Shows: "1" in white text
+
+
+═════════════════════════════════════════════════════════════════════════════════
+COLORS USED
+═════════════════════════════════════════════════════════════════════════════════
+
+    BLUE:        #0066CC  (Kushi brand blue)
+    ░░░░░░░░░░░░░░░░░░░░░
+    Used in: Circle border, text, buttons
+
+    RED:         #FF6B6B  (Active/Alert red)
+    ░░░░░░░░░░░░░░░░░░░░░
+    Used in: Trip count badge, ACTIVE status
+
+    GREEN:       #4CAF50  (Success green)
+    ░░░░░░░░░░░░░░░░░░░░░
+    Used in: Dropoff location icon
+
+    WHITE:       #FFFFFF  (Pure white)
+    ░░░░░░░░░░░░░░░░░░░░░
+    Used in: Circle background, dropdown background
+
+    DARK:        #333333  (Almost black)
+    ░░░░░░░░░░░░░░░░░░░░░
+    Used in: Location text, labels
+
+    GRAY:        #999999  (Medium gray)
+    ░░░░░░░░░░░░░░░░░░░░░
+    Used in: Secondary text
+
+
+═════════════════════════════════════════════════════════════════════════════════
+POSITIONING ON SCREEN
+═════════════════════════════════════════════════════════════════════════════════
+
+    PHONE PORTRAIT:
+    
+    ┌─────────────────────────────┐
+    │                             │  Top
+    │  [Status bar]               │
+    │                             │
+    │                             │
+    │  [Your app content]         │
+    │                             │
+    │                             │
+    │  [Navigation bar]  ┏━━━━┓   │ Bottom-Right
+    │                   ┃[1]▼┃   │ (20px from right,
+    │                   ┗━━━━┛   │  40px from bottom)
+    └─────────────────────────────┘
+    
+    The bubble sits in the bottom-right corner, above the navigation bar.
+
+
+═════════════════════════════════════════════════════════════════════════════════
+INTERACTION GUIDE
+═════════════════════════════════════════════════════════════════════════════════
+
+    USER ACTION                          WHAT HAPPENS
+    ─────────────────────────────────────────────────────────────────────────
+
+    1. App goes to background            → Floating bubble appears
+       (Press Home button)               → Animation: scales in
+
+    2. Tap on bubble circle              → App opens
+                                         → Shows Active Trip screen
+                                         → Bubble disappears
+
+    3. Tap on dropdown arrow (▼)         → Dropdown menu opens
+                                         → Arrow rotates to (▲)
+                                         → Shows trip details
+
+    4. Tap on trip card (in dropdown)    → App opens
+                                         → Shows Active Trip screen
+
+    5. Tap dropdown arrow again (▲)      → Dropdown menu closes
+                                         → Arrow rotates back to (▼)
+
+    6. App comes to foreground           → Bubble disappears
+       (Tap Home or open app)            → Animation: scales out
+
+
+═════════════════════════════════════════════════════════════════════════════════
+TRIP DETAILS IN DROPDOWN
+═════════════════════════════════════════════════════════════════════════════════
+
+    The dropdown shows:
+    
+    ┌──────────────────────────────┐
+    │ STATUS BADGE │ FARE AMOUNT   │  → "ACTIVE" in red | "₹500" in blue
+    ├──────────────────────────────┤
+    │ 📍 Pickup Location           │  → Red location icon
+    │    Specific address here     │     Address shown
+    ├──────────────────────────────┤
+    │ 📍 Dropoff Location          │  → Green location icon
+    │    Specific address here     │     Address shown
+    ├──────────────────────────────┤
+    │ Tap to view details →        │  → Gray text, right-aligned
+    └──────────────────────────────┘
+
+
+═════════════════════════════════════════════════════════════════════════════════
+REAL-WORLD EXAMPLE SCENARIOS
+═════════════════════════════════════════════════════════════════════════════════
+
+    SCENARIO 1: Driver Navigating with Google Maps
+    ─────────────────────────────────────────────────
+    Driver opened Maps app to navigate to pickup point. While using Maps,
+    the floating bubble appears in corner showing:
+    
+    ┌──────────────────┐
+    │ Google Maps      │
+    │                  │
+    │ [Map display]    │  ┏━━━━┓
+    │                  │  ┃[1]▼┃  ← Bubble with trip count
+    │ [Controls]       │  ┗━━━━┛
+    └──────────────────┘
+    
+    Driver can now tap bubble to see trip details without leaving Maps!
+
+
+    SCENARIO 2: Driver Chatting with User
+    ──────────────────────────────────────
+    Driver opened Messages to chat with user. Floating bubble appears
+    showing trip is still active:
+    
+    ┌──────────────────┐
+    │ Messages         │
+    │                  │
+    │ User: Where?     │
+    │ Driver: 5min...  │  ┏━━━━┐
+    │ User: Great!     │  ┃[1]▼┃  ← Shows trip is running
+    │                  │  ┗━━━━┛
+    │ [Type...]        │
+    └──────────────────┘
+    
+    Driver can tap to view full trip details if needed.
+
+
+    SCENARIO 3: Driver in Another App
+    ──────────────────────────────────
+    Driver in Settings, Dialer, or any other app. Bubble still visible:
+    
+    ┌──────────────────┐
+    │ Any App          │
+    │                  │
+    │ [App content]    │  ┏━━━━┓
+    │                  │  ┃[1]▼┃  ← Works with ANY app!
+    │ [More content]   │  ┗━━━━┛
+    └──────────────────┘
+    
+    Bubble works over all apps, providing always-visible trip status.
+
+
+═════════════════════════════════════════════════════════════════════════════════
+ANIMATION BEHAVIOR
+═════════════════════════════════════════════════════════════════════════════════
+
+    APPEAR ANIMATION (When app goes to background):
+    ┌──────────────────────────────────┐
+    │ Frame 1 (0ms):     ┏━┓            │  Start: Very small
+    │                    ┗━┛            │
+    │ Frame 2 (100ms):  ┏━━━━┓          │  Growing...
+    │                  ┃    ┃          │
+    │                  ┗━━━━┛          │
+    │ Frame 3 (200ms): ┏━━━━━┓         │  Almost there...
+    │                 ┃     ┃         │
+    │                 ┗━━━━━┛         │
+    │ Frame 4 (300ms): ┏━━━━━━┓        │  Complete!
+    │                 ┃  [1] ┃        │
+    │                 ┗━━━━━━┛        │
+    └──────────────────────────────────┘
+    
+    Effect: Smooth spring animation, takes ~300-400ms
+
+
+    DROPDOWN OPEN ANIMATION:
+    ┌──────────────────────┐
+    │ Arrow: ▼ → ▲         │  Arrow rotates 180° (100ms)
+    │ Menu: Hidden → Show  │  Menu fades in (100ms)
+    └──────────────────────┘
+
+
+═════════════════════════════════════════════════════════════════════════════════
+IMPORTANT: THIS IS SYSTEM-LEVEL OVERLAY
+═════════════════════════════════════════════════════════════════════════════════
+
+What does this mean?
+
+✅ WORKS EVEN WHEN:
+   • App is in background (minimized)
+   • Different app is in foreground
+   • Screen is locked (may need special handling)
+   • User is using any other app
+
+✅ APPEARS OVER:
+   • Messages, Maps, Camera
+   • Settings, Dialer, Browser
+   • Games, Videos, Social Media
+   • ANY app on the phone!
+
+✅ ALWAYS VISIBLE:
+   • As long as trip is active (in_progress)
+   • Stays on top of everything
+   • User can interact with it from anywhere
+
+✅ DISAPPEARS WHEN:
+   • App comes to foreground
+   • Trip status changes from in_progress
+   • User closes the app
+
+
+═════════════════════════════════════════════════════════════════════════════════
+
+READY TO SEE IT IN ACTION?
+
+Build the APK and test:
+  1. expo prebuild --clean
+  2. cd android && ./gradlew assembleRelease
+  3. Install APK on your phone
+  4. Create an active trip
+  5. Press HOME button
+  6. See the floating bubble appear! 🎉
+
+═════════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,61 @@
+services:
+  - type: web
+    name: kushi-cabs-backend
+    env: node
+    plan: free
+    region: singapore
+    
+    # Build configuration
+    buildCommand: npm install
+    startCommand: npm start
+    
+    # Root directory
+    rootDir: backend
+    
+    # Environment variables
+    envVars:
+      - key: STPL_API_URL
+        value: https://sms.hitechsms.com/app/smsapi/index.php
+      - key: STPL_API_KEY
+        sync: false  # Add via Render dashboard for security
+      - key: STPL_SENDER_ID
+        value: KUSCAB
+      - key: STPL_ROUTE_ID
+        value: "13"
+      - key: STPL_COUNTRY_CODE
+        value: "91"
+      - key: OTP_TTL_SECONDS
+        value: "300"
+      - key: STPL_OTP_TEMPLATE_ID
+        value: "1707177980314073534"
+      - key: STPL_API_QUERY_KEY_FIELD
+        value: key
+      - key: STPL_API_QUERY_MOBILE_FIELD
+        value: contacts
+      - key: STPL_API_QUERY_MESSAGE_FIELD
+        value: msg
+      - key: STPL_API_QUERY_SENDER_FIELD
+        value: senderid
+      - key: STPL_API_QUERY_USERNAME_FIELD
+        value: user
+      - key: STPL_API_QUERY_PASSWORD_FIELD
+        value: passwd
+      - key: STPL_API_QUERY_ROUTE_FIELD
+        value: routeid
+      - key: STPL_API_QUERY_TYPE_FIELD
+        value: type
+      - key: STPL_API_QUERY_TYPE_VALUE
+        value: text
+      - key: STPL_API_QUERY_CAMPAIGN_FIELD
+        value: campaign
+      - key: STPL_API_QUERY_TEMPLATE_FIELD
+        value: template_id
+      - key: STPL_API_QUERY_COUNTRY_FIELD
+        value: country
+      - key: SUPABASE_URL
+        value: https://vofupwsnbcidjnifaihm.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false  # Add via Render dashboard for security
+    
+    # Auto-deploy from Git
+    autoDeploy: true

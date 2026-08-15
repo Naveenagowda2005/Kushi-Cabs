@@ -1,0 +1,222 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    KUSHI CABS APK BUILD - QUICK REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+📍 PROJECT LOCATION:
+   c:\Newfolder\Kushi\Kushi-Cabs-master\newtaxi\apps\unified
+
+───────────────────────────────────────────────────────────────────────────────
+🚀 QUICK START (2 COMMANDS)
+───────────────────────────────────────────────────────────────────────────────
+
+1. cd "c:\Newfolder\Kushi\Kushi-Cabs-master\newtaxi\apps\unified"
+2. eas build --platform android --profile production
+
+Then wait 15-30 minutes for build to complete ⏱️
+
+───────────────────────────────────────────────────────────────────────────────
+✅ FIRST TIME SETUP (Run Once)
+───────────────────────────────────────────────────────────────────────────────
+
+npm install -g expo-cli
+npm install -g eas-cli
+eas login
+
+───────────────────────────────────────────────────────────────────────────────
+🔧 VERIFICATION
+───────────────────────────────────────────────────────────────────────────────
+
+Run this script to check if everything is set up:
+   .\verify-apk-setup.ps1
+
+Required tools:
+   ✓ Node.js (v20+)
+   ✓ npm
+   ✓ expo-cli
+   ✓ eas-cli
+   ✓ Expo account (login with: eas login)
+
+───────────────────────────────────────────────────────────────────────────────
+📦 BUILD PROFILES
+───────────────────────────────────────────────────────────────────────────────
+
+Development:  eas build --platform android --profile development
+              → Fast, debug tools, 150MB, local testing
+
+Production:   eas build --platform android --profile production
+              → Optimized, 80-120MB, recommended testing
+
+Preview:      eas build --platform android --profile preview
+              → Balanced, 100MB, team testing
+
+───────────────────────────────────────────────────────────────────────────────
+⏱️ ESTIMATED TIMES
+───────────────────────────────────────────────────────────────────────────────
+
+Setup (first time):        1-2 hours
+Cloud build:              15-30 minutes
+APK download:             2-5 minutes
+Installation on phone:    2-3 minutes
+First app launch:        10-15 seconds
+───────────────────────────────────────────────────────────────────────────────
+TOTAL FIRST TIME:         2-4 hours (mostly waiting for build)
+SUBSEQUENT BUILDS:        20-35 minutes
+───────────────────────────────────────────────────────────────────────────────
+
+───────────────────────────────────────────────────────────────────────────────
+📱 INSTALL ON PHONE (WiFi Method)
+───────────────────────────────────────────────────────────────────────────────
+
+1. On Phone:
+   Settings → About Phone → Tap "Build Number" 7 times
+   Settings → Developer Options → Wireless Debugging → Enable
+   Note the IP address shown (e.g., 192.168.1.100)
+
+2. On Computer:
+   adb connect 192.168.1.100:5555
+   adb devices  (verify connection)
+   adb install "C:\Path\To\app-release.apk"
+
+3. On Phone:
+   Tap "Kushi Cabs" icon to launch
+
+───────────────────────────────────────────────────────────────────────────────
+🧪 TESTING
+───────────────────────────────────────────────────────────────────────────────
+
+Test Account (configured for development):
+   Phone: 1123456789
+   OTP: 123456
+
+Features to test:
+   ✓ Sign in with OTP
+   ✓ Dashboard loads
+   ✓ View trips
+   ✓ Wallet functionality
+   ✓ Location/GPS
+   ✓ Navigation
+
+───────────────────────────────────────────────────────────────────────────────
+🔍 DEBUGGING
+───────────────────────────────────────────────────────────────────────────────
+
+Check build status:
+   eas build --status
+
+View real-time logs:
+   adb logcat | findstr "Kushi"
+
+Clear app cache:
+   adb shell pm clear com.Kushi_Cabs
+
+Reinstall app:
+   adb uninstall com.Kushi_Cabs
+   adb install app-release.apk
+
+───────────────────────────────────────────────────────────────────────────────
+📚 USEFUL LINKS
+───────────────────────────────────────────────────────────────────────────────
+
+Detailed Guide:      APK_BUILD_DEVELOPER_GUIDE.md
+Full Documentation:  START_HERE_BUILD_APK.md
+Troubleshooting:     TROUBLESHOOTING.md
+
+Expo Docs:           https://docs.expo.dev
+React Native:        https://reactnative.dev
+Android ADB:         https://developer.android.com/tools/adb
+
+───────────────────────────────────────────────────────────────────────────────
+🆘 COMMON ISSUES
+───────────────────────────────────────────────────────────────────────────────
+
+Issue: "eas command not found"
+Fix:   npm install -g eas-cli
+
+Issue: "expo command not found"
+Fix:   npm install -g expo-cli
+
+Issue: "Build failed"
+Fix:   eas build --status (check error)
+       npm cache clean --force
+       npm install --legacy-peer-deps
+       eas build --platform android --profile production
+
+Issue: "App won't install"
+Fix:   adb uninstall com.Kushi_Cabs
+       adb install app-release.apk
+
+Issue: "App crashes immediately"
+Fix:   adb logcat | findstr "Kushi" (check logs)
+       Verify .env has all required variables
+
+Issue: "Phone not detected by ADB"
+Fix:   adb kill-server
+       adb start-server
+       adb connect 192.168.x.x:5555
+
+───────────────────────────────────────────────────────────────────────────────
+💡 PRO TIPS
+───────────────────────────────────────────────────────────────────────────────
+
+1. Use cloud build first (easiest, most reliable)
+2. Test on real device, not emulator (WiFi works better)
+3. Name APK files with date: app-release-2026-08-15.apk
+4. Always check logs: adb logcat | findstr "Kushi"
+5. Keep dependencies updated: npm install
+6. Use development profile for rapid testing
+7. Use production profile for final testing
+
+───────────────────────────────────────────────────────────────────────────────
+📋 CHECKLIST BEFORE BUILDING
+───────────────────────────────────────────────────────────────────────────────
+
+□ Node.js v20+ installed
+□ npm installed
+□ expo-cli installed
+□ eas-cli installed
+□ Expo account created and logged in (eas login)
+□ Project directory exists
+□ package.json exists
+□ app.json exists
+□ eas.json exists
+□ Dependencies installed (npm install)
+□ 20+ GB free disk space
+□ Stable internet connection
+□ Phone has 5+ GB storage
+□ Developer Options enabled on phone
+
+───────────────────────────────────────────────────────────────────────────────
+📞 DOCUMENTATION FILES
+───────────────────────────────────────────────────────────────────────────────
+
+START_HERE_BUILD_APK.md              ← Start here for complete overview
+APK_BUILD_DEVELOPER_GUIDE.md         ← Detailed step-by-step guide  
+APK_BUILD_WIFI_INSTALLATION_GUIDE.md ← WiFi installation details
+verify-apk-setup.ps1                 ← Run to verify setup
+APK_QUICK_REFERENCE.txt              ← This file
+
+───────────────────────────────────────────────────────────────────────────────
+🎯 NEXT STEPS
+───────────────────────────────────────────────────────────────────────────────
+
+1. Run verification:
+   .\verify-apk-setup.ps1
+
+2. If all checks pass, build:
+   cd "c:\Newfolder\Kushi\Kushi-Cabs-master\newtaxi\apps\unified"
+   eas login
+   eas build --platform android --profile production
+
+3. Wait for build to complete (15-30 minutes)
+
+4. Download APK from console output or Expo website
+
+5. Install on phone:
+   adb connect 192.168.x.x:5555
+   adb install app-release.apk
+
+6. Test the app
+
+═══════════════════════════════════════════════════════════════════════════════
+                           HAPPY BUILDING! 🚀
+═══════════════════════════════════════════════════════════════════════════════

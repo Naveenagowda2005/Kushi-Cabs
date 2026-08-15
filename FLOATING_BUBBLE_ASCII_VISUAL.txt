@@ -1,0 +1,422 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                ║
+║          🫧 FLOATING BUBBLE - VISUAL DESIGN (ASCII ART)                       ║
+║                                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+STATE 1: BUBBLE COLLAPSED (CLOSED)
+═══════════════════════════════════════════════════════════════════════════════════
+
+FULL SCREEN VIEW:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                               │
+│  [Background: Other App - Maps, Messaging, etc.]                             │
+│                                                                               │
+│                                                                               │
+│                                                                               │
+│                                                                               │
+│                                                                               │
+│                                                                               │
+│                                                                               │
+│                                                                               │
+│                                                   ┏━━━━━━━━━━━━━━━━━━━━━━┓  │
+│                                                   ┃  🔵 Kushi Cabs [1] ▼ ┃  │
+│                                                   ┃  🔵               🔘 ┃  │
+│                                                   ┃      🔵 Kushi 🔵    ┃  │
+│                                                   ┃         🔵 Cabs     ┃  │
+│                                                   ┃  🔵               🔘 ┃  │
+│                                                   ┃  🔵 Kushi Cabs [1] ▼ ┃  │
+│                                                   ┗━━━━━━━━━━━━━━━━━━━━━━┛  │
+│                                                                               │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+BUBBLE DETAIL VIEW:
+                              
+                         ╭─────────────────╮
+                        ╱                   ╲
+                       │                     │
+                       │   🔵 KUSHI     [1] │  ← Red badge with trip count
+                       │   🔵 CABS        ▼ │  ← Blue dropdown arrow
+                       │                     │     (appears as circular button)
+                       │                     │
+                        ╲                   ╱
+                         ╰─────────────────╯
+
+KEY PARTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Circle Background:     ███ WHITE (#FFFFFF)
+Circle Border:         ███ BLUE (#0066CC) - 3px thick
+Circle Size:           360px × 360px (radius: 180px)
+
+Text (centered):       "Kushi"  (14px, Bold, Blue)
+                       "Cabs"   (12px, Semi-bold, Blue)
+
+Badge [Top-Right]:     ███ RED (#FF6B6B), circular, 28×28px
+                       Shows: "1" (trip count, white text, bold)
+
+Button [Top-Right]:    ███ BLUE (#0066CC), circular, 32×32px
+                       Icon: ▼ (expand-more)
+                       Color: White
+
+Position:              Bottom-Right corner
+Shadow:                Soft shadow beneath
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+STATE 2: BUBBLE EXPANDED (OPENED)
+═══════════════════════════════════════════════════════════════════════════════════
+
+FULL SCREEN VIEW:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                               │
+│  [Background: Other App - Maps, Messaging, etc.]                             │
+│                                                                               │
+│                                                                               │
+│                                                   ┏━━━━━━━━━━━━━━━━━━━━━━┓  │
+│                                                   ┃  🔵 Kushi Cabs [1] ▲ ┃  │
+│                                                   ┗━━━━━━━━━━━━━━━━━━━━━━┛  │
+│                                                   │                        │
+│                                                   ┌────────────────────────┐ │
+│                                                   │ ACTIVE       ₹500      │ │
+│                                                   │─────────────────────────│ │
+│                                                   │ 📍 Pickup Location     │ │
+│                                                   │    Connaught Place...  │ │
+│                                                   │─────────────────────────│ │
+│                                                   │ 📍 Dropoff Location    │ │
+│                                                   │    Indira Gandhi...    │ │
+│                                                   │─────────────────────────│ │
+│                                                   │ Tap to view details → │ │
+│                                                   └────────────────────────┘ │
+│                                                                               │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+DROPDOWN MENU DETAIL VIEW:
+
+                          ┌────────────────────────┐
+                          │  ACTIVE    ₹500        │  ← Status & Amount header
+                          ├────────────────────────┤
+                          │ 📍 Pickup Location     │
+                          │    Connaught Place     │  ← Red pin icon
+                          │    New Delhi, India    │
+                          ├────────────────────────┤
+                          │ 📍 Dropoff Location    │
+                          │    Indira Gandhi...    │  ← Green pin icon
+                          │    New Delhi, India    │
+                          ├────────────────────────┤
+                          │ Tap to view details → │  ← Italic gray text
+                          └────────────────────────┘
+
+DROPDOWN DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Menu Background:       ███ WHITE (#FFFFFF)
+Menu Border:           ███ LIGHT GRAY (#E0E0E0) - 1px
+Menu Size:             280dp width, auto height
+Menu Shadow:           Soft shadow around it
+Border Radius:         12px rounded corners
+Padding:               12dp all sides
+
+Header Row:
+  Status Badge:        ███ RED (#FF6B6B) - left side
+                       Text: "ACTIVE" (white, 10px, bold)
+  Fare Amount:         ███ BLUE (#0066CC) - right side
+                       Text: "₹500" (blue, 14px, bold)
+
+Location Rows:
+  Pickup Icon:         📍 RED (#FF6B6B) - 14px
+  Pickup Label:        "Pickup Location" (12px, black)
+  Pickup Address:      "Connaught Place" (12px, black)
+  
+  Divider:             Light gray line
+  
+  Dropoff Icon:        📍 GREEN (#4CAF50) - 14px
+  Dropoff Label:       "Dropoff Location" (12px, black)
+  Dropoff Address:     "Indira Gandhi Apt" (12px, black)
+
+Footer:
+  Text:                "Tap to view details →" (10px, gray, italic, right-aligned)
+  Margin:              6dp top
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+INTERACTION FLOW
+═══════════════════════════════════════════════════════════════════════════════════
+
+SCENARIO: Driver is driving and goes to check Maps app
+
+STEP 1: Driver in Active Trip
+┌─────────────────────────────────────┐
+│  Active Trip Screen                 │
+│                                     │
+│  From: Pickup Location              │
+│  To: Dropoff Location               │
+│  Fare: ₹500                         │
+│                                     │
+│  [Call] [Chat] [Navigate]          │
+│                                     │
+│  Next: 500m                         │
+│  ETA: 12 minutes                    │
+│                                     │
+└─────────────────────────────────────┘
+
+STEP 2: Driver Presses Home → App Goes to Background
+┌─────────────────────────────────────┐
+│  Maps App (or any other app)        │
+│                                     │
+│  [Map showing location]             │
+│                                     │
+│  [Search bars and controls]         │
+│                                     │
+│                                     │  ┏━━━━━━━━━━━━━━━┓
+│                                     │  ┃ Kushi [1] ▼  ┃  ← BUBBLE APPEARS!
+│                                     │  ┗━━━━━━━━━━━━━━━┛
+└─────────────────────────────────────┘
+
+STEP 3: Driver Taps Dropdown Arrow
+┌─────────────────────────────────────┐
+│  Maps App                           │
+│                                     │
+│  [Map showing location]             │
+│                                     │
+│                                     │  ┏━━━━━━━━━━━━━━━┓
+│                                     │  ┃ Kushi [1] ▲  ┃
+│                                     │  ┗━━━━━━━━━━━━━━━┛
+│                                     │  ┌─────────────────┐
+│                                     │  │ ACTIVE │ ₹500   │
+│                                     │  │ 📍 From: ...    │
+│                                     │  │ 📍 To: ...      │
+│                                     │  │ Tap for details │
+│                                     │  └─────────────────┘
+└─────────────────────────────────────┘
+
+STEP 4: Driver Taps Trip Card → App Opens
+┌─────────────────────────────────────┐
+│  Active Trip Screen                 │
+│                                     │
+│  From: Pickup Location              │
+│  To: Dropoff Location               │
+│  Fare: ₹500                         │
+│                                     │
+│  [Call] [Chat] [Navigate]          │
+│                                     │
+│  Next: 450m                         │
+│  ETA: 10 minutes                    │
+│                                     │  (Bubble disappeared)
+│                                     │
+└─────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+COLOR SCHEME
+═══════════════════════════════════════════════════════════════════════════════════
+
+PRIMARY BLUE (#0066CC):
+  ███████████  Used in: Circle border, text, dropdown arrow button
+  
+RED/ACTIVE (#FF6B6B):
+  ███████████  Used in: Trip count badge, status "ACTIVE" label
+  
+GREEN/LOCATION (#4CAF50):
+  ███████████  Used in: Dropoff location icon
+  
+WHITE (#FFFFFF):
+  ███████████  Used in: Circle background, dropdown background, text on colored
+  
+BLACK (#333333):
+  ███████████  Used in: Location text, labels, primary text
+  
+LIGHT GRAY (#F0F0F0, #E0E0E0):
+  ███████████  Used in: Dividers, borders, subtle backgrounds
+  
+MEDIUM GRAY (#999999):
+  ███████████  Used in: Secondary text, subtle text
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+SIZE SPECIFICATIONS (in Device-Independent Pixels - dp)
+═══════════════════════════════════════════════════════════════════════════════════
+
+Bubble Circle:
+  Width:      360dp
+  Height:     360dp
+  Radius:     180dp
+  Border:     3dp
+  Padding:    20dp
+
+Text:
+  "Kushi":    14sp (bold)
+  "Cabs":     12sp (semi-bold)
+
+Badge:
+  Width:      28dp
+  Height:     28dp
+  Radius:     14dp
+  Border:     2dp
+  Text:       14sp (bold)
+
+Dropdown Button:
+  Width:      32dp
+  Height:     32dp
+  Radius:     16dp
+  Border:     2dp
+  Icon:       20dp
+
+Dropdown Menu:
+  Width:      280dp
+  Max Height: 400dp
+  Padding:    12dp
+  Border:     1dp
+  Radius:     12dp
+
+Status Badge:
+  Padding:    8dp horizontal, 4dp vertical
+  Text:       10sp (bold)
+
+Location Text:
+  Size:       12sp
+  Margin:     6dp
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+ANIMATION TIMING
+═══════════════════════════════════════════════════════════════════════════════════
+
+Bubble Appear:
+  Duration:   300-400ms
+  Type:       Spring animation
+  Effect:     Scale 0 → 1, Opacity 0 → 1
+
+Bubble Disappear:
+  Duration:   200-300ms
+  Type:       Spring animation
+  Effect:     Scale 1 → 0, Opacity 1 → 0
+
+Dropdown Open:
+  Duration:   100-150ms
+  Arrow Rotation: 0° → 180°
+  Menu Opacity:   0 → 1
+
+Dropdown Close:
+  Duration:   100ms
+  Arrow Rotation: 180° → 0°
+  Menu Opacity:   1 → 0
+
+Tap Feedback:
+  Duration:   100-150ms
+  Effect:     Scale 1 → 0.95 → 1
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+RESPONSIVE BEHAVIOR
+═══════════════════════════════════════════════════════════════════════════════════
+
+SMALL SCREENS (< 400px wide):
+┌─────────────────────────────┐
+│ [Other App]                 │
+│                             │
+│                             │
+│                      ┏━━━━┓ │
+│                      ┃[1]▼┃ │  ← Smaller bubble
+│                      ┗━━━━┛ │
+└─────────────────────────────┘
+
+NORMAL SCREENS (400-700px wide):
+┌──────────────────────────────────┐
+│ [Other App]                      │
+│                                  │
+│                                  │
+│                         ┏━━━━━━┓ │
+│                         ┃[1]▼ ┃ │  ← Standard bubble
+│                         ┗━━━━━━┛ │
+└──────────────────────────────────┘
+
+LARGE SCREENS (> 700px wide):
+┌────────────────────────────────────────┐
+│ [Other App]                            │
+│                                        │
+│                                        │
+│                                ┏━━━━━━┓│
+│                                ┃[1]▼ ┃ │  ← Larger bubble
+│                                ┗━━━━━━┛│
+└────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+BEFORE vs AFTER COMPARISON
+═══════════════════════════════════════════════════════════════════════════════════
+
+BEFORE (Without Floating Bubble):
+┌────────────────────────────────────┐
+│ Messages App                       │
+│                                    │
+│ Driver: I'm at your location       │
+│                                    │
+│ User: Great, I see you coming!     │
+│                                    │
+│ Driver: Yes, ETA 5 minutes         │
+│                                    │
+│ User: Thanks!                      │
+│                                    │
+│ [Type message...]                  │
+│                                    │
+│ ❌ No way to see active trip info  │
+│ ❌ Must switch apps back & forth   │
+│ ❌ Easy to lose context            │
+└────────────────────────────────────┘
+
+AFTER (With Floating Bubble):
+┌────────────────────────────────────┐
+│ Messages App                       │
+│                                    │
+│ Driver: I'm at your location       │
+│                                    │
+│ User: Great, I see you coming!     │
+│                                    │
+│ Driver: Yes, ETA 5 minutes         │
+│                                    │
+│ User: Thanks!                      │
+│                                    │
+│ [Type message...]   ┏━━━━━━┓      │
+│                     ┃[1]▼ ┃      │  ✅ Can see trip info instantly
+│                     ┗━━━━━━┛      │  ✅ Can tap to view full details
+│                                    │  ✅ Don't lose message context
+└────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+SHADOW & ELEVATION DETAILS (Android Material Design)
+═══════════════════════════════════════════════════════════════════════════════════
+
+Bubble Circle:
+  Elevation:  12dp
+  Shadow:     0dp offset, 4dp blur, 8dp spread
+  Color:      rgba(0, 102, 204, 30%)
+
+Dropdown Button:
+  Elevation:  8dp
+  Shadow:     0dp offset, 2dp blur, 4dp spread
+  Color:      rgba(0, 102, 204, 40%)
+
+Trip Count Badge:
+  Elevation:  6dp
+  Shadow:     0dp offset, 2dp blur, 4dp spread
+  Color:      rgba(255, 107, 107, 30%)
+
+Dropdown Menu:
+  Elevation:  10dp
+  Shadow:     0dp offset, 4dp blur, 8dp spread
+  Color:      rgba(0, 0, 0, 15%)
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+THIS IS YOUR FLOATING BUBBLE! 🎨
+
+Ready to see it on your phone? Build the APK and test! 🚀
+
+═══════════════════════════════════════════════════════════════════════════════════
