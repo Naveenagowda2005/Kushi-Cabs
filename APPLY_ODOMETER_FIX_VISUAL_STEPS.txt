@@ -1,0 +1,171 @@
+╔═══════════════════════════════════════════════════════════════════════╗
+║                 ODOMETER UPLOAD FIX - VISUAL STEPS                    ║
+║                                                                       ║
+║  Your odometer upload will work after following these simple steps    ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+STEP 1: OPEN SUPABASE DASHBOARD
+────────────────────────────────
+
+   Go to: https://supabase.co
+   
+   [Screenshot: Supabase login page]
+   - Log in with your account
+   - You'll see your projects
+
+
+STEP 2: SELECT YOUR PROJECT
+───────────────────────────
+
+   Click on project: "cqfsirfjwfxvwggjkrvd"
+   
+   [Screenshot: Projects list showing your project]
+   - This is your taxi app database
+   - Click to open it
+
+
+STEP 3: NAVIGATE TO SQL EDITOR
+──────────────────────────────
+
+   Left sidebar: Click "SQL Editor"
+   
+   [Screenshot: Supabase dashboard with SQL Editor highlighted]
+   - This opens the query editor
+   - Where you can run SQL commands
+
+
+STEP 4: CREATE NEW QUERY
+───────────────────────
+
+   Top right button: Click "+ New Query"
+   
+   [Screenshot: SQL Editor with +New Query button]
+   - A blank SQL editor opens
+   - Ready for your fix
+
+
+STEP 5: COPY THE FIX SQL
+───────────────────────
+
+   Option A: From your file
+   - Open: ODOMETER_FIX_SQL.sql (in your TAXI folder)
+   - Select ALL (Ctrl+A)
+   - Copy (Ctrl+C)
+
+   Option B: Manually (if file not found)
+   - Copy the SQL below
+
+
+STEP 6: PASTE INTO SQL EDITOR
+─────────────────────────────
+
+   Click in the SQL editor box
+   Paste: Ctrl+V
+   
+   [Screenshot: SQL editor with pasted code]
+   
+   You should see:
+   ✓ DROP POLICY lines
+   ✓ CREATE POLICY lines
+   ✓ No error squiggles
+
+
+STEP 7: RUN THE FIX
+──────────────────
+
+   Option A: Click "Run" button (blue)
+   Option B: Press Ctrl+Enter
+   
+   [Screenshot: Run button highlighted]
+   - Wait a few seconds...
+
+
+STEP 8: VERIFY SUCCESS
+──────────────────────
+
+   You should see:
+   ✓ "Success" message (bottom right)
+   ✓ No red error boxes
+   ✓ Query completed in X ms
+   
+   [Screenshot: Success notification]
+   
+   If you see errors:
+   ✗ Copy the error text
+   ✗ Retry the paste/run
+
+
+STEP 9: RESTART YOUR APP
+────────────────────────
+
+   Method 1 (Mobile):
+   - Close the app completely
+   - Wait 5 seconds
+   - Reopen the app
+
+   Method 2 (Emulator):
+   - Press Ctrl+C in terminal
+   - Run: npm start
+   - Wait for it to load
+
+   Method 3 (Browser):
+   - Press Ctrl+Shift+R (hard refresh)
+   - Wait 5 seconds
+
+
+STEP 10: TEST THE FIX
+─────────────────────
+
+   ✓ Log in as DRIVER
+   ✓ Go to ACTIVE TRIP
+   ✓ Click "UPLOAD ODOMETER"
+   ✓ Select an image
+   ✓ Click Upload
+
+   Expected result:
+   ✓ Image uploads successfully
+   ✓ Preview shows immediately
+   ✓ No "row violates RLS" error
+   ✓ 🎉 SUCCESS!
+
+
+═════════════════════════════════════════════════════════════════════════
+
+⚠️  IMPORTANT NOTES:
+
+1. Make sure you're in the CORRECT project
+   - Double check: cqfsirfjwfxvwggjkrvd
+   - If different, navigate to the right project first
+
+2. Copy the ENTIRE SQL from ODOMETER_FIX_SQL.sql
+   - Don't skip any lines
+   - Don't edit the SQL
+
+3. If you get an error:
+   - Try running it again
+   - Check you copied the complete SQL
+   - Make sure no characters are missing
+
+
+═════════════════════════════════════════════════════════════════════════
+
+🕐 TIME NEEDED: About 5 minutes total
+
+   1-2 min: Open Supabase & SQL Editor
+   1-2 min: Copy and paste SQL
+   1   min: Run the SQL
+   1   min: Restart app & test
+
+
+═════════════════════════════════════════════════════════════════════════
+
+✅ YOU'RE DONE!
+
+Once the fix is applied:
+✓ Drivers can upload odometer images
+✓ No more "row violates RLS policy" errors
+✓ Uploads complete in seconds
+✓ System works as designed
+
+
+═════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,24 @@
+========================================
+QUICK FIX - COMMISSION ERROR
+========================================
+
+ERROR: "column \"updated_at\" of relation \"trips\" does not exist"
+
+LOCATION: When clicking "Collected" button on trip completion screen
+
+QUICK FIX (2 minutes):
+1. Open Supabase Dashboard: https://supabase.com/dashboard
+2. Select project: vofupwsnbcidjnifaihm
+3. Go to SQL Editor
+4. Open file: newtaxi/HOTFIX_COMMISSION_UPDATED_AT.sql
+5. Copy the SQL code
+6. Paste into SQL Editor
+7. Click RUN
+8. Done! ✅
+
+TEST:
+- Complete a trip
+- Click "Yes, Money Collected"
+- Should work now without error
+
+========================================

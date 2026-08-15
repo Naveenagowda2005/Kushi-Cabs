@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Kushi Cabs",
+    "slug": "kushicabs-unified",
+    "version": "1.0.0",
+    "icon": "./app-icon.png",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "kushicabs",
+    "splash": {
+      "image": "./app-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#001a33"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyAGZ5ps5kpMnfbDPox8kuN4IoWMSO0TeAY"
+      }
+    },
+    "android": {
+      "versionCode": 18,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAGZ5ps5kpMnfbDPox8kuN4IoWMSO0TeAY"
+        }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.Kushi_Cabs"
+    },
+    "web": {
+      "favicon": "./app-icon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Kushi Cabs to use your location for navigation and trip tracking.",
+          "locationWhenInUsePermission": "Allow Kushi Cabs to use your location for navigation."
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c40895af-5ab6-416c-98be-453cd0be21fc"
+      }
+    }
+  }
+}

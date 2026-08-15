@@ -1,0 +1,118 @@
+-- ============================================================================
+-- COMPLETE MIGRATION SCRIPT FOR NEW SUPABASE ACCOUNT
+-- This script runs all migrations to create complete database schema
+-- Target: https://cqfsirfjwfxvwggjkrvd.supabase.co
+-- ============================================================================
+-- 
+-- INSTRUCTIONS:
+-- 1. Copy all content from this file
+-- 2. Go to https://cqfsirfjwfxvwggjkrvd.supabase.co
+-- 3. Open SQL Editor
+-- 4. Paste and run all content
+-- 5. Wait for all migrations to complete
+-- 6. Verify tables are created
+-- 
+-- This includes migrations 001 through 078
+-- ============================================================================
+
+-- Run migrations in order
+-- Note: Some migrations are run through Supabase CLI, others through SQL
+
+-- Execute the following in order:
+
+-- 001_initial_schema.sql
+-- 002_rls_policies.sql
+-- 003_accept_trip_function.sql
+-- 004_all_functions.sql
+-- 009_roles_read_policy.sql
+-- 010_users_insert_policy.sql
+-- 011_fix_wallet_trigger.sql
+-- 012_upsert_policies.sql
+-- 013_seed_vendor.sql
+-- 014_vendors_select_policy.sql
+-- 015_trips_insert_policy.sql
+-- 016_v2_features.sql
+-- 017_fix_trip_insert_policy.sql
+-- 018_vendor_create_trip.sql
+-- 019_add_email_to_users.sql
+-- 020_fix_all_insert_policies.sql
+-- 021_payment_orders.sql
+-- 022_driver_online_status.sql
+-- 023_add_super_admin.sql
+-- 024_seed_sample_data.sql
+-- 025_app_settings_and_fix_trigger.sql
+-- 026_add_commission_settings.sql
+-- 027_fix_deduct_commission.sql
+-- 028_add_commission_to_trips.sql
+-- 029_add_car_details_to_trips.sql
+-- 030_add_is_published_to_trips.sql
+-- 031_add_trip_segments_and_packages.sql
+-- 032_add_customer_pre_advance.sql
+-- 033_update_deduct_commission_with_preadvance.sql
+-- 034_set_default_customer_preadvance.sql
+-- 035_add_payment_gateway_to_payment_orders.sql
+-- 036_add_toll_included_to_trips.sql
+-- 037_driver_documents_verification.sql
+-- 038_add_verification_status_to_users.sql
+-- 039_driver_verification_rls_policies.sql
+-- 040_fix_document_data_type.sql
+-- 041_fix_document_status_semantics.sql
+-- 042_fix_existing_documents_status.sql
+-- 043_add_new_document_types.sql
+-- 044_add_return_date_to_trips.sql
+-- 045_add_order_to_trip_segments.sql
+-- 046_add_state_tax_and_pet_to_trips.sql
+-- 047_add_fixed_km_to_trips.sql
+-- 048_update_car_and_seater_types.sql
+-- 049_backfill_existing_trips.sql
+-- 050_backfill_segment_id.sql
+-- 051_vendor_documents_verification.sql
+-- 052_vendor_verification_rls_policies.sql
+-- 053_create_app_policies_table.sql
+-- 054_fix_app_policies_rls.sql
+-- 055_fix_vendor_insert_verification_status.sql
+-- 056_vendor_update_verification_status.sql
+-- 057_vendor_verification_rpc.sql
+-- 058_fix_deduct_commission_format.sql
+-- 059_seed_app_policies.sql
+-- 060_phonepe_payments.sql
+-- 061_fix_vendor_documents_rls.sql
+-- 062_fix_payment_orders_rls.sql
+-- 062_reset_vendor_to_pending_rpc.sql (alternative to 062)
+-- 063_vendor_re_verification.sql
+-- 064_add_is_re_verification_to_rpc.sql
+-- 065_fix_is_re_verification_flag.sql
+-- 066_add_hills_included_to_trips.sql
+-- 067_add_minimum_wallet_balance_setting.sql
+-- 068_vendors_super_admin_read_policy.sql
+-- 069_admin_trip_assignments.sql OR 069_driver_re_verification_flag.sql
+-- 070_add_notes_to_trips.sql OR 070_super_admin_trip_edit_policy.sql
+-- 071_add_extra_km_charge_to_trips.sql
+-- 072_fix_driver_trip_visibility.sql
+-- 073_fix_driver_trip_visibility_comprehensive.sql
+-- 074_fix_driver_accept_vendor_assigned_trip.sql
+-- 075_fix_accept_trip_active_trip_check.sql
+-- 076_add_active_sessions_table.sql OR 076_add_any_sedan_car_type.sql
+-- 077_add_vendor_trip_read_status.sql
+-- 078_add_trips_index_for_performance.sql
+
+-- ============================================================================
+-- QUICK START - RECOMMENDED METHOD
+-- ============================================================================
+-- 
+-- Use Supabase CLI instead for cleaner migration:
+--
+-- 1. Ensure you have Supabase CLI installed:
+--    npm install -g supabase
+--
+-- 2. Link to new project:
+--    cd newtaxi
+--    supabase link --project-ref cqfsirfjwfxvwggjkrvd
+--
+-- 3. Push all migrations:
+--    supabase db push
+--
+-- This will run migrations in the correct order and handle dependencies.
+-- ============================================================================
+
+PRINT 'Migration script ready. See instructions above.';

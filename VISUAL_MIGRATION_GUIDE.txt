@@ -1,0 +1,270 @@
+═══════════════════════════════════════════════════════════════════════════════════
+VISUAL STEP-BY-STEP MIGRATION GUIDE
+═══════════════════════════════════════════════════════════════════════════════════
+
+STEP 1: COUNT DATA IN OLD ACCOUNT
+─────────────────────────────────────────────────────────────────────────────────
+
+1. Open browser → https://vofupwsnbcidjnifaihm.supabase.co
+   ┌─────────────────────────────────────────────────────────┐
+   │ Supabase Dashboard - OLD Account                        │
+   │ [Projects] > [Your Project]                             │
+   └─────────────────────────────────────────────────────────┘
+
+2. Left sidebar → Click "SQL Editor"
+   ┌─────────────────────────────────────────────────────────┐
+   │ LEFT SIDEBAR:                                           │
+   │ ├── Authentication                                      │
+   │ ├── Database                                            │
+   │ ├── Storage                                             │
+   │ ├── SQL Editor ← CLICK HERE                            │
+   │ └── ...                                                 │
+   └─────────────────────────────────────────────────────────┘
+
+3. Top area → Click "New Query"
+   ┌─────────────────────────────────────────────────────────┐
+   │ [New Query] [Saved queries...]                          │
+   │  ↑ CLICK THIS                                           │
+   └─────────────────────────────────────────────────────────┘
+
+4. Paste this into editor:
+   ┌─────────────────────────────────────────────────────────┐
+   │ SELECT 'Users: ' || COUNT(*)::TEXT FROM users UNION ALL │
+   │ SELECT 'Vendors: ' || COUNT(*)::TEXT FROM vendors ...   │
+   │                                                          │
+   │ [Run] [Format] [Save]                                   │
+   │  ↑ CLICK RUN                                            │
+   └─────────────────────────────────────────────────────────┘
+
+5. Results show below:
+   ┌─────────────────────────────────────────────────────────┐
+   │ QUERY RESULTS:                                          │
+   │ ┌──────────┐                                            │
+   │ │?column  │                                            │
+   │ ├──────────┤                                            │
+   │ │Users: 5  │ ← WRITE THIS DOWN                         │
+   │ │Vendors:2 │ ← WRITE THIS DOWN                         │
+   │ │Drivers:3 │ ← WRITE THIS DOWN                         │
+   │ │Trips: 10 │ ← WRITE THIS DOWN                         │
+   │ │...       │                                            │
+   │ └──────────┘                                            │
+   └─────────────────────────────────────────────────────────┘
+
+✅ SAVE THESE NUMBERS FOR VERIFICATION LATER
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+STEP 2: EXPORT DATA FROM OLD ACCOUNT
+─────────────────────────────────────────────────────────────────────────────────
+
+1. Still in OLD Account SQL Editor
+2. Click "New Query" again
+3. Open file: EXPORT_DATA_FROM_OLD_ACCOUNT.sql
+4. Copy ALL content from that file
+5. Paste into SQL Editor
+6. Click [Run]
+
+7. Wait for results (takes ~1 minute)
+8. Results will show:
+   ┌─────────────────────────────────────────────────────────┐
+   │ USERS:                                                  │
+   │ ┌─────────────────────────────────────────────────────┐ │
+   │ │ id          │ phone      │ name    │ role │ email   │ │
+   │ ├─────────────────────────────────────────────────────┤ │
+   │ │ uuid-123    │ 9876543210 │ John    │ 1    │ j@a.com │ │
+   │ │ uuid-456    │ 9876543211 │ Jane    │ 1    │ j@b.com │ │
+   │ └─────────────────────────────────────────────────────┘ │
+   │                                                          │
+   │ VENDORS:                                                │
+   │ ┌─────────────────────────────────────────────────────┐ │
+   │ │ id   │ user_id │ company_name │ status │ ...        │ │
+   │ └─────────────────────────────────────────────────────┘ │
+   │                                                          │
+   │ ... (and more tables)                                   │
+   └─────────────────────────────────────────────────────────┘
+
+9. Top right → Click [Download] (or copy manually)
+10. Save file as: data_export.csv
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+STEP 3: IMPORT DATA TO NEW ACCOUNT
+─────────────────────────────────────────────────────────────────────────────────
+
+1. Open NEW browser tab → https://cqfsirfjwfxvwggjkrvd.supabase.co
+   ┌─────────────────────────────────────────────────────────┐
+   │ Supabase Dashboard - NEW Account                        │
+   │ [Projects] > [Your Project]                             │
+   └─────────────────────────────────────────────────────────┘
+
+2. Left sidebar → Click "SQL Editor"
+3. Click "New Query"
+
+4. Open file: IMPORT_DATA_TO_NEW_ACCOUNT.sql
+5. Copy ALL content
+
+6. Paste into NEW Account SQL Editor
+   ┌─────────────────────────────────────────────────────────┐
+   │ ALTER TABLE wallets DISABLE TRIGGER ALL;               │
+   │ ...                                                     │
+   │ INSERT INTO users (id, phone, name, role, email...)    │
+   │ VALUES                                                  │
+   │ -- Paste your data here                                │
+   │ ON CONFLICT (id) DO NOTHING;                           │
+   │                                                         │
+   │ ...                                                     │
+   │ [Run]                                                   │
+   └─────────────────────────────────────────────────────────┘
+
+7. Now you need to fill in the VALUES sections:
+   ┌─────────────────────────────────────────────────────────┐
+   │ Step by step:                                           │
+   │ 1. Open data_export.csv in notepad                      │
+   │ 2. Find USERS: section                                  │
+   │ 3. Copy the data rows                                   │
+   │ 4. Back in SQL Editor                                   │
+   │ 5. Find "INSERT INTO users" section                     │
+   │ 6. Replace "-- Paste your data here" with copied data   │
+   │ 7. Format as SQL:                                       │
+   │    ('uuid-1', '9876543210', 'John', '1', 'j@a.com'),   │
+   │    ('uuid-2', '9876543211', 'Jane', '1', 'j@b.com'),   │
+   │ 8. Repeat for vendors, drivers, trips, etc             │
+   └─────────────────────────────────────────────────────────┘
+
+8. When filled in, looks like:
+   ┌─────────────────────────────────────────────────────────┐
+   │ INSERT INTO users (id, phone, name, role, email)        │
+   │ VALUES                                                  │
+   │ ('uuid-123', '9876543210', 'John', 'role-1', 'j@a.co'),│
+   │ ('uuid-456', '9876543211', 'Jane', 'role-1', 'j@b.co') │
+   │ ON CONFLICT (id) DO NOTHING;                           │
+   │                                                         │
+   │ INSERT INTO vendors (id, user_id, company_name...)      │
+   │ VALUES                                                  │
+   │ ...                                                     │
+   └─────────────────────────────────────────────────────────┘
+
+9. Click [Run]
+10. Should see: "Query completed successfully"
+    ┌─────────────────────────────────────────────────────────┐
+    │ Query completed successfully in 1.2 seconds            │
+    │ (affecting 5 rows)                                      │
+    └─────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+STEP 4: VERIFY MIGRATION WORKED
+─────────────────────────────────────────────────────────────────────────────────
+
+1. Still in NEW Account SQL Editor
+2. Click "New Query" again
+3. Paste this:
+   ┌─────────────────────────────────────────────────────────┐
+   │ SELECT 'Users: ' || COUNT(*)::TEXT FROM users UNION ALL │
+   │ SELECT 'Vendors: ' || COUNT(*)::TEXT FROM vendors       │
+   │ ...                                                     │
+   └─────────────────────────────────────────────────────────┘
+
+4. Click [Run]
+
+5. Compare results with Step 1 numbers:
+   ┌─────────────────────────────────────────────────────────┐
+   │ STEP 1 (OLD Account)  │  STEP 4 (NEW Account)          │
+   │ Users: 5              │  Users: 5              ✅ MATCH │
+   │ Vendors: 2            │  Vendors: 2            ✅ MATCH │
+   │ Drivers: 3            │  Drivers: 3            ✅ MATCH │
+   │ Trips: 10             │  Trips: 10             ✅ MATCH │
+   │                                                         │
+   │ If all match → MIGRATION SUCCESSFUL! 🎉                │
+   └─────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+STEP 5: TEST YOUR APP
+─────────────────────────────────────────────────────────────────────────────────
+
+1. Go back to your app (phone/computer)
+2. Close app completely (swipe away on phone, close terminal)
+3. Restart app
+4. Try to login:
+   ┌─────────────────────────────────────────────────────────┐
+   │ TAXI APP LOGIN                                          │
+   │ ┌───────────────────────────────────────────────────┐  │
+   │ │ Phone Number: [9876543210____________]            │  │
+   │ │                                                   │  │
+   │ │ [Get OTP]                                         │  │
+   │ └───────────────────────────────────────────────────┘  │
+   │ (use a phone number from migrated data)                │
+   └─────────────────────────────────────────────────────────┘
+
+5. Verify you can see:
+   ┌─────────────────────────────────────────────────────────┐
+   │ HOME SCREEN                                             │
+   │ ✅ Profile loads                                        │
+   │ ✅ Trips show (or "No trips" if no trips assigned)     │
+   │ ✅ Wallet balance shows                                │
+   │ ✅ Transactions show                                   │
+   │                                                         │
+   │ If all these work → APP IS WORKING! 🎉                │
+   └─────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+TIMING
+─────────────────────────────────────────────────────────────────────────────────
+
+Step 1: Count                 5 minutes
+Step 2: Export                10 minutes
+Step 3: Import                15 minutes
+Step 4: Verify                5 minutes
+Step 5: Test app              10 minutes
+─────────────────────────────────────────────────────────────────────────────────
+TOTAL TIME:                   ~45 minutes
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+TROUBLESHOOTING QUICK FIXES
+─────────────────────────────────────────────────────────────────────────────────
+
+PROBLEM: "Syntax error"
+→ Check for quotes, commas, and parentheses in data
+→ Look at the exact SQL error message
+→ Copy just one row to test format
+
+PROBLEM: "Foreign key violation"
+→ Make sure USERS imported before VENDORS/DRIVERS
+→ Check that user_id values exist in users table
+
+PROBLEM: "Counts don't match"
+→ One table didn't import completely
+→ Check for SQL error messages
+→ Count individual tables to find which one failed
+→ Re-run just that table's import
+
+PROBLEM: "App says 'Connection failed'"
+→ Restart app completely
+→ Check .env file has NEW account URL
+→ Try a different network (WiFi vs cellular)
+
+PROBLEM: "App crashes on login"
+→ Check that user_id from migrated data is valid
+→ Try with a different user
+→ Check app logs for error message
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+FINAL CHECKLIST
+─────────────────────────────────────────────────────────────────────────────────
+
+□ Step 1: Noted data counts from OLD account
+□ Step 2: Exported data successfully from OLD account
+□ Step 3: Imported data to NEW account (no errors)
+□ Step 4: Verified counts match
+□ Step 5: App works and shows migrated data
+□ Next: Keep OLD account for 30 days as backup
+□ Next: Monitor NEW account for issues
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+You're ready! Start with STEP 1 now.
+═══════════════════════════════════════════════════════════════════════════════════
