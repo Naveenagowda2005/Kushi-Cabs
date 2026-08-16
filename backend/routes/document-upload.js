@@ -22,7 +22,12 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = supabaseUrl && supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
   : null;
 
 /**
@@ -357,6 +362,120 @@ router.get('/list-documents/:driverId', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in list-documents:', error);
+    res.status(500).json({
+      error: 'Server error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/upload/populate-missing-urls
+ * Populate missing document_url fields for existing documents in storage
+ * This migration script fixes documents uploaded before the URL-saving fix
+ */
+router.post('/populate-missing-urls', async (req, res) => {
+  try {
+    console.log('📋 Starting document URL population migration...');
+
+    if (!supabase) {
+      return res.status(500).json({
+        error: 'Backend not configured',
+        message: 'Supabase credentials missing'
+      });
+    }
+
+    // Get all driver_documents where document_url is NULL or empty
+    const { data: docsWithoutUrl, error: fetchError } = await supabase
+      .from('driver_documents')
+      .select('id, driver_id, document_type, storage_path')
+      .or('document_url.is.null,document_url.eq.""');
+
+    if (fetchError) {
+      console.error('❌ Error fetching documents without URLs:', fetchError.message);
+      return res.status(500).json({
+        error: 'Failed to fetch documents',
+        message: fetchError.message
+      });
+    }
+
+    console.log(`📄 Found ${docsWithoutUrl?.length || 0} documents without URLs`);
+
+    let updated = 0;
+    let failed = 0;
+
+    // For each document without URL, try to find it in storage and generate URL
+    for (const doc of (docsWithoutUrl || [])) {
+      try {
+        // Try common storage path patterns
+        const possiblePaths = [
+          `drivers/${doc.driver_id}/${doc.document_type}.jpg`,
+          `drivers/${doc.driver_id}/${doc.document_type}.png`,
+          doc.storage_path, // Use stored path if available
+        ].filter(Boolean);
+
+        let foundPath = null;
+
+        // Try to get public URL for each possible path
+        for (const path of possiblePaths) {
+          try {
+            const { data: publicUrlData } = supabase.storage
+              .from('driver-documents')
+              .getPublicUrl(path);
+
+            // Check if file exists by trying to fetch it
+            if (publicUrlData.publicUrl) {
+              foundPath = path;
+              console.log(`  ✅ Found: ${doc.document_type} at ${foundPath}`);
+              break;
+            }
+          } catch (e) {
+            // Continue to next path
+          }
+        }
+
+        if (foundPath) {
+          const { data: publicUrlData } = supabase.storage
+            .from('driver-documents')
+            .getPublicUrl(foundPath);
+
+          // Update database with the URL
+          const { error: updateError } = await supabase
+            .from('driver_documents')
+            .update({
+              document_url: publicUrlData.publicUrl,
+              storage_path: foundPath,
+            })
+            .eq('id', doc.id);
+
+          if (updateError) {
+            console.error(`  ❌ Failed to update ${doc.document_type}:`, updateError.message);
+            failed++;
+          } else {
+            updated++;
+          }
+        } else {
+          console.log(`  ⚠️ Not found in storage: ${doc.document_type}`);
+          failed++;
+        }
+      } catch (e) {
+        console.error(`  ❌ Error processing ${doc.document_type}:`, e.message);
+        failed++;
+      }
+    }
+
+    console.log(`✅ Migration complete: ${updated} updated, ${failed} failed`);
+
+    res.json({
+      success: true,
+      message: 'Document URL population completed',
+      updated,
+      failed,
+      total: (docsWithoutUrl || []).length
+    });
+
+  } catch (error) {
+    console.error('❌ Error in populate-missing-urls:', error);
     res.status(500).json({
       error: 'Server error',
       message: error.message
