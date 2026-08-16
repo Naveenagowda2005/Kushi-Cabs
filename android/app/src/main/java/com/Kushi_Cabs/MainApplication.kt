@@ -1,4 +1,3 @@
-
 package com.Kushi_Cabs
 
 import android.app.Application
@@ -26,7 +25,6 @@ class MainApplication : Application(), ReactApplication {
             val packages = PackageList(this).packages
             // Packages that cannot be autolinked yet can be added manually here, for example:
             // packages.add(new MyReactNativePackage());
-            packages.add(FloatingBubblePackage())
             return packages
           }
 
